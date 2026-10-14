@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" role="img" aria-labelledby="title description">
+  <title id="title">Fictional athlete illustration</title>
+  <desc id="description">Abstract sports illustration used instead of photographs of real athletes.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#dcecff"/>
+      <stop offset="1" stop-color="#eef5ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="420" fill="url(#background)"/>
+  <circle cx="645" cy="94" r="110" fill="#c8e0ff" opacity=".7"/>
+  <circle cx="142" cy="356" r="170" fill="#d6e8ff" opacity=".75"/>
+  <path d="M400 90c-42 0-72 31-72 72 0 36 22 62 51 70l-34 27c-50 39-79 98-79 161h268c0-63-29-122-79-161l-34-27c29-8 51-34 51-70 0-41-30-72-72-72Z" fill="#3d8af7"/>
+  <circle cx="400" cy="158" r="38" fill="#f5c5a8"/>
+  <path d="M327 143c8-51 34-75 73-75s65 24 73 75c-19-16-44-24-73-24s-54 8-73 24Z" fill="#1f2a37"/>
+  <path d="m349 255 51 40 51-40 42 45-93 92-93-92 42-45Z" fill="#fff" opacity=".94"/>
+</svg>

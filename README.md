@@ -20,6 +20,8 @@ The current interface is a frontend prototype. Authentication, verification, rea
 - Tailwind CSS
 - Node.js seed script and JSON sample data
 
+See [`docs/BUILD_AND_ARCHITECTURE.md`](./docs/BUILD_AND_ARCHITECTURE.md) for the application structure, data flow, route guide, and development workflow.
+
 ## Getting started
 
 ### Prerequisites
@@ -46,9 +48,11 @@ npm run build
 
 ## Sample data
 
-The generated sample dataset is in [`data/athletes.json`](./data/athletes.json), and its dependency-free generator is in [`data/seed.mjs`](./data/seed.mjs). It contains 30 fictional adult athlete profiles across all 17 Philippine administrative regions. See [`data/README.md`](./data/README.md) for the schema and regeneration details.
+The generated sample dataset is in [`data/athletes.json`](./data/athletes.json), and its dependency-free generator is in [`data/seed.mjs`](./data/seed.mjs). It contains 30 fictional adult athlete profiles across all 17 Philippine administrative regions. Each profile has an ID, fictional name, sport, adult age, height in centimeters, region code and name, province or locality, fictional bio and achievements, verification demo flag, mock funding goal and raised amount, funding progress, mock votes, and ranking.
 
 Never replace seed examples with real athlete identities, contact details, proof documents, or payment information. Keep all demo funding and vote values clearly fictional.
+
+See [`data/README.md`](./data/README.md) for the complete schema, regeneration instructions, and synthetic-data rules.
 
 ## Project principles
 

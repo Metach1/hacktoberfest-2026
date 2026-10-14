@@ -1,0 +1,605 @@
+{
+  "description": "Entirely fictional adult profiles and mock metrics for local development and demos. No real athlete data.",
+  "athletes": [
+    {
+      "id": "ath-001",
+      "name": "Mikaela Solis",
+      "sport": "Track and Field",
+      "age": 23,
+      "heightCm": 164,
+      "regionCode": "NCR",
+      "region": "National Capital Region",
+      "provinceOrLocality": "Quezon City",
+      "bio": "A fictional middle-distance runner focused on consistent community training.",
+      "achievements": [
+        "Fictional Metro Manila open meet finisher"
+      ],
+      "verified": true,
+      "fundingGoal": 80000,
+      "fundingRaised": 28000,
+      "fundingProgress": 35,
+      "votes": 124,
+      "ranking": 13
+    },
+    {
+      "id": "ath-002",
+      "name": "Tomas Alvar",
+      "sport": "Basketball",
+      "age": 21,
+      "heightCm": 178,
+      "regionCode": "CAR",
+      "region": "Cordillera Administrative Region",
+      "provinceOrLocality": "Baguio City",
+      "bio": "A fictional guard who helps organize youth-free adult recreational leagues.",
+      "achievements": [
+        "Fictional Cordillera invitational participant"
+      ],
+      "verified": true,
+      "fundingGoal": 65000,
+      "fundingRaised": 22000,
+      "fundingProgress": 34,
+      "votes": 97,
+      "ranking": 21
+    },
+    {
+      "id": "ath-003",
+      "name": "Neri Villanueva",
+      "sport": "Volleyball",
+      "age": 24,
+      "heightCm": 169,
+      "regionCode": "Region I",
+      "region": "Ilocos Region",
+      "provinceOrLocality": "Vigan City, Ilocos Sur",
+      "bio": "A fictional volleyball setter supporting a local adult club.",
+      "achievements": [
+        "Fictional Ilocos club tournament finalist"
+      ],
+      "verified": true,
+      "fundingGoal": 72000,
+      "fundingRaised": 31000,
+      "fundingProgress": 43,
+      "votes": 88,
+      "ranking": 24
+    },
+    {
+      "id": "ath-004",
+      "name": "Ivo Santiago",
+      "sport": "Cycling",
+      "age": 26,
+      "heightCm": 172,
+      "regionCode": "Region II",
+      "region": "Cagayan Valley",
+      "provinceOrLocality": "Tuguegarao City, Cagayan",
+      "bio": "A fictional endurance cyclist preparing for a regional road event.",
+      "achievements": [
+        "Fictional Cagayan Valley road event finisher"
+      ],
+      "verified": true,
+      "fundingGoal": 90000,
+      "fundingRaised": 40000,
+      "fundingProgress": 44,
+      "votes": 112,
+      "ranking": 17
+    },
+    {
+      "id": "ath-005",
+      "name": "Amara de Vera",
+      "sport": "Arnis",
+      "age": 22,
+      "heightCm": 160,
+      "regionCode": "Region III",
+      "region": "Central Luzon",
+      "provinceOrLocality": "San Fernando, Pampanga",
+      "bio": "A fictional arnis practitioner training for a regional demonstration.",
+      "achievements": [
+        "Fictional Central Luzon arnis medalist"
+      ],
+      "verified": true,
+      "fundingGoal": 60000,
+      "fundingRaised": 18000,
+      "fundingProgress": 30,
+      "votes": 76,
+      "ranking": 28
+    },
+    {
+      "id": "ath-006",
+      "name": "Paolo Dizon",
+      "sport": "Weightlifting",
+      "age": 25,
+      "heightCm": 170,
+      "regionCode": "Region IV-A",
+      "region": "CALABARZON",
+      "provinceOrLocality": "Lipa City, Batangas",
+      "bio": "A fictional weightlifter seeking support for equipment and travel.",
+      "achievements": [
+        "Fictional Batangas strength meet participant"
+      ],
+      "verified": true,
+      "fundingGoal": 85000,
+      "fundingRaised": 51000,
+      "fundingProgress": 60,
+      "votes": 146,
+      "ranking": 8
+    },
+    {
+      "id": "ath-007",
+      "name": "Lian Mercado",
+      "sport": "Swimming",
+      "age": 20,
+      "heightCm": 166,
+      "regionCode": "Region IV-B",
+      "region": "MIMAROPA",
+      "provinceOrLocality": "Calapan City, Oriental Mindoro",
+      "bio": "A fictional swimmer balancing training with community coaching.",
+      "achievements": [
+        "Fictional MIMAROPA swim meet finalist"
+      ],
+      "verified": true,
+      "fundingGoal": 70000,
+      "fundingRaised": 24000,
+      "fundingProgress": 34,
+      "votes": 91,
+      "ranking": 23
+    },
+    {
+      "id": "ath-008",
+      "name": "Sela Magsino",
+      "sport": "Boxing",
+      "age": 27,
+      "heightCm": 163,
+      "regionCode": "Region V",
+      "region": "Bicol Region",
+      "provinceOrLocality": "Naga City, Camarines Sur",
+      "bio": "A fictional amateur boxer working toward a regional tournament.",
+      "achievements": [
+        "Fictional Bicol boxing invitational finalist"
+      ],
+      "verified": true,
+      "fundingGoal": 95000,
+      "fundingRaised": 33000,
+      "fundingProgress": 35,
+      "votes": 139,
+      "ranking": 10
+    },
+    {
+      "id": "ath-009",
+      "name": "Renzo Ledesma",
+      "sport": "Football",
+      "age": 23,
+      "heightCm": 175,
+      "regionCode": "Region VI",
+      "region": "Western Visayas",
+      "provinceOrLocality": "Iloilo City, Iloilo",
+      "bio": "A fictional midfielder representing a community adult football club.",
+      "achievements": [
+        "Fictional Western Visayas league participant"
+      ],
+      "verified": true,
+      "fundingGoal": 76000,
+      "fundingRaised": 29000,
+      "fundingProgress": 38,
+      "votes": 105,
+      "ranking": 19
+    },
+    {
+      "id": "ath-010",
+      "name": "Tala Cordero",
+      "sport": "Volleyball",
+      "age": 22,
+      "heightCm": 168,
+      "regionCode": "Region VII",
+      "region": "Central Visayas",
+      "provinceOrLocality": "Tagbilaran City, Bohol",
+      "bio": "A fictional volleyball outside hitter from an adult community team.",
+      "achievements": [
+        "Fictional Central Visayas cup finalist"
+      ],
+      "verified": true,
+      "fundingGoal": 68000,
+      "fundingRaised": 37000,
+      "fundingProgress": 54,
+      "votes": 154,
+      "ranking": 6
+    },
+    {
+      "id": "ath-011",
+      "name": "Nico Abellanosa",
+      "sport": "Dragon Boat",
+      "age": 28,
+      "heightCm": 180,
+      "regionCode": "Region VIII",
+      "region": "Eastern Visayas",
+      "provinceOrLocality": "Tacloban City, Leyte",
+      "bio": "A fictional paddler training with a regional adult crew.",
+      "achievements": [
+        "Fictional Eastern Visayas regatta finisher"
+      ],
+      "verified": true,
+      "fundingGoal": 88000,
+      "fundingRaised": 30000,
+      "fundingProgress": 34,
+      "votes": 83,
+      "ranking": 26
+    },
+    {
+      "id": "ath-012",
+      "name": "Rhea Cabato",
+      "sport": "Taekwondo",
+      "age": 24,
+      "heightCm": 162,
+      "regionCode": "Region IX",
+      "region": "Zamboanga Peninsula",
+      "provinceOrLocality": "Zamboanga City",
+      "bio": "A fictional taekwondo athlete preparing for a regional open.",
+      "achievements": [
+        "Fictional Zamboanga open podium finisher"
+      ],
+      "verified": true,
+      "fundingGoal": 64000,
+      "fundingRaised": 26000,
+      "fundingProgress": 41,
+      "votes": 119,
+      "ranking": 15
+    },
+    {
+      "id": "ath-013",
+      "name": "Elian Roque",
+      "sport": "Basketball",
+      "age": 20,
+      "heightCm": 181,
+      "regionCode": "Region X",
+      "region": "Northern Mindanao",
+      "provinceOrLocality": "Cagayan de Oro City",
+      "bio": "A fictional forward training in an adult city basketball program.",
+      "achievements": [
+        "Fictional Northern Mindanao league finalist"
+      ],
+      "verified": true,
+      "fundingGoal": 73000,
+      "fundingRaised": 42000,
+      "fundingProgress": 58,
+      "votes": 171,
+      "ranking": 3
+    },
+    {
+      "id": "ath-014",
+      "name": "Mara Quinto",
+      "sport": "Sepak Takraw",
+      "age": 26,
+      "heightCm": 158,
+      "regionCode": "Region XI",
+      "region": "Davao Region",
+      "provinceOrLocality": "Davao City",
+      "bio": "A fictional sepak takraw player committed to regional competition.",
+      "achievements": [
+        "Fictional Davao regional games participant"
+      ],
+      "verified": true,
+      "fundingGoal": 69000,
+      "fundingRaised": 19000,
+      "fundingProgress": 28,
+      "votes": 73,
+      "ranking": 29
+    },
+    {
+      "id": "ath-015",
+      "name": "Juno Sarmiento",
+      "sport": "Wrestling",
+      "age": 25,
+      "heightCm": 174,
+      "regionCode": "Region XII",
+      "region": "SOCCSKSARGEN",
+      "provinceOrLocality": "Koronadal City, South Cotabato",
+      "bio": "A fictional wrestler training for an adult open tournament.",
+      "achievements": [
+        "Fictional SOCCSKSARGEN grappling finalist"
+      ],
+      "verified": true,
+      "fundingGoal": 81000,
+      "fundingRaised": 27000,
+      "fundingProgress": 33,
+      "votes": 99,
+      "ranking": 20
+    },
+    {
+      "id": "ath-016",
+      "name": "Arielle Pangan",
+      "sport": "Badminton",
+      "age": 21,
+      "heightCm": 165,
+      "regionCode": "Region XIII",
+      "region": "Caraga",
+      "provinceOrLocality": "Butuan City, Agusan del Norte",
+      "bio": "A fictional badminton player building experience on the regional circuit.",
+      "achievements": [
+        "Fictional Caraga doubles finalist"
+      ],
+      "verified": true,
+      "fundingGoal": 57000,
+      "fundingRaised": 23000,
+      "fundingProgress": 40,
+      "votes": 108,
+      "ranking": 18
+    },
+    {
+      "id": "ath-017",
+      "name": "Samira Hadji",
+      "sport": "Track and Field",
+      "age": 24,
+      "heightCm": 167,
+      "regionCode": "BARMM",
+      "region": "Bangsamoro Autonomous Region in Muslim Mindanao",
+      "provinceOrLocality": "Cotabato City",
+      "bio": "A fictional sprinter representing a community athletics club.",
+      "achievements": [
+        "Fictional Bangsamoro athletics meet finisher"
+      ],
+      "verified": true,
+      "fundingGoal": 78000,
+      "fundingRaised": 35000,
+      "fundingProgress": 45,
+      "votes": 132,
+      "ranking": 11
+    },
+    {
+      "id": "ath-018",
+      "name": "Luca Manalo",
+      "sport": "Basketball",
+      "age": 22,
+      "heightCm": 176,
+      "regionCode": "NCR",
+      "region": "National Capital Region",
+      "provinceOrLocality": "Pasig City",
+      "bio": "A fictional point guard who volunteers at an adult neighborhood sports club.",
+      "achievements": [
+        "Fictional Pasig invitational finalist"
+      ],
+      "verified": true,
+      "fundingGoal": 71000,
+      "fundingRaised": 36000,
+      "fundingProgress": 51,
+      "votes": 181,
+      "ranking": 2
+    },
+    {
+      "id": "ath-019",
+      "name": "Dara Fuentebella",
+      "sport": "Trail Running",
+      "age": 29,
+      "heightCm": 159,
+      "regionCode": "CAR",
+      "region": "Cordillera Administrative Region",
+      "provinceOrLocality": "La Trinidad, Benguet",
+      "bio": "A fictional trail runner training on community routes in Benguet.",
+      "achievements": [
+        "Fictional Cordillera trail challenge finisher"
+      ],
+      "verified": true,
+      "fundingGoal": 92000,
+      "fundingRaised": 47000,
+      "fundingProgress": 51,
+      "votes": 143,
+      "ranking": 9
+    },
+    {
+      "id": "ath-020",
+      "name": "Noel Esguerra",
+      "sport": "Cycling",
+      "age": 23,
+      "heightCm": 173,
+      "regionCode": "Region I",
+      "region": "Ilocos Region",
+      "provinceOrLocality": "Laoag City, Ilocos Norte",
+      "bio": "A fictional cyclist preparing for a long-distance regional ride.",
+      "achievements": [
+        "Fictional Ilocos road challenge finisher"
+      ],
+      "verified": true,
+      "fundingGoal": 63000,
+      "fundingRaised": 21000,
+      "fundingProgress": 33,
+      "votes": 80,
+      "ranking": 27
+    },
+    {
+      "id": "ath-021",
+      "name": "Celine Manabat",
+      "sport": "Weightlifting",
+      "age": 26,
+      "heightCm": 161,
+      "regionCode": "Region III",
+      "region": "Central Luzon",
+      "provinceOrLocality": "Cabanatuan City, Nueva Ecija",
+      "bio": "A fictional lifter looking for support for competition equipment.",
+      "achievements": [
+        "Fictional Nueva Ecija strength event finalist"
+      ],
+      "verified": true,
+      "fundingGoal": 84000,
+      "fundingRaised": 45000,
+      "fundingProgress": 54,
+      "votes": 167,
+      "ranking": 4
+    },
+    {
+      "id": "ath-022",
+      "name": "Basti Lontoc",
+      "sport": "Swimming",
+      "age": 22,
+      "heightCm": 177,
+      "regionCode": "Region IV-A",
+      "region": "CALABARZON",
+      "provinceOrLocality": "Santa Rosa City, Laguna",
+      "bio": "A fictional distance swimmer training with a local adult club.",
+      "achievements": [
+        "Fictional CALABARZON open-water finisher"
+      ],
+      "verified": true,
+      "fundingGoal": 76000,
+      "fundingRaised": 39000,
+      "fundingProgress": 51,
+      "votes": 127,
+      "ranking": 12
+    },
+    {
+      "id": "ath-023",
+      "name": "Yana Gatchalian",
+      "sport": "Boxing",
+      "age": 23,
+      "heightCm": 165,
+      "regionCode": "Region V",
+      "region": "Bicol Region",
+      "provinceOrLocality": "Legazpi City, Albay",
+      "bio": "A fictional boxer preparing for a regional amateur event.",
+      "achievements": [
+        "Fictional Albay boxing open finalist"
+      ],
+      "verified": true,
+      "fundingGoal": 88000,
+      "fundingRaised": 32000,
+      "fundingProgress": 36,
+      "votes": 94,
+      "ranking": 22
+    },
+    {
+      "id": "ath-024",
+      "name": "Kean Jover",
+      "sport": "Football",
+      "age": 25,
+      "heightCm": 179,
+      "regionCode": "Region VI",
+      "region": "Western Visayas",
+      "provinceOrLocality": "Roxas City, Capiz",
+      "bio": "A fictional defender training with a community adult football team.",
+      "achievements": [
+        "Fictional Western Visayas cup semifinalist"
+      ],
+      "verified": true,
+      "fundingGoal": 67000,
+      "fundingRaised": 25000,
+      "fundingProgress": 37,
+      "votes": 115,
+      "ranking": 16
+    },
+    {
+      "id": "ath-025",
+      "name": "Mavi Llorente",
+      "sport": "Basketball",
+      "age": 27,
+      "heightCm": 183,
+      "regionCode": "Region VII",
+      "region": "Central Visayas",
+      "provinceOrLocality": "Cebu City, Cebu",
+      "bio": "A fictional center who competes in local adult leagues.",
+      "achievements": [
+        "Fictional Cebu city league finalist"
+      ],
+      "verified": true,
+      "fundingGoal": 97000,
+      "fundingRaised": 58000,
+      "fundingProgress": 60,
+      "votes": 202,
+      "ranking": 1
+    },
+    {
+      "id": "ath-026",
+      "name": "Inez Ocampo",
+      "sport": "Arnis",
+      "age": 21,
+      "heightCm": 157,
+      "regionCode": "Region X",
+      "region": "Northern Mindanao",
+      "provinceOrLocality": "Iligan City, Lanao del Norte",
+      "bio": "A fictional arnis practitioner training for a friendly regional meet.",
+      "achievements": [
+        "Fictional Northern Mindanao arnis finalist"
+      ],
+      "verified": true,
+      "fundingGoal": 59000,
+      "fundingRaised": 16000,
+      "fundingProgress": 27,
+      "votes": 69,
+      "ranking": 30
+    },
+    {
+      "id": "ath-027",
+      "name": "Rafi Natividad",
+      "sport": "Dragon Boat",
+      "age": 30,
+      "heightCm": 182,
+      "regionCode": "Region XI",
+      "region": "Davao Region",
+      "provinceOrLocality": "Tagum City, Davao del Norte",
+      "bio": "A fictional paddler supporting an adult community crew.",
+      "achievements": [
+        "Fictional Davao paddling regatta finisher"
+      ],
+      "verified": true,
+      "fundingGoal": 86000,
+      "fundingRaised": 41000,
+      "fundingProgress": 48,
+      "votes": 156,
+      "ranking": 5
+    },
+    {
+      "id": "ath-028",
+      "name": "Asha Macapaar",
+      "sport": "Sepak Takraw",
+      "age": 23,
+      "heightCm": 160,
+      "regionCode": "Region XII",
+      "region": "SOCCSKSARGEN",
+      "provinceOrLocality": "General Santos City",
+      "bio": "A fictional sepak takraw player preparing for a regional tournament.",
+      "achievements": [
+        "Fictional SOCCSKSARGEN takraw finalist"
+      ],
+      "verified": true,
+      "fundingGoal": 74000,
+      "fundingRaised": 34000,
+      "fundingProgress": 46,
+      "votes": 121,
+      "ranking": 14
+    },
+    {
+      "id": "ath-029",
+      "name": "Dino Balane",
+      "sport": "Badminton",
+      "age": 24,
+      "heightCm": 171,
+      "regionCode": "Region XIII",
+      "region": "Caraga",
+      "provinceOrLocality": "Surigao City, Surigao del Norte",
+      "bio": "A fictional singles player building experience at local events.",
+      "achievements": [
+        "Fictional Caraga badminton open finalist"
+      ],
+      "verified": true,
+      "fundingGoal": 62000,
+      "fundingRaised": 20000,
+      "fundingProgress": 32,
+      "votes": 87,
+      "ranking": 25
+    },
+    {
+      "id": "ath-030",
+      "name": "Nawal Karim",
+      "sport": "Taekwondo",
+      "age": 28,
+      "heightCm": 168,
+      "regionCode": "BARMM",
+      "region": "Bangsamoro Autonomous Region in Muslim Mindanao",
+      "provinceOrLocality": "Marawi City, Lanao del Sur",
+      "bio": "A fictional taekwondo athlete training with a community sports group.",
+      "achievements": [
+        "Fictional BARMM martial arts open finalist"
+      ],
+      "verified": true,
+      "fundingGoal": 80000,
+      "fundingRaised": 43000,
+      "fundingProgress": 54,
+      "votes": 148,
+      "ranking": 7
+    }
+  ]
+}

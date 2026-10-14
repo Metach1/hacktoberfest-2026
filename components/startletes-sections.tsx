@@ -1,4 +1,4 @@
-﻿import { athletes } from "@/app/data/startletes";
+import { athletes, leaderboardRows } from "@/app/data/startletes";
 import Image from "next/image";
 
 function formatCurrency(value: number) {
@@ -157,12 +157,7 @@ export function LeaderboardPanel() {
           <span>Funding</span>
         </div>
 
-        {[
-          { rank: 1, name: 'EJ Obiena', sport: 'Pole Vault', votes: '12,450', funding: '₱85,000', accent: '#f4b334' },
-          { rank: 2, name: 'Alyssa Valdez', sport: 'Volleyball', votes: '9,200', funding: '₱60,000', accent: '#dd7a36' },
-          { rank: 3, name: 'Jordan Clarkson', sport: 'Basketball', votes: '8,100', funding: '₱45,000', accent: '#8a5be2' },
-          { rank: 4, name: 'Hidilyn Diaz', sport: 'Weightlifting', votes: '7,500', funding: '₱40,000', accent: '#d7dce3' },
-        ].map((row) => (
+        {leaderboardRows.map((row) => (
           <div key={row.name} className="grid grid-cols-[90px_1.3fr_1fr_1fr_1fr] items-center gap-4 border-b border-[#eaf0f5] px-6 py-5 last:border-b-0">
             <div className="flex items-center gap-3">
               <div className="flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold text-white shadow-sm" style={{ backgroundColor: row.accent }}>
