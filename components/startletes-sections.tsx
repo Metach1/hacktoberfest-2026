@@ -1,4 +1,5 @@
 ﻿import { athletes } from "@/app/data/startletes";
+import Image from "next/image";
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("en-PH", {
@@ -8,12 +9,40 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-function PinIcon({ color = "#f43f5e" }: { color?: string }) {
+function PinIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="h-6 w-6" aria-hidden="true">
-      <path d="M12 22s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12Z" fill={color} />
-      <circle cx="12" cy="10" r="3" fill="white" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" className="h-5 w-5" aria-hidden="true">
+      <path d="M12 21s6-5.4 6-11a6 6 0 1 0-12 0c0 5.6 6 11 6 11Z" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="10" r="2" />
     </svg>
+  );
+}
+
+function MapMarker({
+  label,
+  color,
+  left,
+  top,
+}: {
+  label: string;
+  color: string;
+  left: string;
+  top: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={`Athletes in ${label}`}
+      className="absolute z-10 -translate-x-1/2 -translate-y-full"
+      style={{ left, top }}
+    >
+      <span className="flex h-8 w-8 items-center justify-center rounded-full shadow-md" style={{ backgroundColor: color }}>
+        <PinIcon />
+      </span>
+      <span className="absolute left-1/2 top-full mt-1.5 -translate-x-1/2 whitespace-nowrap rounded-full border border-[#e5e7eb] bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 shadow-sm">
+        {label}
+      </span>
+    </button>
   );
 }
 
@@ -44,35 +73,18 @@ export function HomeDashboard() {
       <div className="mt-7 rounded-[26px] border border-[#dfe4ea] bg-[#e7eaec] p-4">
         <div className="relative overflow-hidden rounded-[24px] border border-[#dfe4ea] bg-[#e8e9eb] p-4 shadow-inner">
           <div className="relative h-[420px] overflow-hidden rounded-[18px] bg-[#f6f6f4]">
-            <svg viewBox="0 0 760 420" className="h-full w-full" aria-label="Philippines map illustration">
-              <path d="M246 103l21-16 43 12 24-15 20 7 16-14 13 7 21 12 17-7 18 13 8 13 20 11 10 20 14 6 8 17-12 20-17 6-22 22-18 2-18-6-16 9-15 12-16-7-13 5-21-7-38 15-22-13-14-31-9-20 10-19 13-19 14-7 11-17 14-7Z" fill="#f3f1ef" stroke="#1f2a37" strokeWidth="1.8" strokeLinejoin="round" />
-              <g fontSize="10" fill="#2a3341" fontFamily="Arial, sans-serif" fontWeight="600">
-                <text x="278" y="130">MANILA</text>
-                <text x="395" y="228">CEBU</text>
-                <text x="245" y="187">PALAWAN</text>
-                <text x="216" y="98">BASILAN</text>
-              </g>
-            </svg>
-
-            <div className="absolute left-[28%] top-[24%] flex items-center gap-3 rounded-full border border-[#dfe4ea] bg-white/90 px-3 py-2 shadow-md backdrop-blur-sm">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#f53d49] text-white shadow-sm">
-                <PinIcon color="#f53d49" />
-              </div>
-              <span className="text-sm font-semibold text-slate-700">Metro Manila</span>
-            </div>
-
-            <div className="absolute right-[11%] top-[18%] flex items-center gap-3 rounded-full border border-[#dfe4ea] bg-white/90 px-3 py-2 shadow-md backdrop-blur-sm">
-              <span className="text-sm font-semibold text-slate-700">Davao</span>
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#3d8af7] text-white shadow-sm">
-                <PinIcon color="#3d8af7" />
-              </div>
-            </div>
-
-            <div className="absolute right-[28%] top-[54%] flex items-center gap-3 rounded-full border border-[#dfe4ea] bg-white/90 px-3 py-2 shadow-md backdrop-blur-sm">
-              <span className="text-sm font-semibold text-slate-700">Cebu</span>
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#3d8af7] text-white shadow-sm">
-                <PinIcon color="#3d8af7" />
-              </div>
+            <div className="absolute left-1/2 top-1/2 aspect-[300/470] w-[min(100%,268px)] -translate-x-1/2 -translate-y-1/2">
+              <Image
+                src="/philippines-map.svg"
+                alt="Map of the Philippines"
+                fill
+                sizes="268px"
+                className="object-contain"
+                priority
+              />
+              <MapMarker label="Metro Manila" color="#f53d49" left="40.8%" top="40.8%" />
+              <MapMarker label="Cebu" color="#3d8af7" left="67.1%" top="65.9%" />
+              <MapMarker label="Davao" color="#3d8af7" left="82.8%" top="84.2%" />
             </div>
           </div>
         </div>
