@@ -25,13 +25,36 @@ Dependencies and runnable commands are declared in [`package.json`](../package.j
 app/
   layout.tsx                 Global document, fonts, metadata, and global styles
   page.tsx                   Home route
-  browse/page.tsx            Athlete browsing route
-  leaderboard/page.tsx       Ranking demonstration route
-  profile/page.tsx            Sample athlete profile route
+  browse/page.tsx            Browse route entrypoint
+  leaderboard/page.tsx       Leaderboard route entrypoint
+  login/page.tsx             Login route entrypoint
+  profile/page.tsx           Profile route entrypoint
   data/startletes.ts         Typed adapter from seed JSON to UI view data
+src/
+  feat/
+    browse/
+      page.tsx               Browse feature entrypoint
+      model/browse.ts        Browse feature model
+      ui/browse-screen.tsx   Browse screen
+    leaderboard/
+      page.tsx               Leaderboard feature entrypoint
+      model/leaderboard.ts   Leaderboard feature model
+      ui/leaderboard-screen.tsx Leaderboard screen
+    login/
+      page.tsx               Login feature entrypoint
+      model/login.ts         Login credential type
+      ui/login-screen.tsx    Login screen
+    profile/
+      page.tsx               Profile feature entrypoint
+      model/profile.ts       Profile feature model
+      ui/profile-screen.tsx  Profile screen
+  lib/
+    browse/browse-api.ts     Browse and athlete lookup API
+    leaderboard/leaderboard-api.ts Leaderboard query API
+    profile/profile-api.ts   Demo profile overview API
 components/
   startletes-shell.tsx       Shared page frame, header, and route navigation
-  startletes-sections.tsx    Home, browse, leaderboard, and profile sections
+  startletes-sections.tsx    Home dashboard and shared home sections
 data/
   athletes.json              Generated fictional profiles used by the app
   seed.mjs                   Deterministic generator and data validation
@@ -40,7 +63,7 @@ public/
   athlete-placeholder.svg    Generic artwork; not a real athlete photo
 ```
 
-Each route page composes one content section inside `StartletesShell`. The shell keeps the header, visual frame, and bottom navigation consistent. The route content is grouped in `startletes-sections.tsx`, while `app/data/startletes.ts` adapts the generated dataset to the fields the interface uses. The home map and generic profile artwork are local SVG assets, so the demo does not depend on remote images.
+The `app/` route files are entrypoints that delegate to the matching feature page in `src/feat/`; the home route uses `HomeDashboard` directly, and login is a standalone screen. Browse, leaderboard, and profile pages compose their screens inside `StartletesShell`. Their feature models call the corresponding feature-named API modules under `src/lib/`. The browse and leaderboard APIs use the typed view data from `app/data/startletes.ts`, which adapts the generated dataset to the fields the screens use; the profile API provides illustrative account data. The home map and generic profile artwork are local SVG assets, so the demo does not depend on remote images.
 
 The current browse filter chips and header action buttons are visual controls only. The map markers are positioned visual examples, not a complete regional search workflow. The sample profile statistics and activity feed are illustrative UI values rather than account-backed data.
 
@@ -48,8 +71,8 @@ The current browse filter chips and header action buttons are visual controls on
 
 1. Run `npm run seed` from the repository root.
 2. `data/seed.mjs` writes a deterministic `data/athletes.json` file. It validates the dataset, including profile count, required fields, unique identities, adult ages, and coverage of all 17 Philippine administrative regions.
-3. `app/data/startletes.ts` imports the JSON and maps each profile to the typed `Athlete` shape used by the screens.
-4. The browse section displays a sample of those profiles. The leaderboard sorts the same profiles by their seeded ranking.
+3. `app/data/startletes.ts` imports the JSON and maps each profile to the typed `Athlete` view shape.
+4. The browse and leaderboard feature models use their APIs under `src/lib/` to query those profiles; the leaderboard sorts them by seeded ranking. The profile model reads the demo overview from its feature API.
 
 The generated file is checked in, so the app can run without first regenerating it. The seed command overwrites it with the same fictional records; it does not fetch external data or append records. See the [sample-data guide](../data/README.md) for the complete schema and safety rules.
 
