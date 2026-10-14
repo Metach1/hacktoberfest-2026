@@ -1,10 +1,5 @@
-﻿import { StartletesShell } from "@/components/startletes-shell";
-import { ProfileSummary } from "@/components/startletes-sections";
+﻿import ProfilePage from "@/src/feat/profile/page";
 
-export default function ProfilePage() {
-  return (
-    <StartletesShell>
-      <ProfileSummary />
-    </StartletesShell>
-  );
+export default function ProfileRoute() {
+  return <ProfilePage />;
 }

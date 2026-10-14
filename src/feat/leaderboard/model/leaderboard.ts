@@ -1,0 +1,1 @@
+export { leaderboardRows } from "@/app/data/startletes";

@@ -1,10 +1,5 @@
-﻿import { StartletesShell } from "@/components/startletes-shell";
-import { LeaderboardPanel } from "@/components/startletes-sections";
+﻿import LeaderboardPage from "@/src/feat/leaderboard/page";
 
-export default function LeaderboardPage() {
-  return (
-    <StartletesShell>
-      <LeaderboardPanel />
-    </StartletesShell>
-  );
+export default function LeaderboardRoute() {
+  return <LeaderboardPage />;
 }
