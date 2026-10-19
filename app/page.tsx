@@ -1,10 +1,5 @@
-﻿import { StartletesShell } from "@/components/startletes-shell";
-import { HomeDashboard } from "@/components/startletes-sections";
+﻿import StarleteApp from "@/src/app/starlete-app";
 
 export default function HomePage() {
-  return (
-    <StartletesShell>
-      <HomeDashboard />
-    </StartletesShell>
-  );
+  return <StarleteApp />;
 }
