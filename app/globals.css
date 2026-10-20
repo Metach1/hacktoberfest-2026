@@ -373,3 +373,75 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
   .map-head h2 { font-size: 25px; }
   .filters { margin-top: 18px; }
 }
+
+/* ---- QR-based donation flow (supporter + athlete) ---------------------- */
+
+/* Step 2: QR display */
+.qr-method-tabs { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 18px 0 14px; }
+.qr-method-tabs button { border: 1px solid var(--line); background: white; border-radius: 999px; padding: 7px 16px; font-weight: 700; font-size: 12px; }
+.qr-method-tabs button.selected { border-color: var(--blue); background: var(--blue-light); color: var(--blue); }
+.qr-display { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 20px; background: var(--cream); border-radius: 16px; margin-bottom: 8px; }
+.qr-display img { width: 160px; height: 160px; border-radius: 12px; background: white; padding: 8px; border: 1px solid var(--line); }
+.qr-meta { text-align: center; display: flex; flex-direction: column; gap: 2px; }
+.qr-meta small { color: var(--muted); font-size: 11px; }
+
+/* Step 3: receipt upload + OCR */
+.receipt-upload { margin: 18px 0 10px; }
+.receipt-dropzone { width: 100%; border: 2px dashed var(--line); border-radius: 14px; background: #fafbfc; padding: 26px; display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--muted); }
+.receipt-dropzone strong { color: var(--ink); font-size: 14px; }
+.receipt-dropzone small { font-size: 11px; }
+.receipt-preview { display: flex; align-items: center; gap: 14px; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.receipt-preview img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; }
+.receipt-preview div { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.form-error { color: #c0392b; font-size: 11px; margin: 8px 0 0; }
+.field-hint { color: var(--muted); font-size: 11px; text-align: center; margin: 10px 0 0; }
+
+.ocr-status { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 10px 12px; border-radius: 10px; margin-bottom: 14px; background: var(--blue-light); color: var(--blue); }
+.ocr-status.ok { background: #e4f7ee; color: #16815a; }
+.ocr-status.warn { background: #fdf1e3; color: #9a6314; }
+.loader.small { width: 18px; height: 18px; border-width: 3px; margin: 0; }
+
+.suggestion-chip { align-self: flex-start; margin-top: 7px; border: 1px solid var(--blue); background: var(--blue-light); color: var(--blue); border-radius: 999px; padding: 4px 12px; font-size: 11px; font-weight: 700; }
+.donation-step select, .qr-add-form select { border: 1px solid var(--line); border-radius: 10px; min-height: 46px; padding: 0 12px; background: white; }
+
+.review-receipt { margin: 14px 0; text-align: center; }
+.review-receipt img { max-height: 220px; border-radius: 12px; border: 1px solid var(--line); margin: 0 auto; }
+.success-icon.pending { background: #fdf1e3; color: #b9791a; }
+
+.empty-note { text-align: center; color: var(--muted); font-size: 13px; line-height: 1.6; padding: 10px 0 4px; }
+.empty-note.small { padding: 14px; background: var(--cream); border-radius: 12px; }
+.empty-note strong { color: var(--ink); }
+
+/* Athlete: QR management */
+.muted-line { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 0 0 14px; }
+.qr-manage-list { display: flex; flex-direction: column; gap: 10px; }
+.qr-manage-row { display: flex; align-items: center; gap: 12px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.qr-manage-row img { width: 56px; height: 56px; border-radius: 8px; border: 1px solid var(--line); background: white; }
+.qr-manage-meta { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.qr-manage-meta small { color: var(--muted); font-size: 11px; }
+.qr-manage-meta input { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 12px; }
+.qr-manage-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.qr-manage-actions .danger { color: #c0392b; }
+.link-file { color: var(--blue); font-weight: 700; font-size: 12px; cursor: pointer; }
+.qr-add-form { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 16px; }
+.qr-add-form label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 700; margin-bottom: 12px; }
+.qr-add-preview { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12px; }
+
+/* Athlete: pending donations */
+.count-pill { background: var(--gold); color: var(--navy); border-radius: 999px; min-width: 24px; height: 24px; padding: 0 8px; display: inline-grid; place-items: center; font-weight: 800; font-size: 12px; }
+.pending-row { display: flex; align-items: center; gap: 12px; padding: 13px 0; border-top: 1px solid var(--line); font-size: 12px; }
+.pending-thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+.pending-meta { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.pending-meta small { color: var(--muted); font-size: 10px; }
+.pending-meta .auto-hint { color: #9a6314; font-size: 10px; font-weight: 700; }
+.pending-row > b { color: var(--ink); }
+.pending-actions { display: flex; align-items: center; gap: 8px; }
+.donor-note { background: var(--cream); border-radius: 10px; padding: 10px 12px; font-size: 12px; font-style: italic; color: var(--ink); margin: 12px 0; }
+.donor-avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: #ffe9ec; color: #e24a5f; }
+
+@media (max-width: 560px) {
+  .pending-row { flex-wrap: wrap; }
+  .pending-actions { width: 100%; justify-content: flex-end; }
+  .qr-manage-actions { flex-direction: row; }
+  .qr-display img { width: 140px; height: 140px; }
+}
