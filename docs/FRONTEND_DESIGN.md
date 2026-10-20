@@ -11,11 +11,15 @@ connect.
 
 ## Architecture
 
-The entire experience is one client component, `src/app/starlete-app.tsx`,
-mounted at the root route (`app/page.tsx`). It holds page state (`home`,
-`discover`, `profile`, `login`, `register`, `dashboard`, `edit`) and renders the
-matching screen. This keeps the connected journey — discover → profile → donate
-→ confirmation — instant and stateful without a backend.
+The experience uses real App Router routes (`/`, `/discover`, `/athletes/:id`,
+`/login`, `/register`, `/dashboard`, `/dashboard/edit`). Each `app/.../page.tsx`
+renders a screen component from `src/app/screens/`. Cross-cutting state that must
+survive navigation lives in a single client context, `StarleteProvider`
+(`src/app/store.tsx`), mounted once in the root layout alongside the shared
+header, footer, and donation modal (`src/app/shared/chrome.tsx`). This keeps the
+connected journey — discover → profile → donate → confirmation — stateful and
+instant while giving every screen its own URL, deep links, and working
+back/forward navigation. Navigation uses `next/link` and `useRouter`.
 
 State is persisted to `localStorage`:
 
@@ -38,8 +42,8 @@ the look is self-contained and portable.
 
 | Screen | Audience | Purpose |
 | --- | --- | --- |
-| Landing (`home`) | Everyone | Hero headline, trust strip, featured athletes, How It Works, CTA. |
-| Discover | Everyone | Search plus sport and location filters over a card grid. |
+| Landing (`/`) | Everyone | Hero headline, trust strip, featured athletes, How It Works, CTA. |
+| Discover (`/discover`) | Everyone | Interactive region map plus search, sport, and region filters over a card grid; the region is kept in the URL. |
 | Athlete profile | Everyone | Photo, bio, achievement, funding panel, updates, Support button. |
 | Login / Register | Visitors | Role toggle (Supporter / Athlete); athlete fields + minor consent. |
 | Supporter dashboard | Supporter | Picked-for-you athletes, trending, funding leaderboard, impact. |
@@ -68,8 +72,12 @@ The layout adapts at 900px and 680px breakpoints: the hero and grids collapse to
 one or two columns, the top navigation becomes a toggle menu, and the donation
 modal docks to the bottom of the screen on small devices.
 
-## Components (within `starlete-app.tsx`)
+## Components
 
-`Icon`, `Logo`, `Progress`, `AthleteCard`, `Header`, `Landing`, `Discover`,
-`AthleteProfile`, `Auth`, `SupporterDashboard`, `AthleteDashboard`,
-`EditProfile`, and `Donation`.
+- **Shared** (`src/app/shared/`): `Icon`, `Logo`, `Progress`, `AthleteCard`,
+  `MiniAthlete`, `peso`, `photos` (`ui.tsx`); `Header`, `Footer`, `AppChrome`
+  (`chrome.tsx`); `DonationModal` (`donation.tsx`).
+- **Screens** (`src/app/screens/`): `LandingScreen`, `DiscoverScreen`
+  (with `PhilippinesMap`), `AthleteProfileScreen`, `AuthScreen`,
+  `DashboardScreen` (supporter/athlete), `EditProfileScreen`.
+- **State** (`src/app/store.tsx`): `StarleteProvider` and the `useStarlete` hook.

@@ -2,8 +2,8 @@
 
 **Date:** 2026-10-19
 **Build target:** Next.js 16.4.0 (App Router, Turbopack)
-**Scope:** The Starlete single-page application (`src/app/starlete-app.tsx`)
-mounted at `/`, plus global styles and layout.
+**Scope:** The Starlete application, plus global styles and layout. (This report
+predates the move to real App Router routes; see the CHANGELOG for that change.)
 
 ## Result: PASS
 
