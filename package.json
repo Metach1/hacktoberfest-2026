@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "node data/seed.mjs"
+    "test": "node --test",
+    "seed": "node data/seed.mjs",
+    "build:regions": "node data/build-regions.mjs"
   },
   "dependencies": {
     "next": "16.4.0",
