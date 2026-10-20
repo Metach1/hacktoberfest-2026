@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { StarleteProvider } from "@/src/app/store";
+import { AppChrome } from "@/src/app/shared/chrome";
 
 export const metadata: Metadata = {
   title: "Starlete — Fund Filipino athletes",
@@ -10,7 +12,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <StarleteProvider>
+          <AppChrome>{children}</AppChrome>
+        </StarleteProvider>
+      </body>
     </html>
   );
 }

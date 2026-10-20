@@ -1,5 +1,5 @@
-﻿import StarleteApp from "@/src/app/starlete-app";
+﻿import { LandingScreen } from "@/src/app/screens/landing";
 
 export default function HomePage() {
-  return <StarleteApp />;
+  return <LandingScreen />;
 }
