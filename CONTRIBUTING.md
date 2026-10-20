@@ -18,10 +18,11 @@ Thanks for your interest in contributing. Please keep contributions focused, app
    npm install
    ```
 
-3. Generate the fictional athlete dataset:
+3. Generate the fictional athlete dataset and the region-map paths:
 
    ```bash
    npm run seed
+   npm run build:regions
    ```
 
 4. Start the development server:
@@ -36,10 +37,13 @@ Run the relevant checks before opening a pull request:
 
 ```bash
 npm run lint
+npm run test
 npm run build
 ```
 
-For changes to sample data, also run `npm run seed` and verify that its output remains fictional and covers all 17 Philippine administrative regions.
+- `npm run test` runs the dependency-free Node test suite (`node --test`).
+- For changes to sample data, also run `npm run seed` and verify its output remains fictional and covers the 17 populated regions.
+- For changes to the region-map source or taxonomy, run `npm run build:regions` and verify `data/ph-regions.json` still covers all 18 regions. Record any new data source's provenance and license in [`data/geojson/SOURCE.md`](./data/geojson/SOURCE.md).
 
 ## Pull requests
 

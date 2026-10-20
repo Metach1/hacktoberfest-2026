@@ -21,60 +21,98 @@ Dependencies and runnable commands are declared in [`package.json`](../package.j
 
 ## Application structure
 
+The app is a single client component with internal, state-driven page switching
+(landing, discover, profile, login, register, dashboards, edit) rather than
+multiple App Router routes.
+
 ```text
 app/
-  layout.tsx                 Global document, fonts, metadata, and global styles
-  page.tsx                   Home route
-  browse/page.tsx            Browse route entrypoint
-  leaderboard/page.tsx       Leaderboard route entrypoint
-  login/page.tsx             Login route entrypoint
-  profile/page.tsx           Profile route entrypoint
-  data/startletes.ts         Typed adapter from seed JSON to UI view data
+  layout.tsx                 Root layout: mounts the store provider + app chrome
+  page.tsx                   Home route (/)
+  globals.css                Design tokens and all component styles (incl. the map)
+  not-found.tsx              404 page
+  discover/page.tsx          /discover route
+  athletes/[id]/page.tsx     /athletes/:id route (one per seed athlete)
+  login/page.tsx             /login route
+  register/page.tsx          /register route
+  dashboard/page.tsx         /dashboard route (role-aware)
+  dashboard/edit/page.tsx    /dashboard/edit route
 src/
-  feat/
-    browse/
-      page.tsx               Browse feature entrypoint
-      model/browse.ts        Browse feature model
-      ui/browse-screen.tsx   Browse screen
-    leaderboard/
-      page.tsx               Leaderboard feature entrypoint
-      model/leaderboard.ts   Leaderboard feature model
-      ui/leaderboard-screen.tsx Leaderboard screen
-    login/
-      page.tsx               Login feature entrypoint
-      model/login.ts         Login credential type
-      ui/login-screen.tsx    Login screen
-    profile/
-      page.tsx               Profile feature entrypoint
-      model/profile.ts       Profile feature model
-      ui/profile-screen.tsx  Profile screen
-  lib/
-    browse/browse-api.ts     Browse and athlete lookup API
-    leaderboard/leaderboard-api.ts Leaderboard query API
-    profile/profile-api.ts   Demo profile overview API
-components/
-  startletes-shell.tsx       Shared page frame, header, and route navigation
-  startletes-sections.tsx    Home dashboard and shared home sections
+  app/
+    store.tsx                StarleteProvider: shared role/athletes/posts state,
+                             localStorage sync, and donation-modal state
+    screens/                 One screen component per route (client components)
+      landing.tsx  discover.tsx  athlete-profile.tsx
+      auth.tsx     dashboard.tsx edit-profile.tsx
+    shared/
+      ui.tsx                 Icon, Logo, Progress, AthleteCard, peso, photos
+      chrome.tsx             Header, Footer, AppChrome (shared layout chrome)
+      donation.tsx           Global simulated-donation modal
+    data/
+      athletes.ts            Typed adapter: seed JSON -> UI `Athlete` view shape
+    lib/
+      regions.ts             Typed access to the 18-region taxonomy
+      region-map.ts          Typed access to the generated region paths + helpers
 data/
   athletes.json              Generated fictional profiles used by the app
-  seed.mjs                   Deterministic generator and data validation
+  seed.mjs                   Deterministic profile generator and validation
+  regions.mjs                Canonical 18-region taxonomy + name/code resolver
+  athlete-adapter.mjs        Pure seed -> view transform (shared with tests)
+  region-counts.mjs          Pure "athletes per region" tally (shared with tests)
+  athlete-filter.mjs         Pure combined search/sport/region filter (shared)
+  build-regions.mjs          Generates ph-regions.json from the source GeoJSON
+  ph-regions.json            Generated SVG paths for the 18 regions
+  geojson/                   Source region GeoJSON + SOURCE.md (provenance/license)
+test/
+  *.test.mjs                 node --test suite for the pure data/logic modules
 public/
-  philippines-map.svg        Local map illustration
+  philippines-map.svg        Country-outline illustration (single path)
   athlete-placeholder.svg    Generic artwork; not a real athlete photo
 ```
 
-The `app/` route files are entrypoints that delegate to the matching feature page in `src/feat/`; the home route uses `HomeDashboard` directly, and login is a standalone screen. Browse, leaderboard, and profile pages compose their screens inside `StartletesShell`. Their feature models call the corresponding feature-named API modules under `src/lib/`. The browse and leaderboard APIs use the typed view data from `app/data/startletes.ts`, which adapts the generated dataset to the fields the screens use; the profile API provides illustrative account data. The home map and generic profile artwork are local SVG assets, so the demo does not depend on remote images.
+The app uses real App Router routes. Each `app/.../page.tsx` is a thin entry that
+renders a screen component from `src/app/screens/`. Cross-cutting state that must
+survive navigation — the current role, the live athlete list (whose funding
+totals change as donations complete), demo posts, and the donation modal — lives
+in a single client context, `StarleteProvider` (`src/app/store.tsx`), mounted
+once in the root layout. The shared header, footer, and donation modal live in
+`AppChrome` (`src/app/shared/chrome.tsx`), also in the layout, so they persist
+across client-side navigations. Navigation uses `next/link` and `useRouter`
+rather than in-memory page state, so every screen has its own URL and the browser
+back/forward buttons work. The app reads its fictional athletes from the
+generated seed through the typed adapter in `src/app/data/athletes.ts`.
 
-The current browse filter chips and header action buttons are visual controls only. The map markers are positioned visual examples, not a complete regional search workflow. The sample profile statistics and activity feed are illustrative UI values rather than account-backed data.
+Deep links and shareable URLs: each athlete has a route at `/athletes/:id` (all
+30 seed athletes are prerendered at build time), and Discover reflects the
+selected region in the URL (`/discover?region=NCR`) so filtered views are
+shareable and back-button friendly. The dashboard and edit routes redirect to
+`/login` when no role is selected.
+
+The Discover screen renders an interactive map of the 18 Philippine
+administrative regions above its filters. The map reads the generated region
+outlines and the pure region/filter helpers through `src/app/lib/region-map.ts`;
+region names are resolved to canonical codes through `src/app/lib/regions.ts`.
+Clicking a populated region filters the athlete grid to that region. The map
+shapes are generated at build time (see below) rather than drawn by hand or by a
+runtime mapping library.
+
+The sample profile statistics, donation flow, and activity feed are illustrative
+UI values rather than account-backed data; no real payments are processed.
 
 ## Sample-data flow
 
 1. Run `npm run seed` from the repository root.
-2. `data/seed.mjs` writes a deterministic `data/athletes.json` file. It validates the dataset, including profile count, required fields, unique identities, adult ages, and coverage of all 17 Philippine administrative regions.
-3. `app/data/startletes.ts` imports the JSON and maps each profile to the typed `Athlete` view shape.
-4. The browse and leaderboard feature models use their APIs under `src/lib/` to query those profiles; the leaderboard sorts them by seeded ranking. The profile model reads the demo overview from its feature API.
+2. `data/seed.mjs` writes a deterministic `data/athletes.json` file. It validates the dataset, including profile count, required fields, unique identities, adult ages, and coverage of all 17 Philippine administrative regions the seed populates.
+3. `src/app/data/athletes.ts` imports the JSON and maps each profile to the typed `Athlete` view shape (extended with a canonical `regionCode`) via the shared transform in `data/athlete-adapter.mjs`.
+4. `StarleteProvider` holds the adapted athletes and the screens render them across the routes. Discover additionally tallies athletes per region and filters them by the selected region (read from the URL).
 
-The generated file is checked in, so the app can run without first regenerating it. The seed command overwrites it with the same fictional records; it does not fetch external data or append records. See the [sample-data guide](../data/README.md) for the complete schema and safety rules.
+## Region-map data flow
+
+1. Run `npm run build:regions` from the repository root.
+2. `data/build-regions.mjs` reads the committed source GeoJSON in `data/geojson/`, resolves each region to a canonical code via `data/regions.mjs`, projects the geometry to the `0 0 300 470` viewBox, and writes `data/ph-regions.json` with one SVG path per region. It fails if a region is unmatched or if 18-region coverage is incomplete.
+3. The Discover map reads those paths through `src/app/lib/region-map.ts` and renders them as an inline SVG.
+
+Both generated files (`athletes.json`, `ph-regions.json`) are checked in, so the app runs without first regenerating them. The generators overwrite their outputs with the same deterministic content; they do not fetch external data at app runtime or append records. See the [sample-data guide](../data/README.md) for the complete schema, the region-map schema, and safety/provenance rules.
 
 ## Run locally
 
@@ -83,17 +121,20 @@ Requirements: Node.js 20.19 or newer and npm.
 ```bash
 npm install
 npm run seed
+npm run build:regions
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The available screens are:
+Open [http://localhost:3000](http://localhost:3000). The app has real routes:
 
 | Route | Screen |
 | --- | --- |
-| `/` | Home dashboard and Philippines map illustration |
-| `/browse` | Fictional athlete cards |
-| `/leaderboard` | Seeded sample rankings |
-| `/profile` | Illustrative athlete profile and activity |
+| `/` | Landing |
+| `/discover` (optionally `?region=<code>`) | Discover, with the interactive region map |
+| `/athletes/:id` | Athlete profile (one per seed athlete) |
+| `/login`, `/register` | Auth |
+| `/dashboard` | Role-aware dashboard (redirects to `/login` when signed out) |
+| `/dashboard/edit` | Edit profile |
 
 No environment variables are required by the current app. `.env.example` is provided as a safe placeholder for future documented configuration; do not commit local secrets.
 
@@ -103,10 +144,15 @@ Run the repository's current checks before opening a pull request:
 
 ```bash
 npm run lint
+npm run test
 npm run build
 ```
 
-The production build checks that the application compiles and that all App Router pages can be built. The project does not currently define a separate automated unit- or browser-test command.
+`npm run test` runs the dependency-free Node test suite (`node --test`) for the
+pure data and logic modules: the region taxonomy, the seed-to-view adapter, the
+`countByRegion` and combined-filter helpers, and validation of the generated
+`ph-regions.json`. `npm run build` checks that the application compiles and that
+the App Router page builds. There is no separate browser-test command.
 
 ## Contributing and future development
 

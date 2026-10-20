@@ -1,0 +1,56 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { AthleteCard, Icon, MiniAthlete, Progress, peso } from "@/src/app/shared/ui";
+import { useStarlete } from "@/src/app/store";
+import type { Athlete } from "@/src/app/data/athletes";
+
+function SupporterDashboard({ athletes }: { athletes: Athlete[] }) {
+  const top = [...athletes].sort((a, b) => b.raised - a.raised);
+  return (
+    <main className="dashboard page-shell">
+      <div className="dash-welcome"><div><span className="eyebrow">Supporter dashboard</span><h1>Magandang araw, Jamie.</h1><p>There are new stories waiting for your support.</p></div><div className="impact-chip"><Icon name="heart" /><span><small>Your total impact</small><b>₱4,500 given</b></span></div></div>
+      <section><div className="section-head"><div><span className="eyebrow">Picked for you</span><h2>Athletes making moves</h2></div></div><div className="card-grid">{athletes.slice(0, 3).map(a => <AthleteCard key={a.id} athlete={a} />)}</div></section>
+      <section className="dashboard-grid">
+        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Rising now</span><h2>Trending athletes</h2></div></div>{athletes.slice(1, 4).map((a, i) => <MiniAthlete key={a.id} athlete={a} rank={i + 1} />)}</div>
+        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Community</span><h2>Funding leaderboard</h2></div></div>{top.slice(0, 4).map((a, i) => <div className="leader-row" key={a.id}><span className={i === 0 ? "rank first" : "rank"}>{i + 1}</span><div><strong>{a.name}</strong><small>{a.supporters} supporters</small></div><b>{peso(a.raised)}</b></div>)}</div>
+      </section>
+    </main>
+  );
+}
+
+function AthleteDashboard({ athlete, posts, onCreate }: { athlete: Athlete; posts: string[]; onCreate: (p: string) => void }) {
+  const [creating, setCreating] = useState(false);
+  const [post, setPost] = useState("");
+  const percent = Math.round((athlete.raised / athlete.goal) * 100);
+  return (
+    <main className="dashboard page-shell">
+      <div className="dash-welcome"><div><span className="eyebrow">Athlete dashboard</span><h1>Keep going, {athlete.name.split(" ")[0]}.</h1><p>Your community is cheering with every step.</p></div><button className="button" onClick={() => setCreating(true)}><Icon name="plus" /> Create post</button></div>
+      <div className="status-banner"><span className="status-icon"><Icon name="shield" /></span><div><strong>Your profile is verified</strong><p>Supporters can see your verified badge and fund your journey.</p></div><span className="verified-label">Verified athlete</span></div>
+      <section className="stat-grid"><div className="stat-card dark"><small>Total funds received</small><strong>{peso(athlete.raised)}</strong><span>+₱12,400 this month</span></div><div className="stat-card"><small>Funding goal</small><strong>{peso(athlete.goal)}</strong><Progress value={percent} /><span>{percent}% funded</span></div><div className="stat-card"><small>Your community</small><strong>{athlete.supporters}</strong><span>supporters behind you</span></div></section>
+      <section className="dashboard-grid">
+        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Community support</span><h2>Recent donations</h2></div></div>{([["Anonymous supporter", 2500, "Today"], ["Carlo M.", 1000, "Yesterday"], ["Nina A.", 500, "2 days ago"]] as [string, number, string][]).map(d => <div className="donation-row" key={d[2]}><span className="donor-avatar"><Icon name="heart" /></span><div><strong>{d[0]}</strong><small>{d[2]}</small></div><b>+{peso(d[1])}</b></div>)}</div>
+        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Your story</span><h2>Recent posts</h2></div><button className="text-button" onClick={() => setCreating(true)}>New post</button></div>{posts.map((p, i) => <article className="dash-post" key={i}><small>{i ? "1 week ago" : "Just now"}</small><strong>{p}</strong><span>{i ? "86" : "0"} cheers · {i ? "12" : "0"} comments</span></article>)}</div>
+      </section>
+      {creating && <div className="modal-backdrop"><div className="modal small-modal"><button className="modal-close" onClick={() => setCreating(false)}><Icon name="close" /></button><span className="eyebrow">Share an update</span><h2>Bring supporters along</h2><label>Post<textarea value={post} onChange={e => setPost(e.target.value)} placeholder="What happened in training today?" /></label><button className="button full" disabled={!post.trim()} onClick={() => { onCreate(post); setCreating(false); setPost(""); }}>Publish update</button></div></div>}
+    </main>
+  );
+}
+
+export function DashboardScreen() {
+  const { role, athletes, posts, addPost, mounted } = useStarlete();
+  const router = useRouter();
+
+  // Gate the dashboard behind a role. Redirect once hydration has settled so we
+  // do not bounce a signed-in user during the first client render.
+  useEffect(() => {
+    if (mounted && !role) router.replace("/login");
+  }, [mounted, role, router]);
+
+  if (!role) return null;
+  if (role === "athlete") {
+    return <AthleteDashboard athlete={athletes[0]} posts={posts} onCreate={addPost} />;
+  }
+  return <SupporterDashboard athletes={athletes} />;
+}
