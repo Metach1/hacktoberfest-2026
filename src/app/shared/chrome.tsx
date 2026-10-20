@@ -33,6 +33,7 @@ function Header() {
         <Logo />
         <nav className={open ? "nav open" : "nav"}>
           <Link className={isActive("/discover") ? "active" : ""} href="/discover" onClick={close}>Discover</Link>
+          <Link className={isActive("/feed") ? "active" : ""} href="/feed" onClick={close}>Feed</Link>
           <Link href="/#how" onClick={close}>How it works</Link>
           {role ? (
             <>
