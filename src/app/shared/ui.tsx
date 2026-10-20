@@ -38,7 +38,7 @@ export function Icon({ name, size = 20 }: { name: string; size?: number }) {
 
 /** Brand mark that links home. */
 export function Logo() {
-  return <Link className="logo" href="/" aria-label="Starlete home"><span className="logo-mark"><Icon name="spark" size={18} /></span><span>starlete</span></Link>;
+  return <Link className="logo" href="/" aria-label="Starlete home"><img className="logo-mark" src="/logo.svg" alt="" width={32} height={32} /><span>starlete</span></Link>;
 }
 
 export function Progress({ value }: { value: number }) {
