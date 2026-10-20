@@ -4,7 +4,7 @@ import { StarleteProvider } from "@/src/app/store";
 import { AppChrome } from "@/src/app/shared/chrome";
 
 export const metadata: Metadata = {
-  title: "Starlete — Fund Filipino athletes",
+  title: "Startlete — Fund Filipino athletes",
   description:
     "Every champion has a story. Discover and support Filipino athletes on their journey.",
 };

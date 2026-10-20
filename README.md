@@ -1,6 +1,6 @@
-# Startletes
+# Startlete
 
-Startletes is an open-source demo platform concept for helping Filipino athletes get discovered and funded by region, merit, and need. The current Next.js app demonstrates athlete discovery, a Philippines map, browsing, a leaderboard, and an athlete profile.
+Startlete is an open-source demo platform concept for helping Filipino athletes get discovered and funded by region, merit, and need. The current Next.js app demonstrates athlete discovery, a Philippines map, browsing, a leaderboard, and an athlete profile.
 
 > **Demo safety:** All athlete records and funding figures must be fictional. Funding and voting are illustrative only: this project does not process payments, transfer funds, or provide payouts. Do not add real athlete information, personal documents, credentials, or payment details.
 
@@ -109,4 +109,4 @@ Contributions are welcome. Start with [`CONTRIBUTING.md`](./CONTRIBUTING.md), fo
 
 ## License
 
-Startletes is available under the [MIT License](./LICENSE).
+Startlete is available under the [MIT License](./LICENSE).

@@ -25,7 +25,7 @@ export function EditProfileScreen() {
 
   return (
     <main className="settings page-shell">
-      <div className="settings-head"><span className="eyebrow">Account settings</span><h1>Edit your profile</h1><p>Keep your information current for the Starlete community.</p></div>
+      <div className="settings-head"><span className="eyebrow">Account settings</span><h1>Edit your profile</h1><p>Keep your information current for the Startlete community.</p></div>
       <div className="settings-card">
         <div className="profile-avatar">{role === "athlete" ? athleteInitials : "JD"}<button type="button"><Icon name="plus" size={16} /></button></div>
         <form onSubmit={save}>

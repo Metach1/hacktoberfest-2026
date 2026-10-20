@@ -1,6 +1,6 @@
 /**
  * Pure, dependency-free transform from the fictional seed record shape
- * (`data/athletes.json`) to the UI `Athlete` view shape used by the Starlete
+ * (`data/athletes.json`) to the UI `Athlete` view shape used by Startlete
  * screens. Kept as a plain ES module so it can be unit-tested by native Node
  * and imported by the typed adapter in `src/app/data/athletes.ts`.
  *

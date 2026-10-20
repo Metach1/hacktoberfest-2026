@@ -1,12 +1,12 @@
 What it is
 
-Startletes is an open source web platform that helps Filipino athletes get discovered and funded by region, merit, and need. Athletes create verified profiles, visitors discover them through an interactive Philippines map and a browse feed, and a community funding pool ("Startletes Grants") is allocated using a transparent ranking.
+Startlete is an open source web platform that helps Filipino athletes get discovered and funded by region, merit, and need. Athletes create verified profiles, visitors discover them through an interactive Philippines map and a browse feed, and a community funding pool ("Startlete Grants") is allocated using a transparent ranking.
 
 Formerly called "Star Athletes". Donors are called Starvestors.
 
 Why it exists
 
-Existing crowdfunding tools (GoFundMe, Patreon) tend to reward whoever is most popular online. Startletes weighs verified performance and financial need alongside community votes, and uses regional pride to connect athletes with local supporters.
+Existing crowdfunding tools (GoFundMe, Patreon) tend to reward whoever is most popular online. Startlete weighs verified performance and financial need alongside community votes, and uses regional pride to connect athletes with local supporters.
 
 Hard constraints (apply to every change)
 Fake data only. Never include real athlete information. Many athletes are minors.
@@ -23,12 +23,12 @@ Pages
 Page	Purpose
 Home / Map	Interactive SVG map of Philippine regions. Clicking a region (for example Region VII, Central Visayas) shows featured athletes from that region (Cebu, Bohol, Siquijor).
 Browse	Search bar with filters (Basketball, Weightlifting, Esports, Track and Field, and so on). Grid of athlete cards showing sport, age, height, and funding goal percentage.
-Startletes	Community pool summary, leaderboard, grant application (verified athletes only), vote button.
+Startlete	Community pool summary, leaderboard, grant application (verified athletes only), vote button.
 Profile	Athlete bio, sport, region, achievements, proof status, funding progress.
 Admin	Verification queue and report queue.
 Funding model
 
-The central community pool is the core. Starvestors donate (mock) to the pool, and verified athletes apply for a Startletes Grant. Optional direct donations to a specific athlete may be added later, so browse cards can show a funding progress bar.
+The central community pool is the core. Starvestors donate (mock) to the pool, and verified athletes apply for a Startlete Grant. Optional direct donations to a specific athlete may be added later, so browse cards can show a funding progress bar.
 
 Ranking (draft - weights are placeholders)
 
@@ -43,7 +43,7 @@ The formula lives in lib/ranking.ts with unit tests and is documented in the REA
 
 Verification and moderation
 Athlete profiles need proof: a certificate, tournament record, or coach / school endorsement. Proof earns a "Verified" badge.
-Only verified athletes can apply for Startletes Grants.
+Only verified athletes can apply for Startlete Grants.
 Any user can report a profile or comment. Admin outcomes: dismissed, warning, content removed, account suspended.
 Write docs/community-guidelines.md and a content moderation policy.
 Tech stack

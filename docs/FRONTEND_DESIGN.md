@@ -1,12 +1,12 @@
-# Starlete Frontend Design
+# Startlete Frontend Design
 
-Starlete is a responsive web app for funding Filipino athletes. The frontend is
+Startlete is a responsive web app for funding Filipino athletes. The frontend is
 a single client application that manages its own in-app navigation. This
 document describes the shipped UI, the design language, and how the screens
 connect.
 
 > **Demo safety.** Every athlete, photo, funding figure, and donation is
-> fictional or illustrative. Starlete does not process real payments; the
+> fictional or illustrative. Startlete does not process real payments; the
 > checkout is fully simulated.
 
 ## Architecture

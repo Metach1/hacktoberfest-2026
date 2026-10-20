@@ -43,7 +43,7 @@ function Header() {
           ) : (
             <>
               <Link href="/login" onClick={close}>Log in</Link>
-              <Link className="button small" href="/register" onClick={close}>Join Starlete</Link>
+              <Link className="button small" href="/register" onClick={close}>Join Startlete</Link>
             </>
           )}
         </nav>
@@ -58,7 +58,7 @@ function Footer() {
     <footer>
       <Logo />
       <p>Backing Filipino athletes, one story at a time.</p>
-      <span>© 2025 Starlete. Demo experience only.</span>
+      <span>© 2025 Startlete. Demo experience only.</span>
     </footer>
   );
 }

@@ -1,8 +1,8 @@
-# Starlete QA Report
+# Startlete QA Report
 
 **Date:** 2026-10-19
 **Build target:** Next.js 16.4.0 (App Router, Turbopack)
-**Scope:** The Starlete application, plus global styles and layout. (This report
+**Scope:** The Startlete application, plus global styles and layout. (This report
 predates the move to real App Router routes; see the CHANGELOG for that change.)
 
 ## Result: PASS

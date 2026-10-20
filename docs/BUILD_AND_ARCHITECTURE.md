@@ -1,10 +1,10 @@
-# How Startletes Is Built
+# How Startlete Is Built
 
 This guide explains the current application structure, how its screens and sample data fit together, and how to run and validate the project. It describes the repository as it exists today; planned product features are not presented as implemented functionality.
 
 ## Product direction
 
-Startletes is a frontend prototype for discovering Filipino athletes and illustrating how a community could support them. Its product goals and non-negotiable constraints are described in the [project brief](./PROJECT_BRIEF.md). The UI was developed from the Startletes screen concepts in the [UI design notes](./startletes-ui-design.md).
+Startlete is a frontend prototype for discovering Filipino athletes and illustrating how a community could support them. Its product goals and non-negotiable constraints are described in the [project brief](./PROJECT_BRIEF.md). The UI was developed from the Startlete screen concepts in the [UI design notes](./startletes-ui-design.md).
 
 The current app is a visual demo, not a production funding platform. It has no database, authentication, real athlete records, payment processing, or payouts. Athlete details, rankings, activity, and funding amounts are fictional examples.
 
