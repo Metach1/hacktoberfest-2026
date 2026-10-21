@@ -647,3 +647,51 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
   .funding-page .reveal { opacity: 1; transform: none; transition: none; }
   .spotlight-photo img, .regional-stories img, .breakthrough-image img { transition: none; }
 }
+
+/* Community feed — social area where supporters follow athlete updates.
+   Centered single column of post cards with small round profile avatars. */
+.feed-page { max-width: 640px; margin: 0 auto; padding: 48px 20px 90px; }
+.feed-hero { margin-bottom: 30px; }
+.feed-hero h1 { font-size: 34px; margin: 0 0 10px; color: var(--navy); }
+.feed-hero p { color: var(--muted); font-size: 15px; line-height: 1.6; margin: 0 0 20px; }
+
+.feed-list { display: flex; flex-direction: column; gap: 20px; }
+
+.feed-post { background: white; border: 1px solid var(--line); border-radius: 18px; padding: 22px; }
+
+.feed-post-head { margin-bottom: 14px; }
+.feed-author { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ink); }
+.feed-author img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex: none; }
+.feed-avatar-fallback { width: 44px; height: 44px; border-radius: 50%; background: var(--navy); color: white; display: grid; place-items: center; font-weight: 800; flex: none; }
+.feed-author-meta { display: flex; flex-direction: column; gap: 2px; }
+.feed-author-meta strong { display: inline-flex; align-items: center; gap: 6px; font-size: 15px; color: var(--navy); }
+.feed-author-meta small { color: var(--muted); font-size: 12px; }
+.inline-verified { width: 16px; height: 16px; border-radius: 50%; background: var(--blue); color: white; display: grid; place-items: center; flex: none; }
+.feed-post-time { color: var(--muted); font-size: 12px; display: block; margin-bottom: 12px; }
+
+.feed-post-text { color: var(--ink); font-size: 15px; line-height: 1.65; margin: 0 0 16px; }
+
+.feed-actions { display: flex; align-items: center; gap: 22px; border-top: 1px solid var(--line); padding-top: 14px; }
+.feed-action { display: inline-flex; align-items: center; gap: 7px; background: none; border: 0; padding: 4px 0; color: var(--muted); font-weight: 600; font-size: 13px; }
+.feed-action:hover { color: var(--ink); }
+.feed-action.liked { color: var(--blue); }
+
+.feed-comments { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 14px; }
+.feed-comment { display: flex; gap: 11px; }
+.feed-comment-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--blue-light); color: var(--blue); display: grid; place-items: center; font-weight: 700; font-size: 13px; flex: none; }
+.feed-comment strong { font-size: 13px; color: var(--navy); }
+.feed-comment small { color: var(--muted); font-size: 11px; margin-left: 6px; }
+.feed-comment p { margin: 3px 0 0; font-size: 14px; line-height: 1.5; color: var(--ink); }
+.feed-comment-form { display: flex; align-items: center; gap: 10px; }
+.feed-comment-form input { flex: 1; min-height: 42px; border: 1px solid var(--line); border-radius: 10px; padding: 0 14px; font-size: 14px; }
+.feed-comment-form input:focus { outline: 2px solid var(--blue); outline-offset: 0; border-color: transparent; }
+.feed-comment-form .icon-only { background: var(--blue); color: white; border: 0; border-radius: 10px; width: 42px; height: 42px; display: grid; place-items: center; flex: none; }
+.feed-comment-signin { color: var(--muted); font-size: 13px; margin: 0; }
+.feed-comment-signin a { color: var(--blue); font-weight: 700; }
+
+@media (max-width: 760px) {
+  .feed-page { padding: 32px 16px 70px; }
+  .feed-hero h1 { font-size: 27px; }
+  .feed-post { padding: 18px; }
+  .feed-actions { gap: 16px; }
+}
