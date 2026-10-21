@@ -447,3 +447,7 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
   .feed-hero { padding: 40px 24px 36px; margin: 0 -20px 24px; }
   .feed-post { padding: 18px 18px; }
 }
+
+/* Inline form validation message (e.g. funding goal on edit profile) */
+.field-error { display: block; margin-top: 6px; color: #c0392b; font-size: 12px; }
+input[aria-invalid="true"] { border-color: #c0392b; }
