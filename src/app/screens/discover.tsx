@@ -193,12 +193,36 @@ export function DiscoverScreen() {
   );
   const selectedRegionName = selectedRegion ? regionName(selectedRegion) : null;
 
-  const clearSelection = () => {
+  const clearSelection = useCallback(() => {
     setSelectedRegion(null);
     setSearch("");
     setSport("All sports");
     setExpanded(false);
-  };
+  }, [setSelectedRegion]);
+
+  // Deselect on a click anywhere outside the interactive controls, or on
+  // Escape. Only listens while a selection is active, and skips clicks landing
+  // on a map region, a form control, the search box, or the compact list — the
+  // elements the user is meant to interact with. The expanded catalog modal has
+  // its own dismissal, so pause this while it is open.
+  useEffect(() => {
+    if (!listActive || expanded) return;
+    const INTERACTIVE = "[data-region], .region-list, .search-box, select, input, button, a";
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      if (target && target.closest(INTERACTIVE)) return;
+      clearSelection();
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") clearSelection();
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [listActive, expanded, clearSelection]);
 
   const headingName = selectedRegionName ?? "the Philippines";
 
@@ -258,23 +282,26 @@ export function DiscoverScreen() {
         </div>
       </section>
 
-      {/* Expanded detailed catalog, reusing the existing AthleteCard grid. */}
+      {/* Expanded detailed catalog: a solid sheet that slides up over the
+          explorer so the catalog comes to the user, reusing the existing
+          AthleteCard grid. */}
       {expanded && (
-        <section className="section compact catalog-expanded">
-          <div className="results-head">
-            <div>
-              <span className="eyebrow">Athlete community</span>
-              <h2>{filtered.length} athlete{filtered.length === 1 ? "" : "s"}{selectedRegionName ? ` in ${selectedRegionName}` : " to cheer for"}</h2>
+        <div className="modal-backdrop catalog-backdrop" onClick={() => setExpanded(false)}>
+          <div className="catalog-sheet" role="dialog" aria-modal="true" aria-label="Athlete catalog" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="modal-close" onClick={() => setExpanded(false)} aria-label="Close catalog"><Icon name="close" /></button>
+            <div className="results-head">
+              <div>
+                <span className="eyebrow">Athlete community</span>
+                <h2>{filtered.length} athlete{filtered.length === 1 ? "" : "s"}{selectedRegionName ? ` in ${selectedRegionName}` : " to cheer for"}</h2>
+              </div>
             </div>
-            <button type="button" className="text-button" onClick={() => setExpanded(false)}><Icon name="close" size={16} /> Collapse</button>
+            <div className="catalog-sheet-scroll">
+              <div className="card-grid">{filtered.map((a) => <AthleteCard key={a.id} athlete={a} />)}</div>
+              {!filtered.length && <div className="empty"><h3>No athletes found</h3><p>Try broadening your search, choosing another region, or clearing a filter.</p></div>}
+            </div>
           </div>
-          <div className="card-grid">{filtered.map((a) => <AthleteCard key={a.id} athlete={a} />)}</div>
-          {!filtered.length && <div className="empty"><h3>No athletes found</h3><p>Try broadening your search, choosing another region, or clearing a filter.</p></div>}
-        </section>
+        </div>
       )}
-
-      {/* Clicking outside a selection deselects it. */}
-      {listActive && <button type="button" className="explorer-backdrop" aria-label="Clear selection" onClick={clearSelection} />}
     </main>
   );
 }

@@ -392,11 +392,16 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .region-row-fund { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; }
 .region-empty { padding: 26px 16px; text-align: center; color: var(--muted); font-size: 13px; }
 
-/* RIGHT panel: the map. The gradient mask fades the edges that approach the
-   hero above and the community section below so the zoomed map never looks
-   like it collides with those containers. */
+/* RIGHT panel: the map. A two-layer mask feathers all four edges (vertical and
+   horizontal gradients composited with intersect) so the zoomed map fades out
+   evenly instead of colliding with the hero above or cutting off at the sides. */
 .explorer-map { position: relative; z-index: 2; }
-.ph-map { position: relative; -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 91%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 91%, transparent 100%); }
+.ph-map { position: relative;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 91%, transparent 100%), linear-gradient(to right, transparent 0, #000 9%, #000 91%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to bottom, transparent 0, #000 9%, #000 91%, transparent 100%), linear-gradient(to right, transparent 0, #000 9%, #000 91%, transparent 100%);
+  mask-composite: intersect;
+}
 .ph-map-svg { display: block; width: 100%; max-width: 560px; height: auto; margin: 0 auto; overflow: visible; }
 
 /* The inner group carries the zoom transform; CSS eases it smoothly. */
@@ -414,14 +419,18 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .ph-region.selected { fill: var(--gold); stroke: var(--gold-dark); stroke-width: 1; filter: url(#ph-region-shadow); }
 .ph-region.selected:hover { fill: var(--gold); }
 
-/* Full-viewport click-catcher sitting behind the explorer; clicking anywhere
-   that is not the panel/map clears the active selection. */
-.explorer-backdrop { position: fixed; inset: 0; z-index: 1; border: 0; background: transparent; cursor: default; }
+/* Expanded catalog sheet: a solid white panel that slides up from the bottom
+   over a dimmed backdrop, so it fully covers and blocks the explorer behind. */
+.catalog-backdrop { align-items: end; padding: 0; }
+.catalog-sheet { position: relative; width: 100%; max-width: 1184px; margin: 0 auto; background: white; border-radius: 22px 22px 0 0; box-shadow: 0 -20px 60px rgba(3,17,31,.35); padding: 34px clamp(20px, 4vw, 44px) 10px; max-height: 92vh; display: flex; flex-direction: column; animation: catalog-slide-up .4s cubic-bezier(.22,.61,.36,1); }
+.catalog-sheet .results-head { margin-bottom: 24px; padding-right: 48px; }
+.catalog-sheet-scroll { overflow-y: auto; padding-bottom: 28px; }
 
-.catalog-expanded { padding-top: 20px; }
+@keyframes catalog-slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
 
 @media (prefers-reduced-motion: reduce) {
   .ph-zoom { transition: none; }
+  .catalog-sheet { animation: none; }
 }
 
 @media (max-width: 900px) {
