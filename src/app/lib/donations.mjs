@@ -154,3 +154,53 @@ export function confirmedTotals(donations, athleteId) {
   }
   return { total, count };
 }
+
+
+/** Minimum claimed donation amount (pesos) the supporter flow accepts. */
+export const MIN_DONATION_AMOUNT = 50;
+
+/**
+ * Parse a supporter-entered claimed amount (a raw input string) into a number.
+ * Returns 0 for blank/invalid input so callers can treat it as "not yet
+ * entered" without special-casing NaN.
+ *
+ * @param {string|number|null|undefined} raw
+ * @returns {number}
+ */
+export function parseClaimedAmount(raw) {
+  if (raw == null || raw === "") return 0;
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+/**
+ * Whether a parsed claimed amount is high enough to proceed. Keeping this as a
+ * pure predicate lets the UI and tests share one rule.
+ *
+ * @param {number} amount
+ * @returns {boolean}
+ */
+export function isAmountAcceptable(amount) {
+  return Number.isFinite(amount) && amount >= MIN_DONATION_AMOUNT;
+}
+
+/**
+ * Whether the supporter may advance from the details step to review. All of a
+ * receipt, an acceptable amount, a reference, and a method are required.
+ *
+ * @param {Object} input
+ * @param {string} [input.receiptName]
+ * @param {number} [input.amount]
+ * @param {string} [input.reference]
+ * @param {string} [input.method]
+ * @returns {boolean}
+ */
+export function canReviewDonation({ receiptName, amount, reference, method } = {}) {
+  return (
+    Boolean(receiptName) &&
+    isAmountAcceptable(Number(amount)) &&
+    typeof reference === "string" &&
+    reference.trim().length > 0 &&
+    Boolean(method)
+  );
+}

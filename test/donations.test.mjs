@@ -4,12 +4,16 @@ import assert from "node:assert/strict";
 import {
   AUTO_CONFIRM_MS,
   DONATION_STATUS,
+  MIN_DONATION_AMOUNT,
   createPendingDonation,
   confirmDonation,
   isAutoConfirmDue,
   applyAutoConfirm,
   msUntilAutoConfirm,
   confirmedTotals,
+  parseClaimedAmount,
+  isAmountAcceptable,
+  canReviewDonation,
 } from "../src/app/lib/donations.mjs";
 
 test("createPendingDonation builds a pending record with defaults", () => {
@@ -107,4 +111,79 @@ test("confirmedTotals is zero when an athlete has no confirmed donations", () =>
   const donations = [createPendingDonation({ athleteId: 1, amount: 100, id: "1" })];
   assert.deepEqual(confirmedTotals(donations, 1), { total: 0, count: 0 });
   assert.deepEqual(confirmedTotals(donations, 99), { total: 0, count: 0 });
+});
+
+
+// --- Claimed-amount entry (replaces the removed up-front amount prompt) ------
+
+test("parseClaimedAmount treats blank/invalid input as 0 (not yet entered)", () => {
+  assert.equal(parseClaimedAmount(""), 0);
+  assert.equal(parseClaimedAmount(null), 0);
+  assert.equal(parseClaimedAmount(undefined), 0);
+  assert.equal(parseClaimedAmount("abc"), 0);
+  assert.equal(parseClaimedAmount("-100"), 0);
+  assert.equal(parseClaimedAmount("0"), 0);
+});
+
+test("parseClaimedAmount parses valid numeric strings", () => {
+  assert.equal(parseClaimedAmount("500"), 500);
+  assert.equal(parseClaimedAmount("1000.50"), 1000.5);
+  assert.equal(parseClaimedAmount(2500), 2500);
+});
+
+test("isAmountAcceptable enforces the minimum donation amount", () => {
+  assert.equal(isAmountAcceptable(MIN_DONATION_AMOUNT - 1), false);
+  assert.equal(isAmountAcceptable(MIN_DONATION_AMOUNT), true);
+  assert.equal(isAmountAcceptable(5000), true);
+  assert.equal(isAmountAcceptable(0), false);
+});
+
+test("canReviewDonation requires receipt, acceptable amount, reference, and method", () => {
+  const complete = { receiptName: "r.png", amount: 500, reference: "ABC123456", method: "GCash" };
+  assert.equal(canReviewDonation(complete), true);
+  assert.equal(canReviewDonation({ ...complete, receiptName: "" }), false);
+  assert.equal(canReviewDonation({ ...complete, amount: 10 }), false);
+  assert.equal(canReviewDonation({ ...complete, reference: "   " }), false);
+  assert.equal(canReviewDonation({ ...complete, method: "" }), false);
+  assert.equal(canReviewDonation(), false);
+});
+
+// --- Amount-confirmation safeguard (pure state-machine model) ----------------
+//
+// The UI shows a confirmation dialog with the claimed amount before submitting.
+// Canceling returns the supporter to edit (amount preserved, nothing
+// submitted); confirming submits exactly the shown amount. The reducer below
+// mirrors that decision so it can be asserted without a DOM.
+
+function amountGate(state, action) {
+  switch (action.type) {
+    case "REQUEST_CONFIRM":
+      return { ...state, confirming: true, submitted: false };
+    case "CANCEL": // return to edit, keep the amount, submit nothing
+      return { ...state, confirming: false, submitted: false };
+    case "CONFIRM": // proceed with exactly the confirmed amount
+      return { ...state, confirming: false, submitted: true, submittedAmount: state.amount };
+    default:
+      return state;
+  }
+}
+
+test("amount confirmation: canceling returns to edit without submitting", () => {
+  let state = { amount: 750, confirming: false, submitted: false, submittedAmount: null };
+  state = amountGate(state, { type: "REQUEST_CONFIRM" });
+  assert.equal(state.confirming, true);
+  state = amountGate(state, { type: "CANCEL" });
+  assert.equal(state.confirming, false);
+  assert.equal(state.submitted, false);
+  assert.equal(state.submittedAmount, null, "nothing submitted");
+  assert.equal(state.amount, 750, "amount preserved for editing");
+});
+
+test("amount confirmation: confirming submits exactly the shown amount", () => {
+  let state = { amount: 1200, confirming: false, submitted: false, submittedAmount: null };
+  state = amountGate(state, { type: "REQUEST_CONFIRM" });
+  state = amountGate(state, { type: "CONFIRM" });
+  assert.equal(state.confirming, false);
+  assert.equal(state.submitted, true);
+  assert.equal(state.submittedAmount, 1200);
 });

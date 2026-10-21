@@ -32,7 +32,8 @@ design intentionally uses `<img>` with remote photography.
 | Minor consent | Athlete registrants under 18 must confirm simulated parental consent before submit. | Pass |
 | Role rule: supporter donates | Support button opens the simulated checkout for supporters. | Pass |
 | Role rule: athlete cannot donate | Support button is disabled for athletes and the flow blocks the athlete role. | Pass |
-| Donation flow | Amount (preset/custom, min ₱50) → method → review → processing → success with reference. | Pass |
+| Donation flow | Scan QR → upload receipt + enter amount (min ₱50) + method + reference → review → amount confirmation (typo safeguard) → pending with reference. | Pass |
+| Payment-QR validation | Athlete QR uploads are decoded locally (jsQR) and validated against EMVCo / QR Ph format (TLV + CRC-16); unsupported or unreadable images are rejected with an actionable error and never stored. | Pass |
 | Funding update | On success, the athlete's raised total and supporter count increase across the app. | Pass |
 | Persistence | Selected role and athlete funding totals survive a page reload via `localStorage`. | Pass |
 | Logout | Clears role and returns to the landing page. | Pass |

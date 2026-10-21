@@ -79,8 +79,10 @@ npm run build
 ```
 
 `npm run test` runs the dependency-free Node test suite (`node --test`) covering
-the region taxonomy, the seed-to-view adapter, the region/filter helpers, and
-the generated region-map data.
+the region taxonomy, the seed-to-view adapter, the region/filter helpers, the
+generated region-map data, the donation lifecycle and claimed-amount helpers,
+the receipt-text parser, the EMVCo / QR Ph payment-QR validator, and the
+image-aspect-ratio CSS guard.
 
 ## Sample data
 

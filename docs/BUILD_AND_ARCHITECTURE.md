@@ -53,6 +53,11 @@ src/
     lib/
       regions.ts             Typed access to the 18-region taxonomy
       region-map.ts          Typed access to the generated region paths + helpers
+      donations.mjs          Pure donation lifecycle + claimed-amount helpers (shared with tests)
+      receipt-parse.mjs      Pure OCR-text -> field suggestions parser (shared with tests)
+      ocr.ts                 Browser-only Tesseract.js receipt OCR (dynamic import)
+      payment-qr.mjs         Pure EMVCo / QR Ph payment-QR validator (shared with tests)
+      qr-decode.ts           Browser-only jsQR decode + local payment-QR validation
 data/
   athletes.json              Generated fictional profiles used by the app
   seed.mjs                   Deterministic profile generator and validation

@@ -4,6 +4,10 @@ import { useMemo, useRef, useState } from "react";
 import { Icon, peso } from "@/src/app/shared/ui";
 import { useStarlete, type QrCode } from "@/src/app/store";
 import { recognizeReceipt } from "@/src/app/lib/ocr";
+import {
+  canReviewDonation,
+  parseClaimedAmount,
+} from "@/src/app/lib/donations.mjs";
 
 const MAX_RECEIPT_BYTES = 5 * 1024 * 1024; // 5 MB
 const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp"];
@@ -20,25 +24,31 @@ function validateReceipt(file: File): string | null {
 }
 
 /**
- * Global QR-based donation modal. The supporter picks an amount, scans the
- * athlete's published QR with their own wallet app, pays outside the demo, then
- * uploads the receipt. Tesseract.js OCR suggests the amount / reference /
- * method, which the supporter can edit or enter manually. A review step
- * precedes submission; the donation is recorded as PENDING until the athlete
- * confirms (or the demo auto-confirm timeout elapses).
+ * Global QR-based donation modal. The supporter scans the athlete's published
+ * QR with their own wallet app, pays outside the demo, then uploads the receipt
+ * and enters the amount they paid (there is no redundant up-front amount
+ * prompt). Tesseract.js OCR suggests the amount / reference / method, which the
+ * supporter can edit or enter manually. A review step, plus an explicit
+ * amount-confirmation safeguard against typos, precede submission; the donation
+ * is recorded as PENDING until the athlete confirms (or the demo auto-confirm
+ * timeout elapses).
  *
- * No real payment is processed and OCR is not payment verification.
+ * No real payment is processed. Neither OCR nor the amount confirmation is
+ * payment verification — the confirmation only guards against accidental typos.
  */
 export function DonationModal() {
   const { donationTarget, closeDonation, submitDonation, getQrCodes } = useStarlete();
 
   const [step, setStep] = useState(1);
-  const [amount, setAmount] = useState(1000);
+  // Single source of truth for the claimed amount. The supporter enters it
+  // after paying (on the receipt step); there is no redundant up-front prompt.
   const [custom, setCustom] = useState("");
   const [method, setMethod] = useState("");
   const [reference, setReference] = useState("");
   const [supporterName, setSupporterName] = useState("");
   const [note, setNote] = useState("");
+  // Amount-confirmation safeguard shown before the final submit.
+  const [confirmingAmount, setConfirmingAmount] = useState(false);
 
   const [receiptName, setReceiptName] = useState("");
   const [receiptPreview, setReceiptPreview] = useState("");
@@ -59,19 +69,19 @@ export function DonationModal() {
     () => (athlete ? getQrCodes(athlete.id) : []),
     [athlete, getQrCodes],
   );
-  const actual = custom ? Number(custom) : amount;
+  const actual = parseClaimedAmount(custom);
   const activeQr = qrCodes.find((q) => q.method === method) ?? qrCodes[0];
 
   if (!athlete) return null;
 
   const reset = () => {
     setStep(1);
-    setAmount(1000);
     setCustom("");
     setMethod("");
     setReference("");
     setSupporterName("");
     setNote("");
+    setConfirmingAmount(false);
     setReceiptName("");
     setReceiptPreview("");
     setUploadError("");
@@ -84,12 +94,6 @@ export function DonationModal() {
   const close = () => {
     closeDonation();
     reset();
-  };
-
-  const goToQr = () => {
-    // Default the method to the first available QR code, if any.
-    if (!method && qrCodes[0]) setMethod(qrCodes[0].method);
-    setStep(2);
   };
 
   const onUpload = async (file: File | undefined) => {
@@ -135,7 +139,7 @@ export function DonationModal() {
     }
   };
 
-  const canReview = Boolean(receiptName) && actual >= 50 && reference.trim().length > 0 && method;
+  const canReview = canReviewDonation({ receiptName, amount: actual, reference, method });
 
   const submit = () => {
     const donation = submitDonation({
@@ -148,8 +152,9 @@ export function DonationModal() {
       receiptPreview,
       note: note.trim(),
     });
+    setConfirmingAmount(false);
     setSubmittedRef(donation.reference);
-    setStep(5);
+    setStep(4);
   };
 
   const hasQr = qrCodes.length > 0;
@@ -157,73 +162,32 @@ export function DonationModal() {
   return (
     <div className="modal-backdrop">
       <div className="modal donation-modal">
-        {step < 5 && (
+        {step < 4 && (
           <button className="modal-close" onClick={close} aria-label="Close">
             <Icon name="close" />
           </button>
         )}
 
-        {step < 5 && (
+        {step < 4 && (
           <div className="checkout-head">
             <span className="eyebrow">QR donation · demo</span>
             <h2>Back {athlete.name}</h2>
             <div className="stepper">
               <span className={step >= 1 ? "done" : ""}>1</span><i />
               <span className={step >= 2 ? "done" : ""}>2</span><i />
-              <span className={step >= 3 ? "done" : ""}>3</span><i />
-              <span className={step >= 4 ? "done" : ""}>4</span>
+              <span className={step >= 3 ? "done" : ""}>3</span>
             </div>
           </div>
         )}
 
-        {/* Step 1 — choose amount */}
+        {/* Step 1 — show QR to scan & pay (amount is entered after paying) */}
         {step === 1 && (
           <div className="donation-step">
             <img className="checkout-athlete" src={athlete.image} alt="" />
-            <h3>Choose your support</h3>
-            <p>Every amount helps fund training, travel, and competition costs.</p>
-            <div className="amount-grid">
-              {[500, 1000, 2500, 5000].map((a) => (
-                <button
-                  className={!custom && amount === a ? "selected" : ""}
-                  onClick={() => { setAmount(a); setCustom(""); }}
-                  key={a}
-                >
-                  {peso(a)}
-                </button>
-              ))}
-            </div>
-            <label>
-              Or enter a custom amount
-              <div className="money-input">
-                <span>₱</span>
-                <input
-                  type="number"
-                  min="50"
-                  value={custom}
-                  onChange={(e) => setCustom(e.target.value)}
-                  placeholder="Other amount"
-                />
-              </div>
-            </label>
-            <button
-              className="button full gold"
-              disabled={!actual || actual < 50}
-              onClick={goToQr}
-            >
-              Continue with {peso(actual || 0)} <Icon name="arrow" />
-            </button>
-          </div>
-        )}
-
-        {/* Step 2 — show QR to scan & pay */}
-        {step === 2 && (
-          <div className="donation-step">
-            <button className="back-button" onClick={() => setStep(1)}><Icon name="back" /> Amount</button>
-            <h3>Scan &amp; pay {peso(actual)}</h3>
+            <h3>Scan &amp; pay {athlete.name.split(" ")[0]}</h3>
             {hasQr ? (
               <>
-                <p>Open your wallet app, scan this code, and send your support directly to the athlete.</p>
+                <p>Open your wallet app, scan this code, and send your support directly to the athlete. You&rsquo;ll enter the amount you paid on the next step.</p>
                 <div className="qr-method-tabs">
                   {qrCodes.map((q) => (
                     <button
@@ -247,7 +211,14 @@ export function DonationModal() {
                 <p className="safe-note">
                   <Icon name="shield" /> Demo only. This QR is not scannable and no real payment is processed.
                 </p>
-                <button className="button full" onClick={() => setStep(3)}>
+                <button
+                  className="button full"
+                  onClick={() => {
+                    // Default to the first published method if none picked yet.
+                    if (!method && qrCodes[0]) setMethod(qrCodes[0].method);
+                    setStep(2);
+                  }}
+                >
                   I&rsquo;ve paid — upload receipt <Icon name="arrow" />
                 </button>
               </>
@@ -261,10 +232,10 @@ export function DonationModal() {
           </div>
         )}
 
-        {/* Step 3 — upload receipt + OCR + editable fields */}
-        {step === 3 && (
+        {/* Step 2 — upload receipt + OCR + editable fields */}
+        {step === 2 && (
           <div className="donation-step">
-            <button className="back-button" onClick={() => setStep(2)}><Icon name="back" /> QR code</button>
+            <button className="back-button" onClick={() => setStep(1)}><Icon name="back" /> QR code</button>
             <h3>Upload your receipt</h3>
             <p>We&rsquo;ll read it to suggest your details. You can edit everything below.</p>
 
@@ -344,8 +315,9 @@ export function DonationModal() {
                 <input
                   type="number"
                   min="50"
-                  value={custom || amount}
+                  value={custom}
                   onChange={(e) => setCustom(e.target.value)}
+                  placeholder="Enter the amount you paid"
                 />
               </div>
               {suggested?.amount != null && suggested.amount !== actual && (
@@ -383,7 +355,7 @@ export function DonationModal() {
               <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Cheer them on!" />
             </label>
 
-            <button className="button full" disabled={!canReview} onClick={() => setStep(4)}>
+            <button className="button full" disabled={!canReview} onClick={() => setStep(3)}>
               Review support <Icon name="arrow" />
             </button>
             {!canReview && (
@@ -392,10 +364,10 @@ export function DonationModal() {
           </div>
         )}
 
-        {/* Step 4 — review before submit */}
-        {step === 4 && (
+        {/* Step 3 — review before submit */}
+        {step === 3 && (
           <div className="donation-step">
-            <button className="back-button" onClick={() => setStep(3)}><Icon name="back" /> Details</button>
+            <button className="back-button" onClick={() => setStep(2)}><Icon name="back" /> Details</button>
             <h3>Review your support</h3>
             <div className="review-athlete">
               <img src={athlete.image} alt="" />
@@ -421,14 +393,38 @@ export function DonationModal() {
               <Icon name="shield" /> Submitted as <strong>pending</strong> until {athlete.name.split(" ")[0]} confirms
               receipt. Auto-confirms after 3 days (demo timeout — not bank verification).
             </p>
-            <button className="button full gold" onClick={submit}>
+            <button className="button full gold" onClick={() => setConfirmingAmount(true)}>
               Submit for confirmation <Icon name="heart" />
             </button>
+
+            {/* Amount-confirmation safeguard: guards against accidental typos.
+                It is NOT proof of payment — the demo cannot verify transactions. */}
+            {confirmingAmount && (
+              <div className="modal-backdrop" onClick={() => setConfirmingAmount(false)}>
+                <div className="modal small-modal confirm-amount" onClick={(e) => e.stopPropagation()}>
+                  <span className="eyebrow">Check the amount</span>
+                  <h2>Did you pay {peso(actual)}?</h2>
+                  <p>
+                    Please confirm the amount you actually sent to {athlete.name.split(" ")[0]} is{" "}
+                    <strong>{peso(actual)}</strong>. This is a safeguard against typos — it does not
+                    verify your payment.
+                  </p>
+                  <div className="form-actions">
+                    <button className="button secondary" onClick={() => { setConfirmingAmount(false); setStep(2); }}>
+                      Edit amount
+                    </button>
+                    <button className="button gold" onClick={submit}>
+                      Yes, {peso(actual)} is correct
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Step 5 — pending confirmation */}
-        {step === 5 && (
+        {/* Step 4 — pending confirmation */}
+        {step === 4 && (
           <div className="success">
             <span className="success-icon pending"><Icon name="check" size={34} /></span>
             <span className="eyebrow">Pending confirmation</span>

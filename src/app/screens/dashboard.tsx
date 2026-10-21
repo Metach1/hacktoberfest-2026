@@ -6,6 +6,7 @@ import { AthleteCard, Icon, MiniAthlete, Progress, peso } from "@/src/app/shared
 import { useStarlete, type Donation, type QrCode } from "@/src/app/store";
 import type { Athlete } from "@/src/app/data/athletes";
 import { msUntilAutoConfirm } from "@/src/app/lib/donations.mjs";
+import { checkPaymentQr } from "@/src/app/lib/qr-decode";
 
 function SupporterDashboard({ athletes }: { athletes: Athlete[] }) {
   const top = [...athletes].sort((a, b) => b.raised - a.raised);
@@ -53,15 +54,44 @@ function QrManager({ athleteId }: { athleteId: number }) {
   const [image, setImage] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState("");
+  // QR image validation feedback.
+  const [qrChecking, setQrChecking] = useState(false);
+  const [qrError, setQrError] = useState("");
+  const [qrNotice, setQrNotice] = useState("");
 
   const methods = ["GCash", "Maya", "GrabPay", "BPI", "BDO", "LandBank", "UnionBank", "Bank transfer"];
 
-  const readImage = (file: File | undefined, set: (v: string) => void) => {
+  /**
+   * Validate an uploaded QR image before accepting it: decode it locally and
+   * check the decoded contents against supported PH payment QR (QR Ph / EMVCo)
+   * formats. Unsupported or unreadable images are rejected with an actionable
+   * message and never stored. A valid-but-generic EMVCo QR is accepted with a
+   * soft caveat. Nothing leaves the browser; this is not payment verification.
+   */
+  const validateAndSetImage = async (file: File | undefined, set: (v: string) => void) => {
+    setQrError("");
+    setQrNotice("");
     if (!file) return;
-    if (!file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = () => set(String(reader.result ?? ""));
-    reader.readAsDataURL(file);
+    if (!file.type.startsWith("image/")) {
+      setQrError("Please upload an image file (PNG, JPG, or WebP) of your payment QR.");
+      return;
+    }
+    setQrChecking(true);
+    try {
+      const result = await checkPaymentQr(file);
+      if (!result.valid) {
+        setQrError(result.reason ?? "That image isn't a supported payment QR.");
+        return;
+      }
+      if (result.format === "emvco" && result.reason) {
+        setQrNotice(result.reason);
+      }
+      const reader = new FileReader();
+      reader.onload = () => set(String(reader.result ?? ""));
+      reader.readAsDataURL(file);
+    } finally {
+      setQrChecking(false);
+    }
   };
 
   const submitAdd = () => {
@@ -71,6 +101,8 @@ function QrManager({ athleteId }: { athleteId: number }) {
     setMethod("GCash");
     setLabel("");
     setImage("");
+    setQrError("");
+    setQrNotice("");
   };
 
   return (
@@ -110,7 +142,7 @@ function QrManager({ athleteId }: { athleteId: number }) {
                 <>
                   <label className="link-file">
                     Replace image
-                    <input type="file" accept="image/*" hidden onChange={(e) => readImage(e.target.files?.[0], (v) => replaceQrCode(athleteId, qr.id, { image: v }))} />
+                    <input type="file" accept="image/*" hidden onChange={(e) => validateAndSetImage(e.target.files?.[0], (v) => replaceQrCode(athleteId, qr.id, { image: v }))} />
                   </label>
                   <button className="text-button" onClick={() => { if (editLabel.trim()) replaceQrCode(athleteId, qr.id, { label: editLabel.trim() }); setEditing(null); }}>Save</button>
                 </>
@@ -139,12 +171,16 @@ function QrManager({ athleteId }: { athleteId: number }) {
           </label>
           <label className="qr-upload-field">
             QR image (optional — a placeholder is generated if omitted)
-            <input type="file" accept="image/*" onChange={(e) => readImage(e.target.files?.[0], setImage)} />
+            <input type="file" accept="image/*" onChange={(e) => validateAndSetImage(e.target.files?.[0], setImage)} />
+            <small className="field-hint">We check that it&rsquo;s a supported GCash, Maya, or bank (QR Ph) code. This isn&rsquo;t payment verification.</small>
           </label>
+          {qrChecking && <p className="field-hint">Checking the QR code…</p>}
+          {qrError && <p className="form-error">{qrError}</p>}
+          {qrNotice && <p className="field-hint">{qrNotice}</p>}
           {image && <img className="qr-add-preview" src={image} alt="QR preview" width={72} height={72} />}
           <div className="form-actions">
-            <button className="button secondary" onClick={() => { setAdding(false); setImage(""); }}>Cancel</button>
-            <button className="button" disabled={!label.trim()} onClick={submitAdd}>Save QR</button>
+            <button className="button secondary" onClick={() => { setAdding(false); setImage(""); setQrError(""); setQrNotice(""); }}>Cancel</button>
+            <button className="button" disabled={!label.trim() || qrChecking} onClick={submitAdd}>Save QR</button>
           </div>
         </div>
       )}
