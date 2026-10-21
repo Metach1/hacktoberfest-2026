@@ -30,6 +30,33 @@ export function imageForSport(sport) {
 }
 
 /**
+ * Per-athlete photo overrides, keyed by stable seed id.
+ *
+ * The landing page highlights individual athletes, so a specific athlete can
+ * carry an authentic-looking photo in a relatable local setting instead of the
+ * generic sport image. Only the listed ids are overridden; every other athlete
+ * keeps its sport image.
+ *
+ * Mapping note: the photo refresh called out a Track & Field "Mikaela" and a
+ * Boxing "Paolo". Starlete's fictional seed has a Track & Field athlete named
+ * Mikaela Solis (ath-001), which matches on both name and sport, so she gets a
+ * runner-on-a-track photo. The seed has no boxer named Paolo — "Paolo" (ath-006)
+ * is a weightlifter, and the two boxers are women — so no second override is
+ * applied, to avoid pairing an athlete with a photo of the wrong sport.
+ * The URL was verified to return a 200 image response.
+ */
+export const ATHLETE_IMAGE_OVERRIDE = {
+  // A runner mid-stride on an outdoor track — a relatable local training scene.
+  "ath-001":
+    "https://images.unsplash.com/photo-1786333889785-f8311fc3f487?auto=format&fit=crop&w=900&q=85",
+};
+
+/** Resolve an athlete's photo: a per-id override if present, else the sport image. */
+export function imageForAthlete(record) {
+  return ATHLETE_IMAGE_OVERRIDE[record.id] ?? imageForSport(record.sport);
+}
+
+/**
  * Convert a stable seed id (e.g. "ath-007") into the numeric id the UI uses.
  * @param {string} seedId
  * @returns {number}
@@ -52,7 +79,7 @@ export function toAthlete(record) {
     location: record.provinceOrLocality,
     regionCode,
     region: record.region,
-    image: imageForSport(record.sport),
+    image: imageForAthlete(record),
     raised: record.fundingRaised,
     goal: record.fundingGoal,
     supporters: record.votes,

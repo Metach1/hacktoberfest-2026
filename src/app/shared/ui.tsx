@@ -10,6 +10,7 @@ export const peso = (value: number) => `₱${value.toLocaleString("en-PH")}`;
 /** Stock demo imagery used across hero/community sections. */
 export const photos = {
   hero: "https://images.unsplash.com/photo-1535725213980-3cddc939d616?auto=format&fit=crop&w=1400&q=85",
+  teamTraining: "https://images.unsplash.com/photo-1659367527460-92759bf33263?auto=format&fit=crop&w=1400&q=85",
   runner: "https://images.unsplash.com/photo-1658911200109-a65fe8919a3e?auto=format&fit=crop&w=900&q=85",
   boxer: "https://images.unsplash.com/photo-1681203888755-bd61fe3558eb?auto=format&fit=crop&w=900&q=85",
   basketball: "https://images.unsplash.com/photo-1580442256395-d9c32a65fbf6?auto=format&fit=crop&w=900&q=85",
@@ -77,4 +78,3 @@ export function MiniAthlete({ athlete, rank }: { athlete: Athlete; rank: number 
     </Link>
   );
 }
-
