@@ -675,6 +675,9 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .feed-action { display: inline-flex; align-items: center; gap: 7px; background: none; border: 0; padding: 4px 0; color: var(--muted); font-weight: 600; font-size: 13px; }
 .feed-action:hover { color: var(--ink); }
 .feed-action.liked { color: var(--blue); }
+/* Only the feed's liked heart is filled; unliked stays outlined, and other
+   uses of the shared heart icon are unaffected. */
+.feed-action.liked svg { fill: currentColor; }
 
 .feed-comments { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 14px; }
 .feed-comment { display: flex; gap: 11px; }
