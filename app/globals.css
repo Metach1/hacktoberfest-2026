@@ -366,33 +366,62 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .map-section { max-width: 1050px; margin: 0 auto; padding: 56px 28px 8px; }
 .map-head { display: flex; align-items: end; justify-content: space-between; gap: 18px; margin-bottom: 22px; }
 .map-head h2 { font-size: 30px; margin: 6px 0 6px; color: var(--navy); }
-.map-head p { margin: 0; color: var(--muted); font-size: 14px; }
-.ph-map { background: var(--cream); border: 1px solid var(--line); border-radius: 18px; padding: 18px; }
-.ph-map-svg { display: block; width: 100%; max-width: 460px; height: auto; margin: 0 auto; }
-.ph-region { fill: #e5e9ef; stroke: var(--white); stroke-width: .6; transition: fill .15s, transform .15s; outline: none; }
-.ph-region.populated { fill: #9db9e8; cursor: pointer; }
-.ph-region.populated:hover { fill: var(--blue); }
-.ph-region.populated:focus-visible { fill: var(--blue); stroke: var(--gold); stroke-width: 1.2; }
-.ph-region.selected { fill: var(--gold); stroke: var(--gold-dark); stroke-width: 1; }
-.ph-region.empty { fill: #eceef2; cursor: default; opacity: .7; }
-.ph-map-legend { display: flex; flex-wrap: wrap; gap: 18px; justify-content: center; margin-top: 14px; font-size: 12px; color: var(--muted); }
-.legend-item { display: inline-flex; align-items: center; gap: 7px; }
-.legend-swatch { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
-.legend-swatch.populated { background: #9db9e8; }
+.map-head p { margin: 0; color: var(--muted); font-size: 14px; display: inline-flex; align-items: center; gap: 6px; }
+.map-head p svg { color: var(--blue); }
+
+/* Card gets a subtle gradient + depth so the map reads as a focal element. */
+.ph-map { position: relative; background: radial-gradient(circle at 30% 0%, #ffffff, var(--cream) 60%); border: 1px solid var(--line); border-radius: 22px; padding: 26px 18px 20px; box-shadow: 0 18px 44px rgba(7,28,52,.08); }
+.ph-map-svg { display: block; width: 100%; max-width: 480px; height: auto; margin: 0 auto; overflow: visible; }
+
+.ph-region { fill: #e9edf3; stroke: #ffffff; stroke-width: .7; transition: fill .25s ease, transform .2s ease, filter .2s ease; outline: none; transform-box: fill-box; transform-origin: center; }
+/* Choropleth: light-to-deep blue by athlete count. */
+.ph-region.i1 { fill: #cfe0ff; }
+.ph-region.i2 { fill: #9dbcf4; }
+.ph-region.i3 { fill: #5a8ae8; }
+.ph-region.i4 { fill: var(--blue); }
+.ph-region.populated { cursor: pointer; }
+.ph-region.populated:hover { filter: url(#ph-region-shadow) brightness(1.06); transform: scale(1.03); }
+.ph-region.populated:focus-visible { stroke: var(--gold); stroke-width: 1.6; filter: url(#ph-region-shadow); }
+.ph-region.selected { fill: var(--gold); stroke: var(--gold-dark); stroke-width: 1.6; filter: url(#ph-region-shadow); }
+.ph-region.selected:hover { fill: var(--gold); }
+.ph-region.empty { fill: #edeff3; cursor: default; opacity: .65; }
+
+/* Count badges sit above the regions; clicks fall through to the path. */
+.ph-badge { pointer-events: none; }
+.ph-badge circle { fill: var(--navy); stroke: #ffffff; stroke-width: 1; }
+.ph-badge text { fill: #ffffff; font-size: 7px; font-weight: 800; }
+.ph-badge.selected circle { fill: var(--gold-dark); }
+
+.ph-map-legend { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; justify-content: center; margin-top: 18px; font-size: 12px; color: var(--muted); }
+.legend-item, .legend-scale { display: inline-flex; align-items: center; gap: 7px; }
+.legend-scale { gap: 4px; }
+.legend-label { font-size: 11px; }
+.legend-swatch { width: 15px; height: 15px; border-radius: 4px; display: inline-block; }
+.legend-swatch.i1 { background: #cfe0ff; }
+.legend-swatch.i2 { background: #9dbcf4; }
+.legend-swatch.i3 { background: #5a8ae8; }
+.legend-swatch.i4 { background: var(--blue); }
 .legend-swatch.selected { background: var(--gold); }
-.legend-swatch.empty { background: #eceef2; border: 1px solid var(--line); }
+.legend-swatch.empty { background: #edeff3; border: 1px solid var(--line); }
 /* The map now sits between the hero and the filters, so the filter bar no
    longer overlaps the hero; neutralize its negative top margin in this flow. */
 .map-section + .filters { margin-top: 22px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ph-region { transition: fill .25s ease; }
+  .ph-region.populated:hover { transform: none; }
+}
 
 @media (max-width: 760px) {
   .map-section { padding: 36px 18px 4px; }
   .map-head { flex-direction: column; align-items: flex-start; gap: 10px; }
   .map-head h2 { font-size: 25px; }
+  .ph-map { padding: 18px 12px 16px; }
+  .ph-badge text { font-size: 8px; }
   .filters { margin-top: 18px; }
 }
 
-/* Starlete white-first athlete funding landing page (adapted from Figma Make) */
+/* Accepted incoming landing-page styles: Starlete white-first athlete funding landing page. */
 .home-app { background: var(--color-pure); }
 /* Deep-blue header + white text on the landing page only. The shared header
    markup is reused; only its colors change under .home-app. */

@@ -2,7 +2,7 @@
 
 ## Our commitment
 
-Startletes is committed to a welcoming, respectful community. We want participation to be safe and constructive for everyone, regardless of background, identity, experience, or role in the project.
+Startlete is committed to a welcoming, respectful community. We want participation to be safe and constructive for everyone, regardless of background, identity, experience, or role in the project.
 
 ## Expected behavior
 
@@ -27,4 +27,4 @@ Retaliation against someone for making a good-faith report is not acceptable.
 
 ## Scope
 
-This Code of Conduct applies in project spaces and whenever someone is representing the Startletes project in public.
+This Code of Conduct applies in project spaces and whenever someone is representing the Startlete project in public.

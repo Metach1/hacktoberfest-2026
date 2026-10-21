@@ -2,7 +2,7 @@
 
 ## 1. Open-source onboarding
 
-- [x] 1.1 Add the root MIT `LICENSE` and rewrite `README.md` as the Startletes project guide; verify it describes the app, prerequisites, setup and development commands, seed command, project constraints, and links to contributor guidance.
+- [x] 1.1 Add the root MIT `LICENSE` and rewrite `README.md` as the Startlete project guide; verify it describes the app, prerequisites, setup and development commands, seed command, project constraints, and links to contributor guidance.
 - [x] 1.2 Add `CONTRIBUTING.md` with validation and pull-request instructions and `CODE_OF_CONDUCT.md` with behavior, enforcement, and private reporting to the repository owner's GitHub contact method; verify the contact route is available before inviting contributors.
 - [x] 1.3 Add a root `.env.example` explaining that the current app has no required environment variables and update `.gitignore` to unignore only `.env.example`; verify `.env.example` is not ignored and `.env.local` remains ignored with `git check-ignore`.
 

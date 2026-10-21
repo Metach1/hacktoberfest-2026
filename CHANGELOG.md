@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Starlete are documented in this file.
+All notable changes to Startlete are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project aims to follow semantic versioning once it reaches a release.
@@ -34,7 +34,7 @@ and this project aims to follow semantic versioning once it reaches a release.
 - Dependency-free Node test suite (`npm run test`, `node --test`) covering the
   region taxonomy, the seed-to-view athlete adapter, the `countByRegion` and
   combined-filter helpers, and validation of the generated region-map data.
-- Starlete application screens: landing, discover, athlete profile, login,
+- Startlete application screens: landing, discover, athlete profile, login,
   register, supporter dashboard, athlete dashboard, edit profile, and a
   multi-step simulated donation flow.
 - Modern sports-community visual design (navy / blue / gold / white, Inter) in
@@ -66,7 +66,7 @@ and this project aims to follow semantic versioning once it reaches a release.
 - Discover's free-text location filter was replaced by a region filter that
   stays in sync with the interactive map selection.
 - Replaced the earlier multi-route prototype and the earthy/editorial redesign
-  with the Starlete single-app experience mounted at `/`.
+  with the Startlete single-app experience mounted at `/`.
 - Switched the app font to Inter.
 
 ### Removed

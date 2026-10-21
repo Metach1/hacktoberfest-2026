@@ -1,8 +1,8 @@
-# Startletes UI Design Documentation
+# Startlete UI Design Documentation
 
 ## Overview
 
-Startletes is a fundraising and discovery platform for local athletes in the Philippines. The interface is designed to help users:
+Startlete is a fundraising and discovery platform for local athletes in the Philippines. The interface is designed to help users:
 
 - discover athlete profiles by sport and location,
 - browse promising athletes and funding campaigns,
@@ -77,7 +77,7 @@ The home dashboard gives a quick overview of the ecosystem: athlete population, 
 
 The page has:
 
-- a header with the brand name `Startletes`, search icon, bell icon, and profile avatar,
+- a header with the brand name `Startlete`, search icon, bell icon, and profile avatar,
 - a large map panel in the middle with the Philippines silhouette,
 - three summary cards below it:
   - Total Athletes

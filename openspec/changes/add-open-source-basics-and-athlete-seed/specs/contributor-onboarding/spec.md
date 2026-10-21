@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Make the Startletes repository straightforward to understand, set up, and contribute to while clearly communicating its license, community expectations, and environment configuration.
+Make the Startlete repository straightforward to understand, set up, and contribute to while clearly communicating its license, community expectations, and environment configuration.
 
 ## ADDED Requirements
 
@@ -14,7 +14,7 @@ The repository SHALL include a root-level MIT license that identifies the projec
 - **THEN** a root-level `LICENSE` file identifies the MIT license and its copyright holder
 
 ### Requirement: Project setup and purpose are documented
-The README SHALL explain Startletes' purpose, major user-facing capabilities, current technology, local setup and development commands, contribution entry point, and hard constraints on fake data and mock funding.
+The README SHALL explain Startlete's purpose, major user-facing capabilities, current technology, local setup and development commands, contribution entry point, and hard constraints on fake data and mock funding.
 
 #### Scenario: New contributor prepares a local checkout
 - **WHEN** a contributor follows the README from a fresh checkout

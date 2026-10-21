@@ -2,7 +2,7 @@
 
 ## Why
 
-Startletes needs clear, trustworthy open-source onboarding and a safe, reusable dataset for development and demos. The current repository has only a minimal README, ignores all `.env*` files, has no seed-data tooling, and its sample athlete data uses real public athlete identities, contrary to the project brief's fake-data-only constraint.
+Startlete needs clear, trustworthy open-source onboarding and a safe, reusable dataset for development and demos. The current repository has only a minimal README, ignores all `.env*` files, has no seed-data tooling, and its sample athlete data uses real public athlete identities, contrary to the project brief's fake-data-only constraint.
 
 ## What Changes
 

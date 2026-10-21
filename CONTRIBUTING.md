@@ -1,4 +1,4 @@
-# Contributing to Startletes
+# Contributing to Startlete
 
 Thanks for your interest in contributing. Please keep contributions focused, approachable, and consistent with the product brief in [`docs/PROJECT_BRIEF.md`](./docs/PROJECT_BRIEF.md).
 

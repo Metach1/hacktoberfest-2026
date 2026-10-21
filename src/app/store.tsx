@@ -13,6 +13,13 @@ import {
   athletes as seedAthletes,
   type Athlete,
 } from "@/src/app/data/athletes";
+import {
+  seedPosts,
+  newId,
+  SUPPORTER_ID,
+  type Post,
+  type ActorId,
+} from "@/src/app/data/posts";
 
 export type Role = "supporter" | "athlete";
 
@@ -21,8 +28,11 @@ export type Role = "supporter" | "athlete";
  * invalidates any athlete list cached in localStorage from an earlier version
  * (e.g. the legacy 5-profile hardcoded array) so returning visitors get the
  * current seed instead of stale data.
+ *
+ * v3: posts moved from a flat `string[]` to structured `Post[]` objects with
+ * likes and comments.
  */
-const DATA_VERSION = "v2";
+const DATA_VERSION = "v3";
 
 interface StarleteState {
   /** Whether client-side state has hydrated from localStorage. */
@@ -31,8 +41,8 @@ interface StarleteState {
   role: Role | null;
   /** The live athlete list (funding totals mutate as donations complete). */
   athletes: Athlete[];
-  /** Athlete-dashboard demo posts. */
-  posts: string[];
+  /** Social feed posts (athlete-authored, with likes and comments). */
+  posts: Post[];
   /** The athlete currently targeted by the donation modal, if open. */
   donationTarget: Athlete | null;
 
@@ -42,7 +52,17 @@ interface StarleteState {
   openDonation: (athlete: Athlete) => void;
   closeDonation: () => void;
   completeDonation: (athleteId: number, amount: number) => void;
-  addPost: (post: string) => void;
+  /** Publish a new post authored by the given athlete. */
+  addPost: (authorAthleteId: number, text: string) => void;
+  /** Toggle a like on a post for the current actor (supporter or athlete). */
+  toggleLike: (postId: string, actorId: ActorId) => void;
+  /** Add a comment to a post. */
+  addComment: (postId: string, authorId: ActorId, authorName: string, text: string) => void;
+}
+
+/** The id for the current actor, used for likes/comments in the demo. */
+export function actorIdForRole(role: Role | null, athletes: Athlete[]): ActorId {
+  return role === "athlete" ? athletes[0]?.id ?? SUPPORTER_ID : SUPPORTER_ID;
 }
 
 const StarleteContext = createContext<StarleteState | null>(null);
@@ -51,7 +71,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role | null>(null);
   const [athletes, setAthletes] = useState<Athlete[]>(seedAthletes);
   const [mounted, setMounted] = useState(false);
-  const [posts, setPosts] = useState(["One step closer to nationals", "Recovery, reset, repeat"]);
+  const [posts, setPosts] = useState<Post[]>(seedPosts);
   const [donationTarget, setDonationTarget] = useState<Athlete | null>(null);
 
   // Hydrate persisted state from localStorage once on client mount. Reading
@@ -63,12 +83,18 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       const savedRole = window.localStorage.getItem("starlete-role") as Role | null;
       const savedVersion = window.localStorage.getItem("starlete-data-version");
       const savedAthletes = window.localStorage.getItem("starlete-athletes");
+      const savedPosts = window.localStorage.getItem("starlete-posts");
       setRole(savedRole ?? null);
       if (savedVersion === DATA_VERSION && savedAthletes) {
         setAthletes(JSON.parse(savedAthletes) as Athlete[]);
+        if (savedPosts) setPosts(JSON.parse(savedPosts) as Post[]);
       } else {
+        // Version bump (or first visit): reset to current seeds and drop stale
+        // caches, including the legacy string[] posts from before v3.
         setAthletes(seedAthletes);
+        setPosts(seedPosts);
         window.localStorage.removeItem("starlete-athletes");
+        window.localStorage.removeItem("starlete-posts");
         window.localStorage.setItem("starlete-data-version", DATA_VERSION);
       }
     } catch {
@@ -84,10 +110,11 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
     try {
       window.localStorage.setItem("starlete-data-version", DATA_VERSION);
       window.localStorage.setItem("starlete-athletes", JSON.stringify(athletes));
+      window.localStorage.setItem("starlete-posts", JSON.stringify(posts));
     } catch {
       // ignore
     }
-  }, [athletes, mounted]);
+  }, [athletes, posts, mounted]);
 
   const login = useCallback((nextRole: Role) => {
     setRole(nextRole);
@@ -117,7 +144,60 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
-  const addPost = useCallback((post: string) => setPosts((prev) => [post, ...prev]), []);
+  const addPost = useCallback((authorAthleteId: number, text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const post: Post = {
+      id: newId("post"),
+      authorAthleteId,
+      text: trimmed,
+      createdAt: new Date().toISOString(),
+      likes: 0,
+      likedBy: [],
+      comments: [],
+    };
+    setPosts((prev) => [post, ...prev]);
+  }, []);
+
+  const toggleLike = useCallback((postId: string, actorId: ActorId) => {
+    setPosts((prev) =>
+      prev.map((p) => {
+        if (p.id !== postId) return p;
+        const liked = p.likedBy.includes(actorId);
+        const likedBy = liked
+          ? p.likedBy.filter((id) => id !== actorId)
+          : [...p.likedBy, actorId];
+        return { ...p, likedBy, likes: p.likes + (liked ? -1 : 1) };
+      }),
+    );
+  }, []);
+
+  const addComment = useCallback(
+    (postId: string, authorId: ActorId, authorName: string, text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? {
+                ...p,
+                comments: [
+                  ...p.comments,
+                  {
+                    id: newId("cmt"),
+                    authorId,
+                    authorName,
+                    text: trimmed,
+                    createdAt: new Date().toISOString(),
+                  },
+                ],
+              }
+            : p,
+        ),
+      );
+    },
+    [],
+  );
 
   const value = useMemo<StarleteState>(
     () => ({
@@ -133,8 +213,10 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       closeDonation,
       completeDonation,
       addPost,
+      toggleLike,
+      addComment,
     }),
-    [mounted, role, athletes, posts, donationTarget, login, logout, getAthlete, openDonation, closeDonation, completeDonation, addPost],
+    [mounted, role, athletes, posts, donationTarget, login, logout, getAthlete, openDonation, closeDonation, completeDonation, addPost, toggleLike, addComment],
   );
 
   return <StarleteContext.Provider value={value}>{children}</StarleteContext.Provider>;
