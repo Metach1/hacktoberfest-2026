@@ -447,3 +447,9 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
   .feed-hero { padding: 40px 24px 36px; margin: 0 -20px 24px; }
   .feed-post { padding: 18px 18px; }
 }
+
+/* Athlete post edit/delete controls (athlete dashboard "Recent posts") */
+.dash-post .post-actions { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
+.dash-post .post-actions .text-button { padding: 2px 0; font-size: 13px; }
+.dash-post .post-actions .text-button.danger { color: #c0392b; }
+.dash-post .post-actions .confirm-text { font-size: 13px; color: var(--muted); margin-right: 2px; }
