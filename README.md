@@ -81,8 +81,9 @@ npm run build
 `npm run test` runs the dependency-free Node test suite (`node --test`) covering
 the region taxonomy, the seed-to-view adapter, the region/filter helpers, the
 generated region-map data, the donation lifecycle and claimed-amount helpers,
-the receipt-text parser, the EMVCo / QR Ph payment-QR validator, and the
-image-aspect-ratio CSS guard.
+the receipt-text parser, the EMVCo / QR Ph payment-QR validator, the donation
+reject lifecycle and supporter/athlete scoping, the receipt-upload filter
+(accept / reject / uncertain) policy, and the image-aspect-ratio CSS guard.
 
 ## Sample data
 
@@ -95,9 +96,57 @@ Never replace seed examples with real athlete identities, contact details, proof
 
 See [`data/README.md`](./data/README.md) for the complete schema, regeneration instructions, and synthetic-data rules.
 
-## Project principles
+## Payments: receipts, review, and upload filtering
 
-- Protect athletes' privacy; many athletes in the real world are minors.
+The supporter donation flow is QR-based and deliberately offline: a supporter
+scans an athlete's published QR, pays in their own wallet app, then uploads the
+receipt and enters the amount. Donations are recorded as **pending** until the
+athlete **confirms** them (or a 3-day demo auto-confirm timeout elapses). The
+athlete can also **reject** a pending donation with a reason (amount mismatch,
+invalid receipt, wrong image, or other) and an optional note, which the
+supporter sees on their rejected payment. Rejected and pending donations never
+count toward an athlete's confirmed totals or supporter count, and a donation
+can never be both confirmed and rejected.
+
+Both dashboards show payment history: the athlete sees **Recent payments**
+(confirmed, pending, rejected, with the rejection reason) and the supporter sees
+**My payments** scoped to their own submissions.
+
+> **Identity limitation.** The demo has a single supporter identity
+> (`SUPPORTER_ID`); it has no real accounts or login. "My payments" is scoped to
+> that one identity so it never shows another supporter's data, but the demo
+> cannot distinguish multiple real supporters. This is the safest compatible
+> behavior for the current model, not multi-user isolation.
+
+### Receipt upload filtering
+
+Uploaded receipts are checked locally, in layers, before they can be stored or
+shown to an athlete. Nothing is ever uploaded to an external service — every
+check runs in the browser, matching how OCR and QR decoding stay on-device.
+
+1. **File type and size** (PNG/JPG/WebP, ≤ 5 MB) — unchanged.
+2. **Explicit-image moderation (optional, local).** If
+   [`nsfwjs`](https://github.com/infinitered/nsfwjs) (MIT, client-side
+   TensorFlow.js) is installed, confidently explicit images are **rejected**
+   before storage/display with a neutral message. `nsfwjs` is **not** a hard
+   dependency: if it is absent the app degrades to the "uncertain" path below
+   rather than silently claiming an image is safe.
+3. **Receipt-text signal (OCR).** A plausible receipt should contain
+   transaction details (amount, reference, and/or a known method). A QR code
+   alone is **not** evidence of a receipt or of payment. Enough signal →
+   **accept**; no signal → **uncertain**.
+4. **Uncertain handling.** Uncertain uploads are kept **private from the
+   athlete** (submitted as metadata only, image withheld) until a clearer
+   receipt is provided. Rejected image bytes are not retained.
+
+**License & privacy:** `nsfwjs` is MIT-licensed and runs entirely on-device;
+no image or data leaves the browser. **Limitations:** OCR and moderation are
+heuristics, not proof. A low explicit score does not prove an image is a genuine
+receipt, and **none of these checks prove a payment occurred** — a confirmed
+donation reflects the demo workflow, never bank settlement. If `nsfwjs` is not
+installed, explicit-image rejection is unavailable and borderline images fall
+through to the uncertain (kept-private) path by design.
+
 - Use fake data only in source, screenshots, tests, and demos.
 - Keep payments and payouts out of scope; funding values are mock examples.
 - Keep the ranking formula public and documented if/when ranking behavior is implemented.

@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Icon, peso } from "@/src/app/shared/ui";
 import { useStarlete, type QrCode } from "@/src/app/store";
 import { recognizeReceipt } from "@/src/app/lib/ocr";
@@ -8,6 +9,8 @@ import {
   canReviewDonation,
   parseClaimedAmount,
 } from "@/src/app/lib/donations.mjs";
+import { classifyReceipt, RECEIPT_DECISION } from "@/src/app/lib/receipt-filter.mjs";
+import { moderateImage } from "@/src/app/lib/moderation";
 
 const MAX_RECEIPT_BYTES = 5 * 1024 * 1024; // 5 MB
 const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp"];
@@ -33,8 +36,15 @@ function validateReceipt(file: File): string | null {
  * is recorded as PENDING until the athlete confirms (or the demo auto-confirm
  * timeout elapses).
  *
- * No real payment is processed. Neither OCR nor the amount confirmation is
- * payment verification — the confirmation only guards against accidental typos.
+ * Uploaded receipts are filtered locally before they can be stored or shown to
+ * the athlete: an optional on-device explicit-image model can reject confidently
+ * explicit images, and an OCR receipt-text signal decides accept vs. uncertain.
+ * Uncertain uploads are kept private from the athlete (submitted as metadata
+ * only) until a clearer receipt is provided; rejected images are never stored.
+ *
+ * No real payment is processed. Neither OCR, moderation, nor the amount
+ * confirmation is payment verification — the confirmation only guards against
+ * accidental typos, and the filters never prove a payment is genuine.
  */
 export function DonationModal() {
   const { donationTarget, closeDonation, submitDonation, getQrCodes } = useStarlete();
@@ -49,10 +59,16 @@ export function DonationModal() {
   const [note, setNote] = useState("");
   // Amount-confirmation safeguard shown before the final submit.
   const [confirmingAmount, setConfirmingAmount] = useState(false);
+  const [showFullQr, setShowFullQr] = useState(false);
 
   const [receiptName, setReceiptName] = useState("");
   const [receiptPreview, setReceiptPreview] = useState("");
   const [uploadError, setUploadError] = useState("");
+  // Receipt-filter decision for the current upload. `accepted` images are shown
+  // to the athlete; `uncertain` images are kept private (not attached to the
+  // athlete-visible record); `rejected` images are never stored.
+  const [filterState, setFilterState] = useState<"idle" | "checking" | "accepted" | "uncertain" | "rejected">("idle");
+  const [filterMessage, setFilterMessage] = useState("");
   const [ocrState, setOcrState] = useState<"idle" | "running" | "done" | "failed">("idle");
   const [ocrProgress, setOcrProgress] = useState(0);
   const [suggested, setSuggested] = useState<{
@@ -63,6 +79,15 @@ export function DonationModal() {
 
   const [submittedRef, setSubmittedRef] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!showFullQr) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setShowFullQr(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [showFullQr]);
 
   const athlete = donationTarget;
   const qrCodes = useMemo<QrCode[]>(
@@ -85,6 +110,8 @@ export function DonationModal() {
     setReceiptName("");
     setReceiptPreview("");
     setUploadError("");
+    setFilterState("idle");
+    setFilterMessage("");
     setOcrState("idle");
     setOcrProgress(0);
     setSuggested(null);
@@ -105,19 +132,49 @@ export function DonationModal() {
     }
     setUploadError("");
     setReceiptName(file.name);
+    // Clear any previous decision/preview while we re-check this upload.
+    setReceiptPreview("");
+    setFilterState("checking");
+    setFilterMessage("");
 
-    // Build a local preview (data URL) without any upload.
-    const reader = new FileReader();
-    reader.onload = () => setReceiptPreview(String(reader.result ?? ""));
-    reader.readAsDataURL(file);
-
-    // Run OCR best-effort; never block manual entry.
+    // Run OCR (receipt-text signal) and local moderation (explicit-image
+    // signal) best-effort, in parallel. Neither blocks manual field entry and
+    // neither is treated as proof of payment.
     setOcrState("running");
     setOcrProgress(0);
-    const result = await recognizeReceipt(file, (p) => setOcrProgress(p));
+    const [result, moderation] = await Promise.all([
+      recognizeReceipt(file, (p) => setOcrProgress(p)),
+      moderateImage(file),
+    ]);
     const hasAny = result.amount != null || result.reference != null || result.method != null;
     setSuggested({ amount: result.amount, reference: result.reference, method: result.method });
     setOcrState(hasAny ? "done" : "failed");
+
+    // Layered decision: explicit -> reject; receipt signal -> accept;
+    // otherwise -> uncertain (kept private from the athlete).
+    const decision = classifyReceipt({
+      ocr: { amount: result.amount, reference: result.reference, method: result.method, rawText: result.rawText },
+      moderation,
+    });
+
+    if (decision.decision === RECEIPT_DECISION.REJECT) {
+      // Never store or preview a rejected image; drop the file reference and
+      // do not retain its bytes.
+      setFilterState("rejected");
+      setFilterMessage(decision.reason);
+      setReceiptName("");
+      setReceiptPreview("");
+      return;
+    }
+
+    // Accepted or uncertain: build a local preview (data URL) for the
+    // supporter. For `uncertain` the preview stays local to the supporter and
+    // is NOT attached to the athlete-visible submission (handled at submit).
+    const reader = new FileReader();
+    reader.onload = () => setReceiptPreview(String(reader.result ?? ""));
+    reader.readAsDataURL(file);
+    setFilterState(decision.decision === RECEIPT_DECISION.ACCEPT ? "accepted" : "uncertain");
+    setFilterMessage(decision.reason);
 
     // Pre-fill empty fields from suggestions; never overwrite user edits.
     if (result.amount != null && !custom) setCustom(String(result.amount));
@@ -139,17 +196,27 @@ export function DonationModal() {
     }
   };
 
-  const canReview = canReviewDonation({ receiptName, amount: actual, reference, method });
+  // An uncertain or rejected image must not be treated as a usable receipt.
+  // Rejected clears receiptName already; uncertain keeps the supporter's local
+  // preview but is withheld from the athlete-visible record at submit time.
+  const canReview =
+    filterState !== "checking" &&
+    filterState !== "rejected" &&
+    canReviewDonation({ receiptName, amount: actual, reference, method });
 
   const submit = () => {
+    // Keep uncertain receipts private from the athlete: submit without the
+    // image (metadata only) so it isn't shown until retried/reviewed. Rejected
+    // images never reach here (receiptName is cleared).
+    const keepPrivate = filterState === "uncertain";
     const donation = submitDonation({
       athleteId: athlete.id,
       amount: actual,
       method,
       reference: reference.trim(),
       supporterName,
-      receiptName,
-      receiptPreview,
+      receiptName: keepPrivate ? "" : receiptName,
+      receiptPreview: keepPrivate ? "" : receiptPreview,
       note: note.trim(),
     });
     setConfirmingAmount(false);
@@ -160,6 +227,7 @@ export function DonationModal() {
   const hasQr = qrCodes.length > 0;
 
   return (
+    <>
     <div className="modal-backdrop">
       <div className="modal donation-modal">
         {step < 4 && (
@@ -206,6 +274,9 @@ export function DonationModal() {
                       <strong>{activeQr.method}</strong>
                       <small>{activeQr.label}</small>
                     </div>
+                    <button className="text-button" onClick={() => setShowFullQr(true)}>
+                      View in full
+                    </button>
                   </div>
                 )}
                 <p className="safe-note">
@@ -273,6 +344,12 @@ export function DonationModal() {
                 </button>
               )}
               {uploadError && <p className="form-error">{uploadError}</p>}
+              {filterState === "rejected" && <p className="form-error">{filterMessage}</p>}
+              {filterState === "uncertain" && (
+                <p className="field-hint warn">
+                  <Icon name="shield" size={14} /> {filterMessage} It won&rsquo;t be shown to the athlete until it&rsquo;s a clearer receipt.
+                </p>
+              )}
             </div>
 
             {ocrState === "running" && (
@@ -444,5 +521,29 @@ export function DonationModal() {
         )}
       </div>
     </div>
+    {showFullQr && activeQr && createPortal(
+      <div className="qr-fullscreen-backdrop" onClick={() => setShowFullQr(false)}>
+        <div
+          className="qr-fullscreen-dialog"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${activeQr.method} QR code`}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <button
+            className="modal-close"
+            aria-label="Close full-size QR code"
+            onClick={() => setShowFullQr(false)}
+          >
+            <Icon name="close" />
+          </button>
+          <span className="eyebrow">{activeQr.method}</span>
+          <img src={activeQr.image} alt={`${activeQr.method} QR code`} />
+          <strong>{activeQr.label}</strong>
+        </div>
+      </div>,
+      document.body,
+    )}
+    </>
   );
 }

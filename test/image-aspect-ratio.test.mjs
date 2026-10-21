@@ -28,6 +28,7 @@ function ruleBody(selector) {
 
 const IMAGE_SELECTORS = [
   ".qr-display img", // supporter: QR shown to scan & pay
+  ".qr-fullscreen-dialog img", // supporter: enlarged QR view
   ".qr-manage-row img", // athlete dashboard: managed QR thumbnails
   ".qr-add-preview", // athlete dashboard: new-QR upload preview
   ".receipt-preview img", // supporter: uploaded receipt thumbnail

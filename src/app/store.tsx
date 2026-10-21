@@ -16,6 +16,7 @@ import {
 import {
   applyAutoConfirm,
   confirmDonation as confirmDonationRecord,
+  rejectDonation as rejectDonationRecord,
   confirmedTotals,
   createPendingDonation,
   DONATION_STATUS,
@@ -42,12 +43,14 @@ export interface QrCode {
   image: string;
 }
 
-export type DonationStatus = "pending" | "confirmed";
+export type DonationStatus = "pending" | "confirmed" | "rejected";
 
-/** A QR-based donation moving through the pending -> confirmed lifecycle. */
+/** A QR-based donation moving through the pending -> confirmed/rejected lifecycle. */
 export interface Donation {
   id: string;
   athleteId: number;
+  /** Stable supporter identity this submission belongs to (demo sentinel). */
+  supporterId: ActorId | null;
   amount: number;
   method: string;
   reference: string;
@@ -59,13 +62,20 @@ export interface Donation {
   createdAt: number;
   confirmedAt: number | null;
   confirmedBy: "athlete" | "auto" | null;
+  /** When the athlete rejected this donation (epoch ms), else null. */
+  rejectedAt: number | null;
+  /** Stored rejection reason value (see REJECTION_REASONS), else null. */
+  rejectionReason: string | null;
+  /** Optional athlete note explaining the rejection. */
+  rejectionNote: string;
 }
 
 /**
- * Bumped whenever persisted data shapes change. v4 combines QR codes,
- * donations, and structured social posts.
+ * Bumped whenever persisted data shapes change. v5 adds supporter identity and
+ * the reject lifecycle to donations (on top of v4's QR codes, donations, and
+ * structured social posts).
  */
-const DATA_VERSION = "v4";
+const DATA_VERSION = "v5";
 
 /**
  * A tiny, dependency-free inline-SVG "QR" placeholder as a data URL. It is NOT
@@ -168,7 +178,13 @@ interface StarleteState {
     note?: string;
   }) => Donation;
   confirmDonation: (donationId: string) => void;
+  /** Reject a pending donation with a required reason and optional note. */
+  rejectDonation: (donationId: string, reason: string, note?: string) => void;
   getDonationsForAthlete: (athleteId: number) => Donation[];
+  /** The current demo supporter's stable identity. */
+  supporterId: ActorId;
+  /** Donations the current supporter submitted (never another supporter's). */
+  getDonationsForSupporter: () => Donation[];
 
   /** Publish a new post authored by the given athlete. */
   addPost: (authorAthleteId: number, text: string) => void;
@@ -181,6 +197,33 @@ interface StarleteState {
 /** The id for the current actor, used for likes/comments in the demo. */
 export function actorIdForRole(role: Role | null, athletes: Athlete[]): ActorId {
   return role === "athlete" ? athletes[0]?.id ?? SUPPORTER_ID : SUPPORTER_ID;
+}
+
+/**
+ * Fill any fields missing from a persisted donation so older records load
+ * safely after a shape change (e.g. before supporterId / rejection fields
+ * existed). Defensive only — never changes a present value.
+ */
+function normalizeDonation(d: Partial<Donation>): Donation {
+  return {
+    id: String(d.id ?? `don-${d.createdAt ?? Date.now()}`),
+    athleteId: Number(d.athleteId),
+    supporterId: d.supporterId ?? null,
+    amount: Number(d.amount ?? 0),
+    method: d.method ?? "",
+    reference: d.reference ?? "",
+    supporterName: d.supporterName || "Anonymous supporter",
+    receiptName: d.receiptName ?? "",
+    receiptPreview: d.receiptPreview ?? "",
+    note: d.note ?? "",
+    status: (d.status as DonationStatus) ?? "pending",
+    createdAt: Number(d.createdAt ?? Date.now()),
+    confirmedAt: d.confirmedAt ?? null,
+    confirmedBy: d.confirmedBy ?? null,
+    rejectedAt: d.rejectedAt ?? null,
+    rejectionReason: d.rejectionReason ?? null,
+    rejectionNote: d.rejectionNote ?? "",
+  };
 }
 
 const StarleteContext = createContext<StarleteState | null>(null);
@@ -205,7 +248,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       const savedDonations = window.localStorage.getItem("starlete-donations");
       const savedPosts = window.localStorage.getItem("starlete-posts");
       setRole(savedRole ?? null);
-      if (savedVersion === DATA_VERSION || savedVersion === "v3") {
+      if (savedVersion === DATA_VERSION || savedVersion === "v4" || savedVersion === "v3") {
         if (savedAthletes) setAthletes(JSON.parse(savedAthletes) as Athlete[]);
         if (savedQr) setQrCodes(JSON.parse(savedQr) as Record<number, QrCode[]>);
         if (savedPosts) {
@@ -217,9 +260,11 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
           }
         }
         if (savedDonations) {
-          // Apply the demo auto-confirm rule to anything that aged past the
-          // window while the app was closed, then reconcile athlete totals.
-          const loaded = JSON.parse(savedDonations) as Donation[];
+          // Normalize older records to the current shape (adds supporterId and
+          // rejection fields when missing), apply the demo auto-confirm rule to
+          // anything that aged past the window while the app was closed, then
+          // reconcile athlete totals.
+          const loaded = (JSON.parse(savedDonations) as Partial<Donation>[]).map(normalizeDonation);
           const reconciled = applyAutoConfirm(loaded) as Donation[];
           setDonations(reconciled);
         }
@@ -344,8 +389,14 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // --- Donation lifecycle --------------------------------------------------
+  // The demo has a single supporter identity (SUPPORTER_ID). Every submission
+  // is stamped with it so "My payments" can be scoped to the current supporter
+  // without ever exposing another supporter's history. (See the limitation
+  // note in the docs: the demo cannot distinguish multiple real supporters.)
+  const supporterId: ActorId = SUPPORTER_ID;
+
   const submitDonation = useCallback<StarleteState["submitDonation"]>((input) => {
-    const donation = createPendingDonation(input) as Donation;
+    const donation = createPendingDonation({ ...input, supporterId: SUPPORTER_ID }) as Donation;
     setDonations((list) => [donation, ...list]);
     return donation;
   }, []);
@@ -356,10 +407,26 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  const rejectDonation = useCallback((donationId: string, reason: string, note?: string) => {
+    setDonations((list) =>
+      list.map((d) =>
+        d.id === donationId ? (rejectDonationRecord(d, reason, note ?? "") as Donation) : d,
+      ),
+    );
+  }, []);
+
   const getDonationsForAthlete = useCallback(
     (athleteId: number) =>
       donations
         .filter((d) => d.athleteId === athleteId)
+        .sort((a, b) => b.createdAt - a.createdAt),
+    [donations],
+  );
+
+  const getDonationsForSupporter = useCallback(
+    () =>
+      donations
+        .filter((d) => d.supporterId === SUPPORTER_ID)
         .sort((a, b) => b.createdAt - a.createdAt),
     [donations],
   );
@@ -439,7 +506,10 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       removeQrCode,
       submitDonation,
       confirmDonation,
+      rejectDonation,
       getDonationsForAthlete,
+      supporterId,
+      getDonationsForSupporter,
       addPost,
       toggleLike,
       addComment,
@@ -448,7 +518,8 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       mounted, role, reconciledAthletes, posts, donationTarget, qrCodes, donations,
       login, logout, getAthlete, openDonation, closeDonation,
       getQrCodes, addQrCode, replaceQrCode, removeQrCode,
-      submitDonation, confirmDonation, getDonationsForAthlete, addPost, toggleLike, addComment,
+      submitDonation, confirmDonation, rejectDonation, getDonationsForAthlete,
+      supporterId, getDonationsForSupporter, addPost, toggleLike, addComment,
     ],
   );
 

@@ -8,14 +8,55 @@ import type { Athlete } from "@/src/app/data/athletes";
 import { type Post } from "@/src/app/data/posts";
 import { TimeAgo } from "@/src/app/shared/time-ago";
 import { msUntilAutoConfirm } from "@/src/app/lib/donations.mjs";
+import {
+  REJECTION_REASONS,
+  rejectionReasonLabel,
+} from "@/src/app/lib/donations.mjs";
 import { checkPaymentQr } from "@/src/app/lib/qr-decode";
 
 function SupporterDashboard({ athletes }: { athletes: Athlete[] }) {
+  const { getDonationsForSupporter, getAthlete } = useStarlete();
   const top = [...athletes].sort((a, b) => b.raised - a.raised);
+  const myPayments = getDonationsForSupporter();
   return (
     <main className="dashboard page-shell">
       <div className="dash-welcome"><div><span className="eyebrow">Supporter dashboard</span><h1>Magandang araw, Jamie.</h1><p>There are new stories waiting for your support.</p></div><div className="impact-chip"><Icon name="heart" /><span><small>Your total impact</small><b>₱4,500 given</b></span></div></div>
       <section><div className="section-head"><div><span className="eyebrow">Picked for you</span><h2>Athletes making moves</h2></div></div><div className="card-grid">{athletes.slice(0, 3).map(a => <AthleteCard key={a.id} athlete={a} />)}</div></section>
+      <section className="dashboard-grid">
+        <div className="dash-card">
+          <div className="section-head"><div><span className="eyebrow">Your payments</span><h2>My payments</h2></div>{myPayments.length > 0 && <span className="count-pill">{myPayments.length}</span>}</div>
+          <p className="muted-line">Donations you submitted. A <strong>pending</strong> submission is awaiting athlete review — it is not yet accepted. A <strong>confirmed</strong> status reflects this demo workflow, not independently verified bank settlement.</p>
+          {myPayments.length === 0 ? (
+            <div className="empty-note small"><p>You haven&rsquo;t submitted any donations yet.</p></div>
+          ) : (
+            <div className="payment-history">
+              {myPayments.map((d) => {
+                const athlete = getAthlete(d.athleteId);
+                return (
+                  <div className="payment-row" key={d.id}>
+                    <div className="payment-main">
+                      <strong>{athlete?.name ?? `Athlete #${d.athleteId}`}</strong>
+                      <StatusBadge status={d.status} />
+                    </div>
+                    <div className="payment-meta">
+                      <span>{peso(d.amount)}</span>
+                      <span>{d.method || "—"}</span>
+                      <span>{shortDate(d.createdAt)}</span>
+                    </div>
+                    {d.status === "pending" && <p className="payment-note muted-line">Awaiting athlete review — not yet accepted.</p>}
+                    {d.status === "rejected" && (
+                      <p className="payment-reject">
+                        Rejected · {rejectionReasonLabel(d.rejectionReason ?? "")}
+                        {d.rejectionNote ? ` — ${d.rejectionNote}` : ""}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
       <section className="dashboard-grid">
         <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Rising now</span><h2>Trending athletes</h2></div></div>{athletes.slice(1, 4).map((a, i) => <MiniAthlete key={a.id} athlete={a} rank={i + 1} />)}</div>
         <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Community</span><h2>Funding leaderboard</h2></div></div>{top.slice(0, 4).map((a, i) => <div className="leader-row" key={a.id}><span className={i === 0 ? "rank first" : "rank"}>{i + 1}</span><div><strong>{a.name}</strong><small>{a.supporters} supporters</small></div><b>{peso(a.raised)}</b></div>)}</div>
@@ -45,6 +86,17 @@ function timeAgo(ts: number): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
+}
+
+/** Absolute short date for history rows (stable, locale-aware). */
+function shortDate(ts: number): string {
+  return new Date(ts).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" });
+}
+
+/** Small colored pill reflecting a donation's status. */
+function StatusBadge({ status }: { status: Donation["status"] }) {
+  const label = status === "confirmed" ? "Confirmed" : status === "rejected" ? "Rejected" : "Pending";
+  return <span className={`status-badge ${status}`}>{label}</span>;
 }
 
 function QrManager({ athleteId }: { athleteId: number }) {
@@ -191,10 +243,36 @@ function QrManager({ athleteId }: { athleteId: number }) {
 }
 
 function PendingDonations({ athleteId }: { athleteId: number }) {
-  const { getDonationsForAthlete, confirmDonation } = useStarlete();
+  const { getDonationsForAthlete, confirmDonation, rejectDonation } = useStarlete();
   const all = getDonationsForAthlete(athleteId);
   const pending = all.filter((d) => d.status === "pending");
   const [open, setOpen] = useState<Donation | null>(null);
+  // Reject flow: target donation, chosen reason, optional note, confirm step.
+  const [rejecting, setRejecting] = useState<Donation | null>(null);
+  const [reason, setReason] = useState("");
+  const [rejectNote, setRejectNote] = useState("");
+  const [confirmReject, setConfirmReject] = useState(false);
+
+  const startReject = (d: Donation) => {
+    setOpen(null);
+    setRejecting(d);
+    setReason("");
+    setRejectNote("");
+    setConfirmReject(false);
+  };
+
+  const cancelReject = () => {
+    setRejecting(null);
+    setReason("");
+    setRejectNote("");
+    setConfirmReject(false);
+  };
+
+  const applyReject = () => {
+    if (!rejecting || !reason) return;
+    rejectDonation(rejecting.id, reason, rejectNote.trim());
+    cancelReject();
+  };
 
   return (
     <div className="dash-card">
@@ -202,7 +280,7 @@ function PendingDonations({ athleteId }: { athleteId: number }) {
         <div><span className="eyebrow">Action needed</span><h2>Pending receipts</h2></div>
         {pending.length > 0 && <span className="count-pill">{pending.length}</span>}
       </div>
-      <p className="muted-line">Review each receipt and confirm you received the funds. Pending donations auto-confirm after 3 days — a demo timeout, not bank verification.</p>
+      <p className="muted-line">Review each receipt and confirm you received the funds, or reject it with a reason. Pending donations auto-confirm after 3 days — a demo timeout, not bank verification.</p>
 
       {pending.length === 0 ? (
         <div className="empty-note small"><p>No pending donations right now.</p></div>
@@ -220,6 +298,7 @@ function PendingDonations({ athleteId }: { athleteId: number }) {
             <b>{peso(d.amount)}</b>
             <div className="pending-actions">
               <button className="text-button" onClick={() => setOpen(d)}>View</button>
+              <button className="text-button danger" onClick={() => startReject(d)}>Reject</button>
               <button className="button small" onClick={() => confirmDonation(d.id)}>Confirm</button>
             </div>
           </div>
@@ -243,8 +322,106 @@ function PendingDonations({ athleteId }: { athleteId: number }) {
               ? <div className="review-receipt"><img src={open.receiptPreview} alt={open.receiptName || "Receipt"} /></div>
               : <p className="muted-line">No receipt image attached.</p>}
             <p className="safe-note"><Icon name="shield" /> Confirming records this demo donation toward your total. OCR and this flow do not verify real payments.</p>
-            <button className="button full gold" onClick={() => { confirmDonation(open.id); setOpen(null); }}>Confirm receipt</button>
+            <div className="form-actions">
+              <button className="button secondary danger" onClick={() => startReject(open)}>Reject…</button>
+              <button className="button gold" onClick={() => { confirmDonation(open.id); setOpen(null); }}>Confirm receipt</button>
+            </div>
           </div>
+        </div>
+      )}
+
+      {rejecting && (
+        <div className="modal-backdrop" onClick={cancelReject}>
+          <div className="modal small-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={cancelReject} aria-label="Close"><Icon name="close" /></button>
+            {!confirmReject ? (
+              <>
+                <span className="eyebrow">Reject donation</span>
+                <h2>Reject {peso(rejecting.amount)} from {rejecting.supporterName}?</h2>
+                <p className="muted-line">Pick a reason. The supporter will see this reason (and your note, if any) with their rejected donation. This does not change your confirmed totals.</p>
+                <label>
+                  Reason
+                  <select value={reason} onChange={(e) => setReason(e.target.value)}>
+                    <option value="" disabled>Select a reason</option>
+                    {REJECTION_REASONS.map((r) => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Note to supporter (optional{reason === "other" ? ", recommended" : ""})
+                  <textarea value={rejectNote} onChange={(e) => setRejectNote(e.target.value)} placeholder="Explain what went wrong, e.g. the amount on the receipt didn't match." />
+                </label>
+                <div className="form-actions">
+                  <button className="button secondary" onClick={cancelReject}>Cancel</button>
+                  <button className="button danger" disabled={!reason} onClick={() => setConfirmReject(true)}>Continue</button>
+                </div>
+                {!reason && <p className="field-hint">Select a reason to continue.</p>}
+              </>
+            ) : (
+              <>
+                <span className="eyebrow">Confirm rejection</span>
+                <h2>Reject this donation?</h2>
+                <div className="review-rows">
+                  <span><small>Amount</small><b>{peso(rejecting.amount)}</b></span>
+                  <span><small>From</small><b>{rejecting.supporterName}</b></span>
+                  <span><small>Reason</small><b>{rejectionReasonLabel(reason)}</b></span>
+                  {rejectNote.trim() && <span><small>Note</small><b>{rejectNote.trim()}</b></span>}
+                </div>
+                <p className="safe-note"><Icon name="shield" /> This marks the donation rejected and will not count toward your totals. It cannot be confirmed afterward.</p>
+                <div className="form-actions">
+                  <button className="button secondary" onClick={() => setConfirmReject(false)}>Back</button>
+                  <button className="button danger" onClick={applyReject}>Reject donation</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Athlete-facing payment history: all donations (confirmed, pending, rejected)
+ * with amount, supporter, method, reference, date, status, and the rejection
+ * reason/note where applicable. Mobile-friendly stacked rows.
+ */
+function PaymentHistory({ athleteId }: { athleteId: number }) {
+  const { getDonationsForAthlete } = useStarlete();
+  const all = getDonationsForAthlete(athleteId);
+
+  return (
+    <div className="dash-card">
+      <div className="section-head">
+        <div><span className="eyebrow">History</span><h2>Recent payments</h2></div>
+        {all.length > 0 && <span className="count-pill">{all.length}</span>}
+      </div>
+      <p className="muted-line">Every donation you&rsquo;ve received, including pending and rejected ones. Confirmed status reflects this demo workflow, not independently verified bank settlement.</p>
+      {all.length === 0 ? (
+        <div className="empty-note small"><p>No payments yet.</p></div>
+      ) : (
+        <div className="payment-history">
+          {all.map((d) => (
+            <div className="payment-row" key={d.id}>
+              <div className="payment-main">
+                <strong>{d.supporterName}</strong>
+                <StatusBadge status={d.status} />
+              </div>
+              <div className="payment-meta">
+                <span>{peso(d.amount)}</span>
+                <span>{d.method || "—"}</span>
+                <span>Ref {d.reference || "—"}</span>
+                <span>{shortDate(d.createdAt)}</span>
+              </div>
+              {d.status === "rejected" && (
+                <p className="payment-reject">
+                  Rejected · {rejectionReasonLabel(d.rejectionReason ?? "")}
+                  {d.rejectionNote ? ` — ${d.rejectionNote}` : ""}
+                </p>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -286,6 +463,10 @@ function AthleteDashboard({ athlete, posts, onCreate }: { athlete: Athlete; post
               ))}
         </div>
         <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Your story</span><h2>Recent posts</h2></div><button className="text-button" onClick={() => setCreating(true)}>New post</button></div>{myPosts.length ? myPosts.map(p => <article className="dash-post" key={p.id}><small><TimeAgo iso={p.createdAt} /></small><strong>{p.text}</strong><span>{p.likes} cheers · {p.comments.length} comments</span></article>) : <p className="profile-bio">No posts yet. Share your first update!</p>}</div>
+      </section>
+
+      <section className="dashboard-grid">
+        <PaymentHistory athleteId={athlete.id} />
       </section>
       {creating && <div className="modal-backdrop"><div className="modal small-modal"><button className="modal-close" onClick={() => setCreating(false)}><Icon name="close" /></button><span className="eyebrow">Share an update</span><h2>Bring supporters along</h2><label>Post<textarea value={post} onChange={e => setPost(e.target.value)} placeholder="What happened in training today?" /></label><button className="button full" disabled={!post.trim()} onClick={() => { onCreate(athlete.id, post); setCreating(false); setPost(""); }}>Publish update</button></div></div>}
     </main>

@@ -14,6 +14,10 @@ import {
   parseClaimedAmount,
   isAmountAcceptable,
   canReviewDonation,
+  REJECTION_REASONS,
+  rejectionReasonLabel,
+  rejectDonation,
+  canRejectDonation,
 } from "../src/app/lib/donations.mjs";
 
 test("createPendingDonation builds a pending record with defaults", () => {
@@ -113,7 +117,6 @@ test("confirmedTotals is zero when an athlete has no confirmed donations", () =>
   assert.deepEqual(confirmedTotals(donations, 99), { total: 0, count: 0 });
 });
 
-
 // --- Claimed-amount entry (replaces the removed up-front amount prompt) ------
 
 test("parseClaimedAmount treats blank/invalid input as 0 (not yet entered)", () => {
@@ -186,4 +189,129 @@ test("amount confirmation: confirming submits exactly the shown amount", () => {
   assert.equal(state.confirming, false);
   assert.equal(state.submitted, true);
   assert.equal(state.submittedAmount, 1200);
+});
+
+// --- Rejecting a pending donation -------------------------------------------
+
+test("createPendingDonation stamps supporterId and rejection defaults", () => {
+  const d = createPendingDonation({ athleteId: 1, amount: 500, supporterId: "supporter" });
+  assert.equal(d.supporterId, "supporter");
+  assert.equal(d.status, DONATION_STATUS.PENDING);
+  assert.equal(d.rejectedAt, null);
+  assert.equal(d.rejectionReason, null);
+  assert.equal(d.rejectionNote, "");
+});
+
+test("REJECTION_REASONS includes the required options plus Other", () => {
+  const values = REJECTION_REASONS.map((r) => r.value);
+  assert.ok(values.includes("amount_mismatch"));
+  assert.ok(values.includes("invalid_receipt"));
+  assert.ok(values.includes("wrong_image"));
+  assert.ok(values.includes("other"));
+  assert.equal(rejectionReasonLabel("amount_mismatch"), "Amount does not match");
+});
+
+test("rejectDonation requires a valid reason", () => {
+  const d = createPendingDonation({ athleteId: 1, amount: 500 });
+  assert.throws(() => rejectDonation(d, ""), /reason/i);
+  assert.throws(() => rejectDonation(d, undefined), /reason/i);
+  assert.throws(() => rejectDonation(d, "not_a_real_reason"), /reason/i);
+});
+
+test("rejectDonation marks a pending donation rejected with reason and note", () => {
+  const d = createPendingDonation({ athleteId: 1, amount: 500, createdAt: 1000 });
+  const r = rejectDonation(d, "invalid_receipt", "  Blurry screenshot  ", 2000);
+  assert.equal(r.status, DONATION_STATUS.REJECTED);
+  assert.equal(r.rejectionReason, "invalid_receipt");
+  assert.equal(r.rejectionNote, "Blurry screenshot", "note is trimmed");
+  assert.equal(r.rejectedAt, 2000);
+  // Confirm metadata stays cleared.
+  assert.equal(r.confirmedAt, null);
+  assert.equal(r.confirmedBy, null);
+  // Original is untouched (immutability).
+  assert.equal(d.status, DONATION_STATUS.PENDING);
+});
+
+test("a confirmed donation cannot be rejected (totals stay intact)", () => {
+  const confirmed = confirmDonation(createPendingDonation({ athleteId: 1, amount: 500 }), "athlete", 2000);
+  const afterReject = rejectDonation(confirmed, "amount_mismatch");
+  assert.equal(afterReject, confirmed, "returns the same confirmed object unchanged");
+  assert.equal(afterReject.status, DONATION_STATUS.CONFIRMED);
+});
+
+test("a rejected donation cannot later be confirmed", () => {
+  const rejected = rejectDonation(createPendingDonation({ athleteId: 1, amount: 500 }), "wrong_image");
+  const afterConfirm = confirmDonation(rejected, "athlete", 3000);
+  assert.equal(afterConfirm, rejected, "returns the same rejected object unchanged");
+  assert.equal(afterConfirm.status, DONATION_STATUS.REJECTED);
+});
+
+test("rejectDonation is idempotent for an already-rejected donation", () => {
+  const rejected = rejectDonation(createPendingDonation({ athleteId: 1, amount: 500 }), "other", "note");
+  const again = rejectDonation(rejected, "amount_mismatch", "different");
+  assert.equal(again, rejected, "unchanged, keeps original reason/note");
+  assert.equal(again.rejectionReason, "other");
+});
+
+test("canRejectDonation only allows pending donations", () => {
+  const pending = createPendingDonation({ athleteId: 1, amount: 500 });
+  assert.equal(canRejectDonation(pending), true);
+  assert.equal(canRejectDonation(confirmDonation(pending)), false);
+  assert.equal(canRejectDonation(rejectDonation(pending, "other")), false);
+  assert.equal(canRejectDonation(null), false);
+});
+
+test("rejected donations do not affect confirmed totals or supporter count", () => {
+  const donations = [
+    confirmDonation(createPendingDonation({ athleteId: 1, amount: 1000, id: "1" })),
+    rejectDonation(createPendingDonation({ athleteId: 1, amount: 9999, id: "2" }), "amount_mismatch"),
+    createPendingDonation({ athleteId: 1, amount: 500, id: "3" }), // pending
+    confirmDonation(createPendingDonation({ athleteId: 1, amount: 2500, id: "4" })),
+  ];
+  const { total, count } = confirmedTotals(donations, 1);
+  assert.equal(total, 3500, "only the two confirmed donations count");
+  assert.equal(count, 2);
+});
+
+test("applyAutoConfirm never auto-confirms a rejected donation", () => {
+  const rejected = rejectDonation(
+    createPendingDonation({ athleteId: 1, amount: 500, createdAt: 0, id: "r" }),
+    "invalid_receipt",
+  );
+  const next = applyAutoConfirm([rejected], AUTO_CONFIRM_MS * 10);
+  assert.equal(next[0].status, DONATION_STATUS.REJECTED);
+});
+
+// --- Visibility scoping: who sees which donations ---------------------------
+// Mirrors the store's getDonationsForAthlete / getDonationsForSupporter filters
+// so the association rule is covered without a React runtime.
+
+const forAthlete = (donations, athleteId) => donations.filter((d) => d.athleteId === athleteId);
+const forSupporter = (donations, supporterId) => donations.filter((d) => d.supporterId === supporterId);
+
+test("donations are scoped to the correct athlete and supporter", () => {
+  const donations = [
+    createPendingDonation({ athleteId: 1, amount: 100, supporterId: "supporter", id: "a" }),
+    confirmDonation(createPendingDonation({ athleteId: 1, amount: 200, supporterId: "supporter", id: "b" })),
+    rejectDonation(createPendingDonation({ athleteId: 2, amount: 300, supporterId: "supporter", id: "c" }), "other"),
+    createPendingDonation({ athleteId: 1, amount: 400, supporterId: "other-supporter", id: "d" }),
+  ];
+
+  // Athlete 1 sees all three of their donations across every status.
+  const a1 = forAthlete(donations, 1);
+  assert.deepEqual(a1.map((d) => d.id).sort(), ["a", "b", "d"]);
+  assert.deepEqual(
+    a1.map((d) => d.status).sort(),
+    [DONATION_STATUS.CONFIRMED, DONATION_STATUS.PENDING, DONATION_STATUS.PENDING].sort(),
+  );
+
+  // The demo supporter sees only their own submissions (never "other-supporter").
+  const mine = forSupporter(donations, "supporter");
+  assert.deepEqual(mine.map((d) => d.id).sort(), ["a", "b", "c"]);
+  assert.ok(!mine.some((d) => d.supporterId === "other-supporter"), "no other supporter's data");
+  // And those span pending, confirmed, and rejected.
+  const statuses = new Set(mine.map((d) => d.status));
+  assert.ok(statuses.has(DONATION_STATUS.PENDING));
+  assert.ok(statuses.has(DONATION_STATUS.CONFIRMED));
+  assert.ok(statuses.has(DONATION_STATUS.REJECTED));
 });

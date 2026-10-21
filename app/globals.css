@@ -232,6 +232,10 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .modal { width: 100%; max-width: 520px; background: white; border-radius: 20px; padding: 31px; position: relative; box-shadow: 0 25px 70px rgba(0,0,0,.3); }
 .small-modal { max-width: 480px; }
 .modal-close { position: absolute; right: 19px; top: 19px; background: #f0f2f4; border: 0; border-radius: 50%; width: 34px; height: 34px; display: grid; place-items: center; z-index: 2; }
+.qr-fullscreen-backdrop { position: fixed; z-index: 110; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(3,17,31,.9); }
+.qr-fullscreen-dialog { position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 100%; max-height: calc(100vh - 40px); overflow: auto; padding: 28px; border-radius: 16px; background: white; text-align: center; }
+.qr-fullscreen-dialog img { display: block; width: min(80vw, 560px); height: min(65vh, 560px); max-height: calc(100vh - 180px); object-fit: contain; background: white; }
+.qr-fullscreen-dialog strong { color: var(--ink); }
 .checkout-head { text-align: center; border-bottom: 1px solid var(--line); padding-bottom: 22px; }
 .checkout-head h2 { margin: 0 0 20px; font-size: 27px; }
 .stepper { display: flex; justify-content: center; align-items: center; }
@@ -411,6 +415,7 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .qr-method-tabs button.selected { border-color: var(--blue); background: var(--blue-light); color: var(--blue); }
 .qr-display { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 20px; background: var(--cream); border-radius: 16px; margin-bottom: 8px; }
 .qr-display img { width: 160px; height: 160px; object-fit: contain; border-radius: 12px; background: white; padding: 8px; border: 1px solid var(--line); }
+.qr-display .text-button { min-height: 40px; }
 .qr-meta { text-align: center; display: flex; flex-direction: column; gap: 2px; }
 .qr-meta small { color: var(--muted); font-size: 11px; }
 
@@ -424,6 +429,7 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .receipt-preview div { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
 .form-error { color: #c0392b; font-size: 11px; margin: 8px 0 0; }
 .field-hint { color: var(--muted); font-size: 11px; text-align: center; margin: 10px 0 0; }
+.field-hint.warn { color: #9a6314; display: flex; align-items: center; gap: 6px; justify-content: center; }
 
 .ocr-status { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 10px 12px; border-radius: 10px; margin-bottom: 14px; background: var(--blue-light); color: var(--blue); }
 .ocr-status.ok { background: #e4f7ee; color: #16815a; }
@@ -467,6 +473,24 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .pending-actions { display: flex; align-items: center; gap: 8px; }
 .donor-note { background: var(--cream); border-radius: 10px; padding: 10px 12px; font-size: 12px; font-style: italic; color: var(--ink); margin: 12px 0; }
 .donor-avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: #ffe9ec; color: #e24a5f; }
+.pending-actions .text-button.danger { color: #c0392b; }
+.button.danger { background: #c0392b; color: #fff; }
+.button.secondary.danger { background: #fdecea; color: #c0392b; }
+
+/* Donation status badges + payment history (athlete + supporter) */
+.status-badge { border-radius: 999px; padding: 2px 10px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; }
+.status-badge.pending { background: #fff3dc; color: #9a6314; }
+.status-badge.confirmed { background: #e4f6ec; color: #1f7a46; }
+.status-badge.rejected { background: #fdecea; color: #c0392b; }
+.payment-history { display: flex; flex-direction: column; }
+.payment-row { padding: 12px 0; border-top: 1px solid var(--line); font-size: 12px; }
+.payment-main { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.payment-main strong { font-size: 13px; }
+.payment-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--muted); margin-top: 4px; }
+.payment-meta span:first-child { color: var(--ink); font-weight: 700; }
+.payment-reject { margin: 6px 0 0; color: #c0392b; font-size: 11px; }
+.payment-note { margin: 6px 0 0; font-size: 11px; }
+
 
 @media (max-width: 560px) {
   .pending-row { flex-wrap: wrap; }

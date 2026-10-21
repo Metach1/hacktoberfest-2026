@@ -58,6 +58,8 @@ src/
       ocr.ts                 Browser-only Tesseract.js receipt OCR (dynamic import)
       payment-qr.mjs         Pure EMVCo / QR Ph payment-QR validator (shared with tests)
       qr-decode.ts           Browser-only jsQR decode + local payment-QR validation
+      receipt-filter.mjs     Pure accept/reject/uncertain receipt policy (shared with tests)
+      moderation.ts          Optional browser-only explicit-image moderation (nsfwjs, graceful fallback)
 data/
   athletes.json              Generated fictional profiles used by the app
   seed.mjs                   Deterministic profile generator and validation
