@@ -44,7 +44,7 @@ the look is self-contained and portable.
 | --- | --- | --- |
 | Landing (`/`) | Everyone | Hero headline, trust strip, featured athletes, How It Works, CTA. |
 | Discover (`/discover`) | Everyone | Interactive region map plus search, sport, and region filters over a card grid; the region is kept in the URL. |
-| Athlete profile | Everyone | Photo, bio, achievement, funding panel, updates, Support button. |
+| Athlete profile | Everyone | Photo, bio, achievement, funding panel with recent confirmed donations (See all / See top popups), updates, Support button. |
 | Login / Register | Visitors | Role toggle (Supporter / Athlete); athlete fields + minor consent. |
 | Supporter dashboard | Supporter | Picked-for-you athletes, My payments (own submissions, scoped to the demo identity), trending, funding leaderboard, impact. |
 | Athlete dashboard | Athlete | Verification status, funds, goal, supporters, pending receipts (confirm/reject with reason), Recent payments history, posts, Create Post. |

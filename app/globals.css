@@ -146,6 +146,25 @@ footer p { margin: 0; flex: 1; }
 .support-stats { display: flex; justify-content: space-between; margin: 11px 0 24px; font-size: 10px; color: var(--muted); }
 .support-stats b { color: var(--ink); }
 .safe-note { color: var(--muted); font-size: 10px; line-height: 1.4; display: flex; align-items: center; justify-content: center; gap: 6px; margin: 13px 0 0; }
+
+/* GoFundMe-style confirmed donations on the public profile */
+.donations-panel { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 16px; }
+.donations-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.donations-head strong { font-size: 14px; }
+.donations-tabs { display: flex; gap: 14px; }
+.donations-tabs .text-button { font-size: 12px; }
+.donations-empty { font-size: 12px; margin: 4px 0 0; }
+.donation-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.donation-list.scroll { max-height: 60vh; overflow-y: auto; margin-top: 6px; }
+.donation-item { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.donation-item:first-child { border-top: none; }
+.donation-item-meta { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.donation-item-meta strong { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.donation-item-meta small { color: var(--muted); font-size: 10px; }
+.donation-item > b { color: var(--ink); white-space: nowrap; }
+.donor-initials { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--cream); color: var(--navy); font-size: 11px; font-weight: 800; flex-shrink: 0; }
+.donations-popup { max-width: 420px; }
+
 .profile-content { display: grid; grid-template-columns: 1.3fr .7fr; gap: 80px; border-top: 1px solid var(--line); margin-top: 70px; padding-top: 65px; }
 .profile-content h2 { font-size: 32px; }
 .profile-content p { color: var(--muted); line-height: 1.75; }

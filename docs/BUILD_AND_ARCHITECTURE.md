@@ -48,6 +48,7 @@ src/
       ui.tsx                 Icon, Logo, Progress, AthleteCard, peso, photos
       chrome.tsx             Header, Footer, AppChrome (shared layout chrome)
       donation.tsx           Global simulated-donation modal
+      donations-panel.tsx    Public-profile confirmed-donations section (recent + See all / See top popups)
     data/
       athletes.ts            Typed adapter: seed JSON -> UI `Athlete` view shape
     lib/

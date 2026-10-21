@@ -234,6 +234,78 @@ export function confirmedTotals(donations, athleteId) {
   return { total, count };
 }
 
+/**
+ * All CONFIRMED donations for an athlete, newest first. Pending and rejected
+ * donations are excluded entirely (they never surface on the public profile).
+ *
+ * @param {Array<Object>} donations
+ * @param {number} athleteId
+ * @returns {Array<Object>} new array, sorted by createdAt descending
+ */
+export function confirmedDonationsForAthlete(donations, athleteId) {
+  return donations
+    .filter((d) => d.athleteId === athleteId && d.status === DONATION_STATUS.CONFIRMED)
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/**
+ * The N most recent CONFIRMED donations for an athlete (default 5), newest
+ * first. A thin convenience wrapper over confirmedDonationsForAthlete.
+ *
+ * @param {Array<Object>} donations
+ * @param {number} athleteId
+ * @param {number} [limit=5]
+ * @returns {Array<Object>}
+ */
+export function recentConfirmedDonations(donations, athleteId, limit = 5) {
+  return confirmedDonationsForAthlete(donations, athleteId).slice(0, Math.max(0, limit));
+}
+
+/**
+ * Stable donor identity key for grouping. The demo's only per-donation identity
+ * signal is the display name the supporter entered (supporterId is a single
+ * shared sentinel in this demo, so it cannot distinguish donors). We therefore
+ * group by the trimmed display name and NEVER merge different names or split a
+ * shared one — matching "use existing donor identities; don't invent or
+ * incorrectly combine them." Anonymous donations all carry the same
+ * "Anonymous supporter" name and so are grouped together; this is a known demo
+ * identity limitation, not a claim that they are the same person.
+ *
+ * @param {Object} donation
+ * @returns {string}
+ */
+export function donorKey(donation) {
+  const name = (donation.supporterName ?? "").trim();
+  return name || "Anonymous supporter";
+}
+
+/**
+ * Rank donors for an athlete by their TOTAL confirmed contribution, highest
+ * first. Only confirmed donations are considered. Ties are broken by the most
+ * recent contribution, then by name for determinism.
+ *
+ * @param {Array<Object>} donations
+ * @param {number} athleteId
+ * @param {number} [limit] Optional cap on returned rows.
+ * @returns {Array<{ donor: string, total: number, count: number, latestAt: number }>}
+ */
+export function topDonorsForAthlete(donations, athleteId, limit) {
+  const byDonor = new Map();
+  for (const d of donations) {
+    if (d.athleteId !== athleteId || d.status !== DONATION_STATUS.CONFIRMED) continue;
+    const key = donorKey(d);
+    const entry = byDonor.get(key) ?? { donor: key, total: 0, count: 0, latestAt: 0 };
+    entry.total += d.amount;
+    entry.count += 1;
+    entry.latestAt = Math.max(entry.latestAt, d.createdAt);
+    byDonor.set(key, entry);
+  }
+  const ranked = [...byDonor.values()].sort(
+    (a, b) => b.total - a.total || b.latestAt - a.latestAt || a.donor.localeCompare(b.donor),
+  );
+  return typeof limit === "number" ? ranked.slice(0, Math.max(0, limit)) : ranked;
+}
+
 /** Minimum claimed donation amount (pesos) the supporter flow accepts. */
 export const MIN_DONATION_AMOUNT = 50;
 

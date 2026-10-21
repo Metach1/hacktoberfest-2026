@@ -83,7 +83,8 @@ the region taxonomy, the seed-to-view adapter, the region/filter helpers, the
 generated region-map data, the donation lifecycle and claimed-amount helpers,
 the receipt-text parser, the EMVCo / QR Ph payment-QR validator, the donation
 reject lifecycle and supporter/athlete scoping, the receipt-upload filter
-(accept / reject / uncertain) policy, and the image-aspect-ratio CSS guard.
+(accept / reject / uncertain) policy, the public-profile confirmed-donation
+display and donor-ranking helpers, and the image-aspect-ratio CSS guard.
 
 ## Sample data
 
@@ -111,6 +112,19 @@ can never be both confirmed and rejected.
 Both dashboards show payment history: the athlete sees **Recent payments**
 (confirmed, pending, rejected, with the rejection reason) and the supporter sees
 **My payments** scoped to their own submissions.
+
+Each athlete's **public profile** shows a GoFundMe-style donations section next
+to the fundraising progress: the five latest **confirmed** donations inline
+(donor name, amount, date), the confirmed-donation count, and a clear empty
+state. A **See all** popup lists every confirmed donation; a **See top** popup
+ranks donors by their total confirmed contribution. Pending and rejected
+donations — and receipts — are never shown here. Donor identities come from the
+name entered on each donation; the display ranking groups by that exact name and
+never merges different names or splits a shared one. Because the demo has no
+real accounts, anonymous donations all share the name "Anonymous supporter" and
+are grouped together — a known demo identity limitation, not a claim that they
+are the same person. All donations popups are mobile-friendly and dismissible via
+close button, outside click, or Escape.
 
 > **Identity limitation.** The demo has a single supporter identity
 > (`SUPPORTER_ID`); it has no real accounts or login. "My payments" is scoped to
