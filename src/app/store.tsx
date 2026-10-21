@@ -20,6 +20,14 @@ import {
   createPendingDonation,
   DONATION_STATUS,
 } from "@/src/app/lib/donations.mjs";
+import {
+  seedPosts,
+  migrateLegacyPosts,
+  newId,
+  SUPPORTER_ID,
+  type Post,
+  type ActorId,
+} from "@/src/app/data/posts";
 
 export type Role = "supporter" | "athlete";
 
@@ -54,12 +62,10 @@ export interface Donation {
 }
 
 /**
- * Bumped whenever the shape or source of persisted data changes. It invalidates
- * any state cached in localStorage from an earlier version so returning
- * visitors get current data instead of stale shapes. v3 adds QR codes and the
- * donation lifecycle.
+ * Bumped whenever persisted data shapes change. v4 combines QR codes,
+ * donations, and structured social posts.
  */
-const DATA_VERSION = "v3";
+const DATA_VERSION = "v4";
 
 /**
  * A tiny, dependency-free inline-SVG "QR" placeholder as a data URL. It is NOT
@@ -130,7 +136,9 @@ interface StarleteState {
   mounted: boolean;
   role: Role | null;
   athletes: Athlete[];
-  posts: string[];
+  /** Social feed posts (athlete-authored, with likes and comments). */
+  posts: Post[];
+  /** The athlete currently targeted by the donation modal, if open. */
   donationTarget: Athlete | null;
   /** Published payment QR codes keyed by athlete id. */
   qrCodes: Record<number, QrCode[]>;
@@ -142,7 +150,6 @@ interface StarleteState {
   getAthlete: (id: number) => Athlete | undefined;
   openDonation: (athlete: Athlete) => void;
   closeDonation: () => void;
-
   // QR management (athlete side).
   getQrCodes: (athleteId: number) => QrCode[];
   addQrCode: (athleteId: number, method: string, label: string, image?: string) => void;
@@ -163,7 +170,17 @@ interface StarleteState {
   confirmDonation: (donationId: string) => void;
   getDonationsForAthlete: (athleteId: number) => Donation[];
 
-  addPost: (post: string) => void;
+  /** Publish a new post authored by the given athlete. */
+  addPost: (authorAthleteId: number, text: string) => void;
+  /** Toggle a like on a post for the current actor (supporter or athlete). */
+  toggleLike: (postId: string, actorId: ActorId) => void;
+  /** Add a comment to a post. */
+  addComment: (postId: string, authorId: ActorId, authorName: string, text: string) => void;
+}
+
+/** The id for the current actor, used for likes/comments in the demo. */
+export function actorIdForRole(role: Role | null, athletes: Athlete[]): ActorId {
+  return role === "athlete" ? athletes[0]?.id ?? SUPPORTER_ID : SUPPORTER_ID;
 }
 
 const StarleteContext = createContext<StarleteState | null>(null);
@@ -172,7 +189,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role | null>(null);
   const [athletes, setAthletes] = useState<Athlete[]>(seedAthletes);
   const [mounted, setMounted] = useState(false);
-  const [posts, setPosts] = useState(["One step closer to nationals", "Recovery, reset, repeat"]);
+  const [posts, setPosts] = useState<Post[]>(seedPosts);
   const [donationTarget, setDonationTarget] = useState<Athlete | null>(null);
   const [qrCodes, setQrCodes] = useState<Record<number, QrCode[]>>(() => seedQrCodes(seedAthletes));
   const [donations, setDonations] = useState<Donation[]>([]);
@@ -186,10 +203,19 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       const savedAthletes = window.localStorage.getItem("starlete-athletes");
       const savedQr = window.localStorage.getItem("starlete-qr");
       const savedDonations = window.localStorage.getItem("starlete-donations");
+      const savedPosts = window.localStorage.getItem("starlete-posts");
       setRole(savedRole ?? null);
-      if (savedVersion === DATA_VERSION) {
+      if (savedVersion === DATA_VERSION || savedVersion === "v3") {
         if (savedAthletes) setAthletes(JSON.parse(savedAthletes) as Athlete[]);
         if (savedQr) setQrCodes(JSON.parse(savedQr) as Record<number, QrCode[]>);
+        if (savedPosts) {
+          const loadedPosts: unknown = JSON.parse(savedPosts);
+          if (Array.isArray(loadedPosts) && loadedPosts.every((post) => typeof post === "string")) {
+            setPosts(migrateLegacyPosts(loadedPosts));
+          } else {
+            setPosts(loadedPosts as Post[]);
+          }
+        }
         if (savedDonations) {
           // Apply the demo auto-confirm rule to anything that aged past the
           // window while the app was closed, then reconcile athlete totals.
@@ -198,10 +224,13 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
           setDonations(reconciled);
         }
       } else {
+        // Reset stale caches when the combined payment and social data shape changes.
         setAthletes(seedAthletes);
+        setPosts(seedPosts);
         setQrCodes(seedQrCodes(seedAthletes));
         setDonations([]);
         window.localStorage.removeItem("starlete-athletes");
+        window.localStorage.removeItem("starlete-posts");
         window.localStorage.removeItem("starlete-qr");
         window.localStorage.removeItem("starlete-donations");
         window.localStorage.setItem("starlete-data-version", DATA_VERSION);
@@ -220,12 +249,13 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
     try {
       window.localStorage.setItem("starlete-data-version", DATA_VERSION);
       window.localStorage.setItem("starlete-athletes", JSON.stringify(athletes));
+      window.localStorage.setItem("starlete-posts", JSON.stringify(posts));
       window.localStorage.setItem("starlete-qr", JSON.stringify(qrCodes));
       window.localStorage.setItem("starlete-donations", JSON.stringify(donations));
     } catch {
       // ignore
     }
-  }, [athletes, qrCodes, donations, mounted]);
+  }, [athletes, posts, qrCodes, donations, mounted]);
 
   // Periodically sweep for demo auto-confirm so a long-lived session confirms
   // donations that cross the 3-day window without a reload.
@@ -334,7 +364,60 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
     [donations],
   );
 
-  const addPost = useCallback((post: string) => setPosts((prev) => [post, ...prev]), []);
+  const addPost = useCallback((authorAthleteId: number, text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const post: Post = {
+      id: newId("post"),
+      authorAthleteId,
+      text: trimmed,
+      createdAt: new Date().toISOString(),
+      likes: 0,
+      likedBy: [],
+      comments: [],
+    };
+    setPosts((prev) => [post, ...prev]);
+  }, []);
+
+  const toggleLike = useCallback((postId: string, actorId: ActorId) => {
+    setPosts((prev) =>
+      prev.map((p) => {
+        if (p.id !== postId) return p;
+        const liked = p.likedBy.includes(actorId);
+        const likedBy = liked
+          ? p.likedBy.filter((id) => id !== actorId)
+          : [...p.likedBy, actorId];
+        return { ...p, likedBy, likes: p.likes + (liked ? -1 : 1) };
+      }),
+    );
+  }, []);
+
+  const addComment = useCallback(
+    (postId: string, authorId: ActorId, authorName: string, text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? {
+                ...p,
+                comments: [
+                  ...p.comments,
+                  {
+                    id: newId("cmt"),
+                    authorId,
+                    authorName,
+                    text: trimmed,
+                    createdAt: new Date().toISOString(),
+                  },
+                ],
+              }
+            : p,
+        ),
+      );
+    },
+    [],
+  );
 
   const value = useMemo<StarleteState>(
     () => ({
@@ -358,12 +441,14 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       confirmDonation,
       getDonationsForAthlete,
       addPost,
+      toggleLike,
+      addComment,
     }),
     [
       mounted, role, reconciledAthletes, posts, donationTarget, qrCodes, donations,
       login, logout, getAthlete, openDonation, closeDonation,
       getQrCodes, addQrCode, replaceQrCode, removeQrCode,
-      submitDonation, confirmDonation, getDonationsForAthlete, addPost,
+      submitDonation, confirmDonation, getDonationsForAthlete, addPost, toggleLike, addComment,
     ],
   );
 

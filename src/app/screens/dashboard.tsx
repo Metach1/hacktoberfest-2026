@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { AthleteCard, Icon, MiniAthlete, Progress, peso } from "@/src/app/shared/ui";
 import { useStarlete, type Donation, type QrCode } from "@/src/app/store";
 import type { Athlete } from "@/src/app/data/athletes";
+import { type Post } from "@/src/app/data/posts";
+import { TimeAgo } from "@/src/app/shared/time-ago";
 import { msUntilAutoConfirm } from "@/src/app/lib/donations.mjs";
 import { checkPaymentQr } from "@/src/app/lib/qr-decode";
 
@@ -249,14 +251,14 @@ function PendingDonations({ athleteId }: { athleteId: number }) {
   );
 }
 
-function AthleteDashboard({ athlete, posts, onCreate }: { athlete: Athlete; posts: string[]; onCreate: (p: string) => void }) {
+function AthleteDashboard({ athlete, posts, onCreate }: { athlete: Athlete; posts: Post[]; onCreate: (authorAthleteId: number, text: string) => void }) {
   const { getDonationsForAthlete } = useStarlete();
   const [creating, setCreating] = useState(false);
   const [post, setPost] = useState("");
   const percent = Math.round((athlete.raised / athlete.goal) * 100);
-
-  const confirmed = getDonationsForAthlete(athlete.id).filter((d) => d.status === "confirmed");
-
+  const donations = getDonationsForAthlete(athlete.id);
+  const confirmed = donations.filter((d) => d.status === "confirmed");
+  const myPosts = posts.filter((p) => p.authorAthleteId === athlete.id);
   return (
     <main className="dashboard page-shell">
       <div className="dash-welcome"><div><span className="eyebrow">Athlete dashboard</span><h1>Keep going, {athlete.name.split(" ")[0]}.</h1><p>Your community is cheering with every step.</p></div><button className="button" onClick={() => setCreating(true)}><Icon name="plus" /> Create post</button></div>
@@ -283,10 +285,9 @@ function AthleteDashboard({ athlete, posts, onCreate }: { athlete: Athlete; post
                 </div>
               ))}
         </div>
-        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Your story</span><h2>Recent posts</h2></div><button className="text-button" onClick={() => setCreating(true)}>New post</button></div>{posts.map((p, i) => <article className="dash-post" key={i}><small>{i ? "1 week ago" : "Just now"}</small><strong>{p}</strong><span>{i ? "86" : "0"} cheers · {i ? "12" : "0"} comments</span></article>)}</div>
+        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Your story</span><h2>Recent posts</h2></div><button className="text-button" onClick={() => setCreating(true)}>New post</button></div>{myPosts.length ? myPosts.map(p => <article className="dash-post" key={p.id}><small><TimeAgo iso={p.createdAt} /></small><strong>{p.text}</strong><span>{p.likes} cheers · {p.comments.length} comments</span></article>) : <p className="profile-bio">No posts yet. Share your first update!</p>}</div>
       </section>
-
-      {creating && <div className="modal-backdrop"><div className="modal small-modal"><button className="modal-close" onClick={() => setCreating(false)}><Icon name="close" /></button><span className="eyebrow">Share an update</span><h2>Bring supporters along</h2><label>Post<textarea value={post} onChange={e => setPost(e.target.value)} placeholder="What happened in training today?" /></label><button className="button full" disabled={!post.trim()} onClick={() => { onCreate(post); setCreating(false); setPost(""); }}>Publish update</button></div></div>}
+      {creating && <div className="modal-backdrop"><div className="modal small-modal"><button className="modal-close" onClick={() => setCreating(false)}><Icon name="close" /></button><span className="eyebrow">Share an update</span><h2>Bring supporters along</h2><label>Post<textarea value={post} onChange={e => setPost(e.target.value)} placeholder="What happened in training today?" /></label><button className="button full" disabled={!post.trim()} onClick={() => { onCreate(athlete.id, post); setCreating(false); setPost(""); }}>Publish update</button></div></div>}
     </main>
   );
 }
