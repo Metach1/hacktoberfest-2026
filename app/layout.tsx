@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { StarleteProvider } from "@/src/app/store";
+import { SessionProvider } from "@/src/app/shared/session-provider";
 import { AppChrome } from "@/src/app/shared/chrome";
 
 export const metadata: Metadata = {
@@ -13,9 +14,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en">
       <body>
-        <StarleteProvider>
-          <AppChrome>{children}</AppChrome>
-        </StarleteProvider>
+        <SessionProvider>
+          <StarleteProvider>
+            <AppChrome>{children}</AppChrome>
+          </StarleteProvider>
+        </SessionProvider>
       </body>
     </html>
   );

@@ -5,24 +5,27 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon, Logo } from "@/src/app/shared/ui";
 import { DonationModal } from "@/src/app/shared/donation";
-import { useStarlete } from "@/src/app/store";
+import { useSession } from "@/src/app/shared/session-provider";
 
 function Header() {
   const pathname = usePathname();
   const router = useRouter();
-  const { role, logout, athletes } = useStarlete();
+  const { role, displayName, signOut: endSession } = useSession();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
-  const initials = role === "athlete"
-    ? athletes[0]?.name.split(" ").map(p => p[0]).slice(0, 2).join("").toUpperCase()
-    : "JD";
+  const initials = (displayName ?? "")
+    .split(" ")
+    .map(p => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "ME";
 
-  const signOut = () => {
-    logout();
+  const signOut = async () => {
+    await endSession();
     close();
     router.push("/");
   };
