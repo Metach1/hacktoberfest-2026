@@ -37,20 +37,25 @@ values
   (30, 'Nawal Karim', 'Taekwondo', 'Marawi City, Lanao del Sur', 'BARMM', 'Bangsamoro Autonomous Region in Muslim Mindanao', '/athlete-placeholder.svg', 'A fictional taekwondo athlete training with a community sports group.', 'Fictional BARMM martial arts open finalist', true, 80000, 43000, 148, true)
 on conflict (id) do update set name = excluded.name, sport = excluded.sport, location = excluded.location, region_code = excluded.region_code, region = excluded.region, image = excluded.image, bio = excluded.bio, achievement = excluded.achievement, verified = excluded.verified, funding_goal = excluded.funding_goal, base_raised = excluded.base_raised, base_supporters = excluded.base_supporters, seeded = true;
 
+-- Clear previously seeded showcase posts/comments so re-running is idempotent.
+delete from public.comments where seeded;
+delete from public.posts where seeded;
+
 -- Seed showcase posts (+ comments). Owner-less, attached to catalog athletes.
 do $$
 declare pid uuid;
 begin
-  insert into public.posts (catalog_athlete_id, content, created_at, seeded) values (1, 'One step closer to nationals — this week''s time trial was a new personal best. Thank you for helping me access better recovery and coaching.', '2026-10-19T14:07:29.157Z', true) returning id into pid;
-  insert into public.comments (post_id, owner_id, author_name, content, created_at, seeded) values (pid, null, 'Jamie', 'So proud of you! Keep flying 🇵🇭', '2026-10-19T15:07:29.157Z', true);
-  insert into public.comments (post_id, owner_id, author_name, content, created_at, seeded) values (pid, null, 'Tomas Alvar', 'Let''s go! Inspiring work.', '2026-10-19T16:07:29.157Z', true);
-  insert into public.posts (catalog_athlete_id, content, created_at, seeded) values (1, 'Recovery, reset, repeat. Rest days are part of the grind too.', '2026-10-15T14:07:29.157Z', true) returning id into pid;
-  insert into public.comments (post_id, owner_id, author_name, content, created_at, seeded) values (pid, null, 'Carlo M.', 'Rest well, champ.', '2026-10-15T15:07:29.157Z', true);
-  insert into public.posts (catalog_athlete_id, content, created_at, seeded) values (2, 'Sparring went well today. Felt sharp and fast. Grateful for every supporter in my corner.', '2026-10-21T14:07:29.157Z', true) returning id into pid;
-  insert into public.posts (catalog_athlete_id, content, created_at, seeded) values (3, 'New shoes, new goals. Chasing a spot on the national team this season.', '2026-10-17T14:07:29.157Z', true) returning id into pid;
-  insert into public.comments (post_id, owner_id, author_name, content, created_at, seeded) values (pid, null, 'Nina A.', 'Rooting for you!', '2026-10-17T15:07:29.157Z', true);
+  insert into public.posts (catalog_athlete_id, content, created_at, seeded) values (1, 'One step closer to nationals — this week''s time trial was a new personal best. Thank you for helping me access better recovery and coaching.', '2026-10-19T14:21:54.911Z', true) returning id into pid;
+  insert into public.comments (post_id, owner_id, author_name, content, created_at, seeded) values (pid, null, 'Jamie', 'So proud of you! Keep flying 🇵🇭', '2026-10-19T15:21:54.911Z', true);
+  insert into public.comments (post_id, owner_id, author_name, content, created_at, seeded) values (pid, null, 'Tomas Alvar', 'Let''s go! Inspiring work.', '2026-10-19T16:21:54.911Z', true);
+  insert into public.posts (catalog_athlete_id, content, created_at, seeded) values (1, 'Recovery, reset, repeat. Rest days are part of the grind too.', '2026-10-15T14:21:54.911Z', true) returning id into pid;
+  insert into public.comments (post_id, owner_id, author_name, content, created_at, seeded) values (pid, null, 'Carlo M.', 'Rest well, champ.', '2026-10-15T15:21:54.911Z', true);
+  insert into public.posts (catalog_athlete_id, content, created_at, seeded) values (2, 'Sparring went well today. Felt sharp and fast. Grateful for every supporter in my corner.', '2026-10-21T14:21:54.911Z', true) returning id into pid;
+  insert into public.posts (catalog_athlete_id, content, created_at, seeded) values (3, 'New shoes, new goals. Chasing a spot on the national team this season.', '2026-10-17T14:21:54.911Z', true) returning id into pid;
+  insert into public.comments (post_id, owner_id, author_name, content, created_at, seeded) values (pid, null, 'Nina A.', 'Rooting for you!', '2026-10-17T15:21:54.911Z', true);
 end $$;
 
+delete from public.qr_codes where seeded;
 -- Seed showcase QR codes for a catalog athlete (owner-less).
 insert into public.qr_codes (catalog_athlete_id, method, label, image, seeded) values
   (1, 'GCash', 'J. Santos · 0917•••1234', '/athlete-placeholder.svg', true),

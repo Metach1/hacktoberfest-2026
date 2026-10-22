@@ -67,6 +67,10 @@ async function main() {
     { athlete: athletes[2]?.id ?? 3, text: "New shoes, new goals. Chasing a spot on the national team this season.", daysAgo: 5, comments: [["Nina A.", "Rooting for you!"]] },
   ];
 
+  lines.push("-- Clear previously seeded showcase posts/comments so re-running is idempotent.");
+  lines.push("delete from public.comments where seeded;");
+  lines.push("delete from public.posts where seeded;");
+  lines.push("");
   lines.push("-- Seed showcase posts (+ comments). Owner-less, attached to catalog athletes.");
   lines.push("do $$");
   lines.push("declare pid uuid;");
@@ -89,6 +93,7 @@ async function main() {
   // --- seed QR codes for the first catalog athlete ---------------------------
   const first = athletes[0];
   if (first) {
+    lines.push("delete from public.qr_codes where seeded;");
     lines.push("-- Seed showcase QR codes for a catalog athlete (owner-less).");
     lines.push("insert into public.qr_codes (catalog_athlete_id, method, label, image, seeded) values");
     lines.push(

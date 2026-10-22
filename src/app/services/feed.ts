@@ -214,11 +214,19 @@ export async function toggleLike(postId: string, currentlyLiked: boolean): Promi
 
   if (currentlyLiked) {
     const { error } = await supabase.from("reactions").delete().eq("post_id", postId).eq("owner_id", uid);
-    if (error) throw error;
+    if (error) throw new Error(error.message);
     return false;
   }
   const { error } = await supabase.from("reactions").insert({ post_id: postId, owner_id: uid });
-  // Ignore unique-violation (already liked in another tab): treat as liked.
-  if (error && !String(error.message).toLowerCase().includes("duplicate")) throw error;
+  if (error) {
+    const msg = error.message.toLowerCase();
+    // Already liked (unique violation) — treat as success.
+    if (msg.includes("duplicate") || msg.includes("unique")) return true;
+    // FK violation means this user has no profiles row yet — surface clearly.
+    if (msg.includes("foreign key") || msg.includes("violates")) {
+      throw new Error("Your account isn't fully set up (no profile row). " + error.message);
+    }
+    throw new Error(error.message);
+  }
   return true;
 }
