@@ -815,11 +815,9 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 }
 
 /* Post edit/delete controls (athlete dashboard "Recent posts" + feed cards) */
-.dash-post .post-actions,
-.feed-post .post-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 10px; }
-.dash-post .post-actions .text-button,
-.feed-post .post-actions .text-button { padding: 2px 0; font-size: 13px; }
-.dash-post .post-actions .text-button.danger,
-.feed-post .post-actions .text-button.danger { color: #c0392b; }
-.dash-post .post-actions .confirm-text,
-.feed-post .post-actions .confirm-text { font-size: 13px; color: var(--muted); margin-right: 2px; }
+/* Post action controls (Edit/Delete, inline delete-confirm). Unconditional so
+   spacing always applies regardless of where .post-actions is nested. */
+.post-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 10px; }
+.post-actions .text-button { padding: 2px 0; font-size: 13px; }
+.post-actions .text-button.danger { color: #c0392b; }
+.post-actions .confirm-text { font-size: 13px; color: var(--muted); margin-right: 2px; }

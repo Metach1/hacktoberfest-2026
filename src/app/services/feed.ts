@@ -82,14 +82,20 @@ export async function getFeed(): Promise<FeedPost[]> {
       ? supabase.from("athletes").select("id, name, image, sport, verified").in("id", catalogIds)
       : Promise.resolve({ data: [], error: null }),
     ownerIds.length
-      ? supabase
-          .from("athlete_profiles")
-          .select("user_id, sport, verified, profiles(first_name, profile_picture)")
-          .in("user_id", ownerIds)
+      ? supabase.from("profiles").select("id, first_name, last_name, profile_picture").in("id", ownerIds)
       : Promise.resolve({ data: [], error: null }),
     supabase.from("comments").select("id, post_id, author_name, content, created_at").in("post_id", postIds).order("created_at", { ascending: true }),
     supabase.from("reactions").select("post_id, owner_id").in("post_id", postIds),
   ]);
+
+  // Enrich owner authors with athlete fields (sport/verified) when present.
+  const athleteExtra = ownerIds.length
+    ? await supabase.from("athlete_profiles").select("user_id, sport, verified").in("user_id", ownerIds)
+    : { data: [], error: null };
+  const extraById = new Map<string, { sport: string; verified: boolean }>();
+  for (const a of (athleteExtra.data ?? []) as Array<{ user_id: string; sport: string | null; verified: boolean }>) {
+    extraById.set(a.user_id, { sport: a.sport ?? "", verified: a.verified ?? false });
+  }
 
   const catalogById = new Map<number, { name: string; image: string; sport: string; verified: boolean }>();
   for (const a of (catalogRes.data ?? []) as Array<{ id: number; name: string; image: string; sport: string; verified: boolean }>) {
@@ -97,21 +103,15 @@ export async function getFeed(): Promise<FeedPost[]> {
   }
 
   const ownerById = new Map<string, { name: string; image: string; sport: string; verified: boolean }>();
-  // Supabase types a joined relation as an array; a to-one join still returns
-  // (at most) one row, so read the first element defensively.
-  type OwnerRow = {
-    user_id: string;
-    sport: string | null;
-    verified: boolean;
-    profiles: { first_name: string | null; profile_picture: string | null }[] | { first_name: string | null; profile_picture: string | null } | null;
-  };
-  for (const row of (ownerRes.data ?? []) as OwnerRow[]) {
-    const prof = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
-    ownerById.set(row.user_id, {
-      name: prof?.first_name ?? "Athlete",
-      image: prof?.profile_picture ?? "",
-      sport: row.sport ?? "",
-      verified: row.verified ?? false,
+  for (const row of (ownerRes.data ?? []) as Array<{ id: string; first_name: string | null; last_name: string | null; profile_picture: string | null }>) {
+    const extra = extraById.get(row.id);
+    const fullName = [row.first_name, row.last_name].filter(Boolean).join(" ").trim();
+    ownerById.set(row.id, {
+      // Prefer the real profile name; only fall back if the profile has no name.
+      name: fullName || row.first_name || "Athlete",
+      image: row.profile_picture ?? "",
+      sport: extra?.sport ?? "",
+      verified: extra?.verified ?? false,
     });
   }
 
