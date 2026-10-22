@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Icon, Logo } from "@/src/app/shared/ui";
@@ -22,6 +22,28 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
   const [consent, setConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (mode !== "login") return;
+    try {
+      const savedEmail = window.sessionStorage.getItem("starlete-login-email");
+      if (savedEmail) setEmail(savedEmail);
+    } catch {
+      // Email persistence is optional when browser storage is unavailable.
+    }
+  }, [mode]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const updateEmail = (value: string) => {
+    setEmail(value);
+    if (mode !== "login") return;
+    try {
+      window.sessionStorage.setItem("starlete-login-email", value);
+    } catch {
+      // Keep the form usable when browser storage is unavailable.
+    }
+  };
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -52,11 +74,18 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
         const { user } = await signIn(email, password);
         const accountRole = user.user_metadata?.role;
         if (accountRole === "athlete" || accountRole === "supporter") login(accountRole);
+        setPassword("");
       }
       await refresh();
       router.push("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      const message = err instanceof Error ? err.message : "Something went wrong. Please try again.";
+      setError(
+        mode === "login" && /invalid login credentials/i.test(message)
+          ? "Email or password is incorrect. Please try again."
+          : message,
+      );
+    } finally {
       setSubmitting(false);
     }
   };
@@ -73,10 +102,15 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
           )}
           <form onSubmit={submit}>
             {mode === "register" && <label>Full name<input required value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Juan dela Cruz" /></label>}
-            <label>Email address<input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" /></label>
-            <label>Password<input type="password" required minLength={8} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" /></label>
+            <label>Email address<input type="email" required autoComplete="email" value={email} onChange={e => updateEmail(e.target.value)} placeholder="you@example.com" /></label>
+            <label>Password<input type="password" required minLength={8} autoComplete={mode === "login" ? "current-password" : "new-password"} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" /></label>
             {mode === "register" && role === "athlete" && <><div className="field-row"><label>Birth date<input type="date" required value={birth} onChange={e => setBirth(e.target.value)} /></label><label>Sport<select required value={sport} onChange={e => setSport(e.target.value)}><option>Track &amp; Field</option><option>Boxing</option><option>Basketball</option><option>Swimming</option></select></label></div><label>City / Province<input required value={location} onChange={e => setLocation(e.target.value)} placeholder="Cebu City" /></label>{showConsent && <label className="consent"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} /><span><b>Parental consent confirmed</b><small>A parent or guardian has approved this simulated athlete profile.</small></span></label>}</>}
-            {(error || sessionError) && <p className="field-error" role="alert">{error || sessionError}</p>}
+            {(error || sessionError) && (
+              <div className="auth-error" role="alert" aria-live="assertive">
+                <span className="auth-error-icon" aria-hidden="true">!</span>
+                <span>{error || sessionError}</span>
+              </div>
+            )}
             <button className="button full" type="submit" disabled={submitting}>{submitting ? "Please wait…" : mode === "login" ? "Log in" : "Create account"} <Icon name="arrow" /></button>
           </form>
           <p className="auth-switch">{mode === "login" ? "New to Startlete?" : "Already a member?"} <Link href={mode === "login" ? "/register" : "/login"}>{mode === "login" ? "Create an account" : "Log in"}</Link></p>
