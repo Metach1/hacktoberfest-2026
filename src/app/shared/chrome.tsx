@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Icon, Logo } from "@/src/app/shared/ui";
 import { DonationModal } from "@/src/app/shared/donation";
 import { useStarlete } from "@/src/app/store";
+import { REGION_MAP } from "@/src/app/lib/region-map";
 
 /** Relative "time ago" label for a notification's epoch-ms timestamp. */
 function timeAgo(ts: number): string {
@@ -110,6 +111,7 @@ function NotificationsBell() {
 
 function Header() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const { role, logout, athletes } = useStarlete();
   const [open, setOpen] = useState(false);
@@ -117,6 +119,17 @@ function Header() {
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
+
+  // The Discover link is region-aware: when the user is on an athlete profile
+  // that was opened from a region (/athletes/<id>?from=<regionCode>), Discover
+  // returns to that region — matching the profile's "Back to athletes". In
+  // every other context it stays the plain /discover full map.
+  const fromParam = searchParams.get("from");
+  const onAthleteProfile = /^\/athletes\/[^/]+$/.test(pathname);
+  const discoverHref =
+    onAthleteProfile && fromParam && REGION_MAP.regions.some((r) => r.regionCode === fromParam)
+      ? `/discover?region=${encodeURIComponent(fromParam)}`
+      : "/discover";
 
   const initials = role === "athlete"
     ? athletes[0]?.name.split(" ").map(p => p[0]).slice(0, 2).join("").toUpperCase()
@@ -133,7 +146,7 @@ function Header() {
       <div className="header-inner">
         <Logo />
         <nav className={open ? "nav open" : "nav"}>
-          <Link className={isActive("/discover") ? "active" : ""} href="/discover" onClick={close}>Discover</Link>
+          <Link className={isActive("/discover") ? "active" : ""} href={discoverHref} onClick={close}>Discover</Link>
           <Link className={isActive("/feed") ? "active" : ""} href="/feed" onClick={close}>Feed</Link>
           <Link href="/#how" onClick={close}>How it works</Link>
           {role ? (
@@ -179,7 +192,9 @@ export function AppChrome({ children }: { children: ReactNode }) {
   const home = pathname === "/";
   return (
     <div className={home ? "app home-app" : "app"}>
-      {!authPage && <Header />}
+      {/* Header reads useSearchParams (for the region-aware Discover link), so
+          it must sit inside a Suspense boundary for prerendering under Next 16. */}
+      {!authPage && <Suspense fallback={<header className="header" />}><Header /></Suspense>}
       {children}
       {!authPage && <Footer />}
       <DonationModal />
