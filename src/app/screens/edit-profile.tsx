@@ -20,6 +20,7 @@ export function EditProfileScreen() {
 
   // Local editable form state, seeded from the loaded profile.
   const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [bio, setBio] = useState("");
   const [sport, setSport] = useState("");
   const [location, setLocation] = useState("");
@@ -32,6 +33,7 @@ export function EditProfileScreen() {
   useEffect(() => {
     if (profile && !seeded) {
       setFirstName(profile.firstName);
+      setLastName(profile.lastName);
       setBio(profile.bio);
       setSport(profile.sport);
       setLocation(profile.location);
@@ -60,6 +62,7 @@ export function EditProfileScreen() {
     try {
       await updateMyProfile({
         firstName,
+        lastName,
         bio,
         sport: isAthlete ? sport : undefined,
         location: isAthlete ? location : undefined,
@@ -84,9 +87,14 @@ export function EditProfileScreen() {
             <div className="profile-avatar">{initials}<button type="button"><Icon name="plus" size={16} /></button></div>
             <form onSubmit={save}>
               <div className="field-row">
-                <label>First name<input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Your name" /></label>
-                {isAthlete && <label>Location<input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="City / Province" /></label>}
+                <label>First name<input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First name" /></label>
+                <label>Last name<input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last name" /></label>
               </div>
+              {isAthlete && (
+                <div className="field-row">
+                  <label>Location<input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="City / Province" /></label>
+                </div>
+              )}
               <label>Bio<textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder={isAthlete ? "Tell supporters about your journey." : "Tell the community about yourself."} /></label>
               {isAthlete && (
                 <div className="field-row">

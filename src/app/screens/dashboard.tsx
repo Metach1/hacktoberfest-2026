@@ -19,11 +19,13 @@ import { checkPaymentQr } from "@/src/app/lib/qr-decode";
 
 function SupporterDashboard({ athletes }: { athletes: Athlete[] }) {
   const { getDonationsForSupporter, getAthlete } = useStarlete();
+  const { displayName } = useSession();
+  const firstName = (displayName ?? "there").split(" ")[0];
   const top = [...athletes].sort((a, b) => b.raised - a.raised);
   const myPayments = getDonationsForSupporter();
   return (
     <main className="dashboard page-shell">
-      <div className="dash-welcome"><div><span className="eyebrow">Supporter dashboard</span><h1>Magandang araw, Jamie.</h1><p>There are new stories waiting for your support.</p></div><div className="impact-chip"><Icon name="heart" /><span><small>Your total impact</small><b>₱4,500 given</b></span></div></div>
+      <div className="dash-welcome"><div><span className="eyebrow">Supporter dashboard</span><h1>Magandang araw, {firstName}.</h1><p>There are new stories waiting for your support.</p></div></div>
       <section><div className="section-head"><div><span className="eyebrow">Picked for you</span><h2>Athletes making moves</h2></div></div><div className="card-grid">{athletes.slice(0, 3).map(a => <AthleteCard key={a.id} athlete={a} />)}</div></section>
       <section className="dashboard-grid">
         <div className="dash-card">
