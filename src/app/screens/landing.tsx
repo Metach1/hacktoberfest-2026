@@ -57,7 +57,7 @@ export function LandingScreen() {
         {loading && <p className="muted-line">Loading athlete profiles…</p>}
         {error && <ErrorState message={error} onRetry={reload} />}
         {!loading && !error && featuredAthletes.length > 0 && (
-          <div className="card-grid">
+          <div className="card-grid spotlight-athlete-grid">
             {featuredAthletes.map((athlete) => (
               <RegisteredAthleteCard key={athlete.id} athlete={athlete} />
             ))}
