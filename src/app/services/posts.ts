@@ -224,47 +224,29 @@ export async function deletePost(postId: string): Promise<void> {
   if (!data) throw new Error("This post could not be found or you do not own it.");
 }
 
-/** Toggle this user's persisted reaction and report whether it changed. */
-export async function togglePostReaction(
+/** Persist whether this user currently likes the post. */
+export async function setPostReaction(
   postId: string,
-): Promise<{ added: boolean; removed: boolean }> {
+  liked: boolean,
+): Promise<void> {
   const supabase = createClient();
   const userId = await getCurrentUserId();
-  const { data: existingReaction, error: readError } = await supabase
-    .from("reactions")
-    .select("post_id")
-    .eq("post_id", postId)
-    .eq("owner_id", userId)
-    .maybeSingle();
-  if (readError) throw new Error(readError.message);
-
-  let added = false;
-  let removed = false;
-
-  if (existingReaction) {
-    const { data, error } = await supabase
-      .from("reactions")
-      .delete()
-      .eq("post_id", postId)
-      .eq("owner_id", userId)
-      .select("post_id")
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    removed = Boolean(data);
-  } else {
-    const { data, error } = await supabase
+  if (liked) {
+    const { error } = await supabase
       .from("reactions")
       .upsert(
         { post_id: postId, owner_id: userId },
         { onConflict: "post_id,owner_id", ignoreDuplicates: true },
-      )
-      .select("post_id")
-      .maybeSingle();
+      );
     if (error) throw new Error(error.message);
-    added = Boolean(data);
+  } else {
+    const { error } = await supabase
+      .from("reactions")
+      .delete()
+      .eq("post_id", postId)
+      .eq("owner_id", userId);
+    if (error) throw new Error(error.message);
   }
-
-  return { added, removed };
 }
 
 /** Save a comment under the authenticated user's profile. */

@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -35,7 +36,7 @@ import {
   createPostComment,
   deletePost as deleteDatabasePost,
   listPosts,
-  togglePostReaction,
+  setPostReaction,
   updatePost as updateDatabasePost,
 } from "@/src/app/services/posts";
 import { isSupabaseConfigured } from "@/src/app/lib/supabase/client";
@@ -309,6 +310,13 @@ function normalizeDonation(d: Partial<Donation>): Donation {
 
 const StarleteContext = createContext<StarleteState | null>(null);
 
+interface PendingLikeUpdate {
+  desiredLiked: boolean;
+  persistedLiked: boolean;
+  running: boolean;
+  post: Post;
+}
+
 export function StarleteProvider({ children }: { children: ReactNode }) {
   const { user, loading: sessionLoading, displayName } = useSession();
   const [role, setRole] = useState<Role | null>(null);
@@ -323,6 +331,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   const [qrCodes, setQrCodes] = useState<Record<number, QrCode[]>>(() => seedQrCodes(seedAthletes));
   const [donations, setDonations] = useState<Donation[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const pendingLikes = useRef(new Map<string, PendingLikeUpdate>());
 
   // Hydrate persisted state from localStorage once on client mount.
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -694,35 +703,72 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   const toggleLike = useCallback((postId: string, actorId: ActorId) => {
     const post = posts.find((item) => item.id === postId);
     if (!post) return;
+
+    const operationKey = `${postId}:${actorId}`;
+    const operation = pendingLikes.current.get(operationKey) ?? (() => {
+      const liked = post.likedBy.includes(actorId);
+      const pending: PendingLikeUpdate = {
+        desiredLiked: liked,
+        persistedLiked: liked,
+        running: false,
+        post,
+      };
+      pendingLikes.current.set(operationKey, pending);
+      return pending;
+    })();
+    operation.desiredLiked = !operation.desiredLiked;
+    const desiredLiked = operation.desiredLiked;
     setPostError(null);
-    void togglePostReaction(postId)
-      .then(({ added, removed }) => {
-        if (added || removed) {
-          setPosts((previous) => previous.map((item) =>
-            item.id === postId
-              ? {
-                  ...item,
-                  likedBy: added
-                    ? (item.likedBy.includes(actorId) ? item.likedBy : [...item.likedBy, actorId])
-                    : item.likedBy.filter((id) => id !== actorId),
-                  likes: item.likes + (added ? 1 : -1),
-                }
-              : item,
-          ));
+    const applyLikeState = (item: Post, liked: boolean): Post => {
+      const currentlyLiked = item.likedBy.includes(actorId);
+      if (currentlyLiked === liked) return item;
+      return {
+        ...item,
+        likedBy: liked
+          ? [...item.likedBy, actorId]
+          : item.likedBy.filter((id) => id !== actorId),
+        likes: Math.max(0, item.likes + (liked ? 1 : -1)),
+      };
+    };
+    setPosts((previous) => previous.map((item) =>
+      item.id === postId ? applyLikeState(item, desiredLiked) : item,
+    ));
+
+    if (operation.running) return;
+    operation.running = true;
+    void (async () => {
+      try {
+        while (operation.desiredLiked !== operation.persistedLiked) {
+          const target = operation.desiredLiked;
+          try {
+            await setPostReaction(postId, target);
+          } catch (error: unknown) {
+            setPostError(error instanceof Error ? error.message : "Could not update this like.");
+            operation.desiredLiked = operation.persistedLiked;
+            const persistedLiked = operation.persistedLiked;
+            setPosts((previous) => previous.map((item) =>
+              item.id === postId ? applyLikeState(item, persistedLiked) : item,
+            ));
+            continue;
+          }
+          operation.persistedLiked = target;
+          if (target) {
+            const event = postLikeNotification(
+              operation.post,
+              actorId,
+              displayName ?? likerName(actorId),
+              user?.id,
+            );
+            if (event) pushNotification(event);
+          }
         }
-        if (added) {
-          const event = postLikeNotification(
-            post,
-            actorId,
-            displayName ?? likerName(actorId),
-            user?.id,
-          );
-          if (event) pushNotification(event);
+      } finally {
+        operation.running = false;
+        if (pendingLikes.current.get(operationKey) === operation) {
+          pendingLikes.current.delete(operationKey);
         }
-      })
-      .catch((error: unknown) => {
-        setPostError(error instanceof Error ? error.message : "Could not update this like.");
-      });
+      }
+    })();
   }, [posts, pushNotification, likerName, user?.id, displayName]);
 
   const addComment = useCallback(
