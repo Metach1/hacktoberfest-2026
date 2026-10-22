@@ -188,6 +188,10 @@ interface StarleteState {
 
   /** Publish a new post authored by the given athlete. */
   addPost: (authorAthleteId: number, text: string) => void;
+  /** Update the text of an existing post (owner-scoped by the caller). */
+  editPost: (postId: string, text: string) => void;
+  /** Permanently remove a post. */
+  deletePost: (postId: string) => void;
   /** Toggle a like on a post for the current actor (supporter or athlete). */
   toggleLike: (postId: string, actorId: ActorId) => void;
   /** Add a comment to a post. */
@@ -446,6 +450,22 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
     setPosts((prev) => [post, ...prev]);
   }, []);
 
+  const editPost = useCallback((postId: string, text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId
+          ? { ...p, text: trimmed, editedAt: new Date().toISOString() }
+          : p,
+      ),
+    );
+  }, []);
+
+  const deletePost = useCallback((postId: string) => {
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+  }, []);
+
   const toggleLike = useCallback((postId: string, actorId: ActorId) => {
     setPosts((prev) =>
       prev.map((p) => {
@@ -511,6 +531,8 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       supporterId,
       getDonationsForSupporter,
       addPost,
+      editPost,
+      deletePost,
       toggleLike,
       addComment,
     }),
@@ -519,7 +541,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       login, logout, getAthlete, openDonation, closeDonation,
       getQrCodes, addQrCode, replaceQrCode, removeQrCode,
       submitDonation, confirmDonation, rejectDonation, getDonationsForAthlete,
-      supporterId, getDonationsForSupporter, addPost, toggleLike, addComment,
+      supporterId, getDonationsForSupporter, addPost, editPost, deletePost, toggleLike, addComment,
     ],
   );
 
