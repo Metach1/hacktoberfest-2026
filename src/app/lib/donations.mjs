@@ -261,47 +261,90 @@ export function recentConfirmedDonations(donations, athleteId, limit = 5) {
   return confirmedDonationsForAthlete(donations, athleteId).slice(0, Math.max(0, limit));
 }
 
+/** The display name used for donations with no supplied donor name. */
+export const ANONYMOUS_DONOR_NAME = "Anonymous supporter";
+
 /**
- * Stable donor identity key for grouping. The demo's only per-donation identity
- * signal is the display name the supporter entered (supporterId is a single
- * shared sentinel in this demo, so it cannot distinguish donors). We therefore
- * group by the trimmed display name and NEVER merge different names or split a
- * shared one — matching "use existing donor identities; don't invent or
- * incorrectly combine them." Anonymous donations all carry the same
- * "Anonymous supporter" name and so are grouped together; this is a known demo
- * identity limitation, not a claim that they are the same person.
+ * Stable donor identity key for grouping NAMED donors. The demo's only
+ * per-donation identity signal is the display name the supporter entered
+ * (supporterId is a single shared sentinel in this demo, so it cannot
+ * distinguish donors). We therefore group by the trimmed display name and NEVER
+ * merge different names or split a shared one — matching "use existing donor
+ * identities; don't invent or incorrectly combine them."
+ *
+ * Anonymous donations all carry the same "Anonymous supporter" name, so this
+ * key is NOT used to group them: because the demo cannot tell one anonymous
+ * supporter from another, `topDonorsForAthlete` keeps each anonymous donation
+ * as its own row rather than claiming they are the same person.
  *
  * @param {Object} donation
  * @returns {string}
  */
 export function donorKey(donation) {
   const name = (donation.supporterName ?? "").trim();
-  return name || "Anonymous supporter";
+  return name || ANONYMOUS_DONOR_NAME;
 }
 
 /**
- * Rank donors for an athlete by their TOTAL confirmed contribution, highest
- * first. Only confirmed donations are considered. Ties are broken by the most
- * recent contribution, then by name for determinism.
+ * Whether a donation has no distinguishing donor name and so must be ranked as
+ * its own anonymous row (never merged with other anonymous donations).
+ *
+ * The anonymous signal is the existing representation already in the data: a
+ * blank name, or the shared sentinel "Anonymous supporter" that
+ * `createPendingDonation` and the store normalize blank names to. We treat both
+ * as anonymous without changing any persisted donation.
+ *
+ * @param {Object} donation
+ * @returns {boolean}
+ */
+export function isAnonymousDonation(donation) {
+  const name = (donation.supporterName ?? "").trim();
+  return name === "" || name === ANONYMOUS_DONOR_NAME;
+}
+
+/**
+ * Rank contributors for an athlete by their TOTAL confirmed contribution,
+ * highest first. Only confirmed donations are considered.
+ *
+ * NAMED donors are aggregated by their exact trimmed display name (their total
+ * and donation count), never merging different names or splitting a shared one.
+ * ANONYMOUS donations (blank name) are NOT aggregated: each becomes its own
+ * "Anonymous supporter" row with that donation's amount and a count of 1, since
+ * the demo cannot tell one anonymous supporter from another.
+ *
+ * Every row carries a stable `id`: the donor key for named donors, or the
+ * donation id for anonymous rows. Ties in total are broken by the most recent
+ * contribution, then by `id` for determinism.
  *
  * @param {Array<Object>} donations
  * @param {number} athleteId
  * @param {number} [limit] Optional cap on returned rows.
- * @returns {Array<{ donor: string, total: number, count: number, latestAt: number }>}
+ * @returns {Array<{ id: string, donor: string, total: number, count: number, latestAt: number }>}
  */
 export function topDonorsForAthlete(donations, athleteId, limit) {
   const byDonor = new Map();
+  const anonymousRows = [];
   for (const d of donations) {
     if (d.athleteId !== athleteId || d.status !== DONATION_STATUS.CONFIRMED) continue;
+    if (isAnonymousDonation(d)) {
+      anonymousRows.push({
+        id: d.id,
+        donor: ANONYMOUS_DONOR_NAME,
+        total: d.amount,
+        count: 1,
+        latestAt: d.createdAt,
+      });
+      continue;
+    }
     const key = donorKey(d);
-    const entry = byDonor.get(key) ?? { donor: key, total: 0, count: 0, latestAt: 0 };
+    const entry = byDonor.get(key) ?? { id: key, donor: key, total: 0, count: 0, latestAt: 0 };
     entry.total += d.amount;
     entry.count += 1;
     entry.latestAt = Math.max(entry.latestAt, d.createdAt);
     byDonor.set(key, entry);
   }
-  const ranked = [...byDonor.values()].sort(
-    (a, b) => b.total - a.total || b.latestAt - a.latestAt || a.donor.localeCompare(b.donor),
+  const ranked = [...byDonor.values(), ...anonymousRows].sort(
+    (a, b) => b.total - a.total || b.latestAt - a.latestAt || a.id.localeCompare(b.id),
   );
   return typeof limit === "number" ? ranked.slice(0, Math.max(0, limit)) : ranked;
 }

@@ -82,8 +82,69 @@ test("topDonorsForAthlete excludes pending/rejected and other athletes", () => {
   ];
   const top = topDonorsForAthlete(donations, 1);
   assert.deepEqual(top, [
-    { donor: "Ana", total: 500, count: 1, latestAt: 100 },
+    { id: "Ana", donor: "Ana", total: 500, count: 1, latestAt: 100 },
   ]);
+});
+
+test("topDonorsForAthlete keeps each anonymous donation as its own row", () => {
+  const donations = [
+    confirmed({ athleteId: 1, amount: 300, name: "", at: 100, id: "anon1" }),
+    confirmed({ athleteId: 1, amount: 700, name: "   ", at: 300, id: "anon2" }), // blank -> anonymous
+    confirmed({ athleteId: 1, amount: 500, name: "Ana", at: 200, id: "a1" }),
+  ];
+  const top = topDonorsForAthlete(donations, 1);
+  // Two separate anonymous rows (not one combined 1000 total).
+  const anon = top.filter((t) => t.donor === "Anonymous supporter");
+  assert.equal(anon.length, 2, "two anonymous donations stay separate");
+  for (const row of anon) assert.equal(row.count, 1, "each anonymous row counts a single donation");
+  assert.deepEqual(
+    anon.map((t) => t.total).sort((a, b) => a - b),
+    [300, 700],
+    "each anonymous row shows its own donation amount",
+  );
+  // Rows are keyed by donation id for anonymous donations.
+  assert.deepEqual(anon.map((t) => t.id).sort(), ["anon1", "anon2"]);
+  // Ranking by total: 700 (anon2) > 500 (Ana) > 300 (anon1). The named row's
+  // id is the donor name; anonymous rows are keyed by donation id.
+  assert.deepEqual(top.map((t) => t.id), ["anon2", "Ana", "anon1"]);
+});
+
+test("topDonorsForAthlete still aggregates named donors while anonymous stay separate", () => {
+  const donations = [
+    confirmed({ athleteId: 1, amount: 400, name: "Ana", at: 100, id: "a1" }),
+    confirmed({ athleteId: 1, amount: 400, name: "Ana", at: 200, id: "a2" }), // Ana total 800, count 2
+    confirmed({ athleteId: 1, amount: 100, name: "", at: 300, id: "x1" }),
+    confirmed({ athleteId: 1, amount: 100, name: "", at: 400, id: "x2" }),
+  ];
+  const top = topDonorsForAthlete(donations, 1);
+  const ana = top.find((t) => t.donor === "Ana");
+  assert.equal(ana.total, 800, "named donor aggregates totals");
+  assert.equal(ana.count, 2, "named donor aggregates counts");
+  assert.equal(ana.id, "Ana", "named donor row keyed by name");
+  const anon = top.filter((t) => t.donor === "Anonymous supporter");
+  assert.equal(anon.length, 2, "anonymous donations are not aggregated");
+});
+
+test("topDonorsForAthlete excludes pending/rejected anonymous donations", () => {
+  const donations = [
+    confirmed({ athleteId: 1, amount: 200, name: "", at: 100, id: "ok" }),
+    createPendingDonation({ athleteId: 1, amount: 9999, supporterName: "", createdAt: 120, id: "pend" }),
+    rejectDonation(createPendingDonation({ athleteId: 1, amount: 9999, supporterName: "", createdAt: 130, id: "rej" }), "other"),
+  ];
+  const top = topDonorsForAthlete(donations, 1);
+  assert.deepEqual(top, [
+    { id: "ok", donor: "Anonymous supporter", total: 200, count: 1, latestAt: 100 },
+  ], "only the confirmed anonymous donation is ranked");
+});
+
+test("ties between anonymous rows are broken deterministically by id", () => {
+  const donations = [
+    confirmed({ athleteId: 1, amount: 500, name: "", at: 100, id: "zzz" }),
+    confirmed({ athleteId: 1, amount: 500, name: "", at: 100, id: "aaa" }),
+  ];
+  const top = topDonorsForAthlete(donations, 1);
+  // Equal total and latestAt -> stable order by id ascending.
+  assert.deepEqual(top.map((t) => t.id), ["aaa", "zzz"]);
 });
 
 test("topDonorsForAthlete does not merge different names or split a shared name", () => {

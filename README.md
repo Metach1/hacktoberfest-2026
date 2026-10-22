@@ -117,13 +117,15 @@ Each athlete's **public profile** shows a GoFundMe-style donations section next
 to the fundraising progress: the five latest **confirmed** donations inline
 (donor name, amount, date), the confirmed-donation count, and a clear empty
 state. A **See all** popup lists every confirmed donation; a **See top** popup
-ranks donors by their total confirmed contribution. Pending and rejected
+ranks contributors by their total confirmed contribution. Pending and rejected
 donations — and receipts — are never shown here. Donor identities come from the
-name entered on each donation; the display ranking groups by that exact name and
-never merges different names or splits a shared one. Because the demo has no
-real accounts, anonymous donations all share the name "Anonymous supporter" and
-are grouped together — a known demo identity limitation, not a claim that they
-are the same person. All donations popups are mobile-friendly and dismissible via
+name entered on each donation; the display ranking groups **named** donors by
+that exact name and never merges different names or splits a shared one. Because
+the demo has no real accounts, it cannot tell one anonymous supporter from
+another, so anonymous donations are **not** grouped: each confirmed anonymous
+donation is ranked as its own "Anonymous supporter" row (its own amount, count
+of 1) rather than claiming they are the same person — a known demo identity
+limitation. All donations popups are mobile-friendly and dismissible via
 close button, outside click, or Escape.
 
 > **Identity limitation.** The demo has a single supporter identity
