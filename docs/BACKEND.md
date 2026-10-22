@@ -5,15 +5,25 @@ and what is planned next. It is written to be accurate, not aspirational.
 
 ## Summary
 
-- **Authentication is fully database-backed** via Supabase (real accounts,
-  password hashing, sessions, a `profiles` table, and Row Level Security).
-- **Social and donation features currently run on a client-side store**
-  (React context persisted to `localStorage`). The **database schema to back
-  them already exists** in `supabase/migrations/` and wiring them is the next
-  step.
+- **Database-backed today (Supabase + RLS):** authentication, user profiles
+  (incl. athlete profiles with region/sport/funding goal), and the social feed
+  (posts, comments, reactions) with real per-user ownership.
+- **Still on the client store (next slices):** the Discover map's athlete source
+  and the QR/donation lifecycle. The database schema for these already exists in
+  `supabase/migrations/`; wiring is in progress.
 
-This is a deliberate, time-boxed scope: auth is the piece that must be real and
-secure, so it was built against the database first.
+Features are being migrated to the database in verified vertical slices, keeping
+the app building green at every step.
+
+## Schema status
+
+The live database matches the production schema in
+`supabase/migrations/0006_full_backend.sql` across all feature tables
+(profiles, athlete_profiles, athletes, posts, comments, reactions, qr_codes,
+donations). One historical drift was reconciled: an earlier-created
+`athlete_profiles` was missing `created_at`/`updated_at`; those columns and the
+`moddatetime` trigger were added to match 0006. A fresh deploy from the
+migrations produces the correct shape directly.
 
 ## What is database-backed today (Supabase)
 
