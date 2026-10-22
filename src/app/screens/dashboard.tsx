@@ -725,7 +725,23 @@ function PaymentHistory({ athleteId }: { athleteId: number }) {
   );
 }
 
-function AthleteDashboard({ athlete, posts, onCreate, onEdit, onDelete }: { athlete: Athlete; posts: Post[]; onCreate: (authorAthleteId: number, text: string) => void; onEdit: (postId: string, text: string) => void; onDelete: (postId: string) => void }) {
+function AthleteDashboard({
+  athlete,
+  posts,
+  postsLoading,
+  postError,
+  onCreate,
+  onEdit,
+  onDelete,
+}: {
+  athlete: Athlete;
+  posts: Post[];
+  postsLoading: boolean;
+  postError: string | null;
+  onCreate: (authorAthleteId: number, text: string) => void;
+  onEdit: (postId: string, text: string) => void;
+  onDelete: (postId: string) => void;
+}) {
   const { getDonationsForAthlete } = useStarlete();
   const [creating, setCreating] = useState(false);
   const [post, setPost] = useState("");
@@ -736,7 +752,9 @@ function AthleteDashboard({ athlete, posts, onCreate, onEdit, onDelete }: { athl
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const percent = athlete.goal > 0 ? Math.round((athlete.raised / athlete.goal) * 100) : 0;
   // Only the signed-in athlete's own posts are shown and editable here.
-  const myPosts = posts.filter(p => p.authorAthleteId === athlete.id);
+  const myPosts = posts.filter((post) =>
+    athlete.profileId ? post.ownerId === athlete.profileId : post.authorAthleteId === athlete.id,
+  );
 
   const startEdit = (p: Post) => { setEditingId(p.id); setEditText(p.text); };
   const cancelEdit = () => { setEditingId(null); setEditText(""); };
@@ -774,7 +792,7 @@ function AthleteDashboard({ athlete, posts, onCreate, onEdit, onDelete }: { athl
                 </div>
               ))}
         </div>
-        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Your story</span><h2>Recent posts</h2></div><button className="text-button" onClick={() => setCreating(true)}>New post</button></div>{myPosts.length ? myPosts.map(p => (
+        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Your story</span><h2>Recent posts</h2></div><button className="text-button" onClick={() => setCreating(true)}>New post</button></div>{postError && <p className="field-error" role="alert">{postError}</p>}{postsLoading ? <p className="profile-bio">Loading posts…</p> : myPosts.length ? myPosts.map(p => (
           <article className="dash-post" key={p.id}>
             <small><TimeAgo iso={p.createdAt} />{p.editedAt ? " · edited" : ""}</small>
             <strong>{p.text}</strong>
@@ -809,7 +827,7 @@ function AthleteDashboard({ athlete, posts, onCreate, onEdit, onDelete }: { athl
 }
 
 export function DashboardScreen() {
-  const { role, athletes, posts, addPost, editPost, deletePost, mounted } = useStarlete();
+  const { role, athletes, posts, postsLoading, postError, addPost, editPost, deletePost, mounted } = useStarlete();
   const { user, displayName } = useSession();
   const router = useRouter();
   const [profileValues, setProfileValues] = useState<{
@@ -856,6 +874,7 @@ export function DashboardScreen() {
     const demoAthlete = athletes[0];
     const athlete: Athlete = profileValues ? {
       ...demoAthlete,
+      profileId: user?.id,
       name: profileValues.name,
       sport: profileValues.sport || demoAthlete.sport,
       location: profileValues.location || demoAthlete.location,
@@ -864,11 +883,11 @@ export function DashboardScreen() {
       achievement: profileValues.achievement,
       goal: profileValues.fundingGoal ?? 0,
       verified: profileValues.verified,
-    } : demoAthlete;
+    } : { ...demoAthlete, profileId: user?.id };
     return (
       <>
         {profileError && <p className="field-error page-shell" role="alert">{profileError}</p>}
-        <AthleteDashboard athlete={athlete} posts={posts} onCreate={addPost} onEdit={editPost} onDelete={deletePost} />
+        <AthleteDashboard athlete={athlete} posts={posts} postsLoading={postsLoading} postError={postError} onCreate={addPost} onEdit={editPost} onDelete={deletePost} />
       </>
     );
   }

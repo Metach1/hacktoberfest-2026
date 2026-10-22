@@ -184,3 +184,26 @@ test("commenting produces one event only when the commenter is not the author", 
     "author commenting on own post emits nothing",
   );
 });
+
+test("post self-notifications use Supabase owner IDs when available", () => {
+  const post = {
+    authorAthleteId: 0,
+    ownerId: "athlete-user-id",
+    likedBy: [],
+    text: "Database-backed post",
+  };
+  assert.equal(
+    postLikeNotification(post, 1, "Athlete", "athlete-user-id"),
+    null,
+    "an athlete does not receive a notification for their own like",
+  );
+  assert.equal(
+    postCommentNotification(post, 1, "Athlete", "My post", "athlete-user-id"),
+    null,
+    "an athlete does not receive a notification for their own comment",
+  );
+  assert.deepEqual(postLikeNotification(post, "supporter", "Supporter", "supporter-user-id"), {
+    type: "post_like",
+    data: { actorName: "Supporter", text: "Database-backed post" },
+  });
+});

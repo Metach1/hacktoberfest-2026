@@ -13,7 +13,7 @@ import { toAthlete } from "@/src/app/lib/profile-adapter";
 import type { Athlete } from "@/src/app/data/athletes";
 
 export function AthleteProfileScreen({ id }: { id: string }) {
-  const { getAthlete, role, openDonation, posts, mounted } = useStarlete();
+  const { getAthlete, role, openDonation, posts, postsLoading, postError, mounted } = useStarlete();
   const router = useRouter();
   const numericId = /^\d+$/.test(id) ? Number(id) : null;
   const demoAthlete = numericId == null ? undefined : getAthlete(numericId);
@@ -50,7 +50,9 @@ export function AthleteProfileScreen({ id }: { id: string }) {
 
   const percent = athlete.goal > 0 ? Math.round((athlete.raised / athlete.goal) * 100) : 0;
   const athletePosts = posts
-    .filter((p) => p.authorAthleteId === athlete.id)
+    .filter((post) => athlete.profileId
+      ? post.ownerId === athlete.profileId
+      : post.authorAthleteId === athlete.id)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   const onSupport = () => {
@@ -84,7 +86,7 @@ export function AthleteProfileScreen({ id }: { id: string }) {
       </section>
       <section className="profile-content">
         <div><span className="eyebrow">The journey</span><h2>Chasing a bigger dream</h2><p>Every training session is a step closer to carrying the Philippine flag on a larger stage. Support covers essential coaching, nutrition, equipment, and the travel required to compete against the best.</p><div className="quote">&ldquo;I&rsquo;m not only running for myself. I&rsquo;m running for every young athlete back home who needs to see that we belong on the world stage.&rdquo;</div></div>
-        <div><span className="eyebrow">Latest updates</span><div className="profile-feed">{athletePosts.length ? athletePosts.map((p) => <PostCard key={p.id} post={p} showAuthor={false} />) : <article className="post"><p>No updates yet. Check back soon.</p></article>}</div></div>
+        <div><span className="eyebrow">Latest updates</span>{postError && <p className="field-error" role="alert">{postError}</p>}<div className="profile-feed">{postsLoading ? <article className="post"><p>Loading posts…</p></article> : athletePosts.length ? athletePosts.map((p) => <PostCard key={p.id} post={p} showAuthor={false} />) : <article className="post"><p>No updates yet. Check back soon.</p></article>}</div></div>
       </section>
     </main>
   );

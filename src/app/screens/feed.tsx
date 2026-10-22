@@ -6,7 +6,7 @@ import { PostCard } from "@/src/app/shared/post-card";
 import { useStarlete } from "@/src/app/store";
 
 export function FeedScreen() {
-  const { role, athletes, posts, addPost } = useStarlete();
+  const { role, athletes, posts, postsLoading, postError, addPost } = useStarlete();
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState("");
 
@@ -38,7 +38,10 @@ export function FeedScreen() {
       </div>
 
       <section className="feed-list">
-        {ordered.length ? (
+        {postError && <p className="field-error" role="alert">{postError}</p>}
+        {postsLoading ? (
+          <div className="empty"><p>Loading posts…</p></div>
+        ) : ordered.length ? (
           ordered.map((p) => <PostCard key={p.id} post={p} />)
         ) : (
           <div className="empty"><h3>No posts yet</h3><p>Check back soon—athletes are just getting started.</p></div>

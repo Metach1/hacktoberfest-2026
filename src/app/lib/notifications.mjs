@@ -142,19 +142,27 @@ export function donationResubmissionNotification(previous, next) {
 
 /**
  * Build a like event only when an external actor adds a like.
+ * @param {string} [actorOwnerId]
  * @returns {{type: "post_like", data: {actorName: string, text: string}}|null}
  */
-export function postLikeNotification(post, actorId, actorName) {
-  if (!post || post.likedBy.includes(actorId) || actorId === post.authorAthleteId) return null;
+export function postLikeNotification(post, actorId, actorName, actorOwnerId) {
+  const isAuthor = post?.ownerId && actorOwnerId
+    ? post.ownerId === actorOwnerId
+    : actorId === post?.authorAthleteId;
+  if (!post || post.likedBy.includes(actorId) || isAuthor) return null;
   return { type: "post_like", data: { actorName, text: post.text } };
 }
 
 /**
  * Build a comment event only when someone other than the post author comments.
+ * @param {string} [actorOwnerId]
  * @returns {{type: "post_comment", data: {actorName: string, text: string}}|null}
  */
-export function postCommentNotification(post, authorId, actorName, text) {
-  if (!post || authorId === post.authorAthleteId) return null;
+export function postCommentNotification(post, authorId, actorName, text, actorOwnerId) {
+  const isAuthor = post?.ownerId && actorOwnerId
+    ? post.ownerId === actorOwnerId
+    : authorId === post?.authorAthleteId;
+  if (!post || isAuthor) return null;
   return { type: "post_comment", data: { actorName, text } };
 }
 

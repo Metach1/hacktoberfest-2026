@@ -1,10 +1,4 @@
-/**
- * Social feed data layer for the Starlete demo.
- *
- * Posts are authored by athletes; supporters (and athletes) can like and
- * comment. Everything is in-memory/localStorage only — there is no backend and
- * no real identities. See `data/README.md` for the fake-data safety rules.
- */
+/** Social-feed view models shared by the store and post components. */
 import { athletes } from "@/src/app/data/athletes";
 
 /** A supporter is represented by this sentinel id in the demo (no real users). */
@@ -17,6 +11,8 @@ export interface Comment {
   id: string;
   /** Who wrote the comment. */
   authorId: ActorId;
+  /** Supabase profile UUID when the comment has a registered author. */
+  ownerId?: string;
   /** Display name shown with the comment. */
   authorName: string;
   text: string;
@@ -28,6 +24,14 @@ export interface Post {
   id: string;
   /** The athlete who authored the post. */
   authorAthleteId: number;
+  /** Supabase user UUID for registered authors. */
+  ownerId?: string;
+  /** Supabase UUID used by the public athlete profile route. */
+  authorProfileId?: string;
+  authorName?: string;
+  authorImage?: string;
+  authorSport?: string;
+  authorVerified?: boolean;
   text: string;
   /** ISO timestamp. */
   createdAt: string;
@@ -40,100 +44,19 @@ export interface Post {
   comments: Comment[];
 }
 
-/** Monotonic-ish id generator good enough for an in-memory demo. */
+/** Monotonic-ish ids for local notification records. */
 let seq = 0;
 export const newId = (prefix: string) =>
   `${prefix}-${Date.now().toString(36)}-${(seq++).toString(36)}`;
 
-/**
- * Seed feed. Two posts migrated from the previous `string[]` model plus a few
- * extra so the global feed looks alive on first load. Authors are spread across
- * the first athletes; dates are staggered into the past.
- */
-function buildSeedPosts(): Post[] {
-  const a = athletes;
-  const day = 86_400_000;
-  const now = Date.now();
-  const seeds: Array<{ author: number; text: string; daysAgo: number; likes: number; comments: Array<[ActorId, string, string]> }> = [
-    {
-      author: a[0]?.id ?? 1,
-      text: "One step closer to nationals — this week's time trial was a new personal best. Thank you for helping me access better recovery and coaching.",
-      daysAgo: 3,
-      likes: 86,
-      comments: [
-        [SUPPORTER_ID, "Jamie", "So proud of you! Keep flying 🇵🇭"],
-        [a[1]?.id ?? 2, a[1]?.name ?? "A teammate", "Let's go! Inspiring work."],
-      ],
-    },
-    {
-      author: a[0]?.id ?? 1,
-      text: "Recovery, reset, repeat. Rest days are part of the grind too.",
-      daysAgo: 7,
-      likes: 42,
-      comments: [[SUPPORTER_ID, "Carlo M.", "Rest well, champ."]],
-    },
-    {
-      author: a[1]?.id ?? 2,
-      text: "Sparring went well today. Felt sharp and fast. Grateful for every supporter in my corner.",
-      daysAgo: 1,
-      likes: 58,
-      comments: [],
-    },
-    {
-      author: a[2]?.id ?? 3,
-      text: "New shoes, new goals. Chasing a spot on the national team this season.",
-      daysAgo: 5,
-      likes: 73,
-      comments: [[SUPPORTER_ID, "Nina A.", "Rooting for you!"]],
-    },
-  ];
-
-  return seeds.map((s) => ({
-    id: newId("post"),
-    authorAthleteId: s.author,
-    text: s.text,
-    createdAt: new Date(now - s.daysAgo * day).toISOString(),
-    likes: s.likes,
-    likedBy: [],
-    comments: s.comments.map(([authorId, authorName, text], i) => ({
-      id: newId("cmt"),
-      authorId,
-      authorName,
-      text,
-      createdAt: new Date(now - s.daysAgo * day + (i + 1) * 3_600_000).toISOString(),
-    })),
-  }));
-}
-
-export const seedPosts: Post[] = buildSeedPosts();
-
-/**
- * Migrate the legacy `string[]` post model to `Post[]`. Each legacy string is
- * attributed to the first athlete (the demo athlete account) with a staggered
- * date so order is stable.
- */
-export function migrateLegacyPosts(legacy: string[]): Post[] {
-  const firstAthleteId = athletes[0]?.id ?? 1;
-  const now = Date.now();
-  return legacy.map((text, i) => ({
-    id: newId("post"),
-    authorAthleteId: firstAthleteId,
-    text,
-    createdAt: new Date(now - i * 86_400_000).toISOString(),
-    likes: 0,
-    likedBy: [],
-    comments: [],
-  }));
-}
-
 /** Resolve an athlete's display name/image for rendering a post header. */
-export function postAuthor(authorAthleteId: number) {
+export function postAuthor(authorAthleteId: number, post?: Post) {
   const athlete = athletes.find((a) => a.id === authorAthleteId);
   return {
-    name: athlete?.name ?? "Starlete athlete",
-    image: athlete?.image ?? "",
-    sport: athlete?.sport ?? "",
-    verified: athlete?.verified ?? false,
+    name: post?.authorName || athlete?.name || "Starlete athlete",
+    image: post?.authorImage ?? athlete?.image ?? "",
+    sport: post?.authorSport ?? athlete?.sport ?? "",
+    verified: post?.authorVerified ?? athlete?.verified ?? false,
   };
 }
 
