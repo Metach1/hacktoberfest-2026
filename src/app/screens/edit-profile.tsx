@@ -31,6 +31,9 @@ export function EditProfileScreen() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   // Populate the form once the profile loads (guard so edits aren't clobbered).
+  // Syncing fetched data into local form state is a legitimate effect; the
+  // `!seeded` guard makes it run once and not cascade.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (profile && !seeded) {
       setFirstName(profile.firstName);
@@ -42,6 +45,7 @@ export function EditProfileScreen() {
       setSeeded(true);
     }
   }, [profile, seeded]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (!user && !sessionLoading) return null;
 

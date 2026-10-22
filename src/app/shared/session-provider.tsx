@@ -89,7 +89,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     await loadProfile(data.user);
   }, [loadProfile]);
 
-  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const supabase = createClient();
     let active = true;
@@ -111,7 +110,6 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       sub.subscription.unsubscribe();
     };
   }, [loadProfile]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   const signOut = useCallback(async () => {
     const supabase = createClient();
