@@ -168,7 +168,22 @@ export function DiscoverScreen() {
   // selection/search changes so "Expand" always reflects the current results.
   const [expanded, setExpanded] = useState(false);
   // Independent "browse every athlete" modal, unaffected by region/search/sport.
-  const [viewAll, setViewAll] = useState(false);
+  // Initialized from ?view=all so it can be opened from another page (e.g. the
+  // supporter dashboard) by navigating to /discover?view=all. The initializer
+  // reads the param once at mount — no setState-in-effect.
+  const [viewAll, setViewAll] = useState(() => searchParams.get("view") === "all");
+
+  // Close the all-athletes sheet and strip ?view=all so a refresh (or the
+  // browser back button) does not reopen it. Leaves any ?region= untouched.
+  const closeViewAll = useCallback(() => {
+    setViewAll(false);
+    if (searchParams.get("view") === "all") {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("view");
+      const query = params.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    }
+  }, [pathname, router, searchParams]);
 
   // The selected region is held in the URL so it is shareable and works with
   // the browser back button. A valid region code is one that exists on the map.
@@ -235,11 +250,11 @@ export function DiscoverScreen() {
   useEffect(() => {
     if (!expanded && !viewAll) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { setExpanded(false); setViewAll(false); }
+      if (e.key === "Escape") { setExpanded(false); closeViewAll(); }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [expanded, viewAll]);
+  }, [expanded, viewAll, closeViewAll]);
 
   const headingName = selectedRegionName ?? "the Philippines";
 
@@ -327,9 +342,9 @@ export function DiscoverScreen() {
       {/* Browse every registered athlete, unfiltered. Same sheet pattern as the
           region catalog, but it never sets a region. */}
       {viewAll && (
-        <div className="modal-backdrop catalog-backdrop" onClick={() => setViewAll(false)}>
+        <div className="modal-backdrop catalog-backdrop" onClick={closeViewAll}>
           <div className="catalog-sheet" role="dialog" aria-modal="true" aria-label="All athletes" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="modal-close" onClick={() => setViewAll(false)} aria-label="Close catalog"><Icon name="close" /></button>
+            <button type="button" className="modal-close" onClick={closeViewAll} aria-label="Close catalog"><Icon name="close" /></button>
             <div className="results-head">
               <div>
                 <span className="eyebrow">Athlete community</span>
