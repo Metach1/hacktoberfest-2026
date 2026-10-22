@@ -1,11 +1,112 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon, Logo } from "@/src/app/shared/ui";
 import { DonationModal } from "@/src/app/shared/donation";
 import { useStarlete } from "@/src/app/store";
+
+/** Relative "time ago" label for a notification's epoch-ms timestamp. */
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+/**
+ * Notifications bell + dropdown panel. The unread badge and list are scoped to
+ * the current role's audience by the store. The panel dismisses on outside
+ * click and Escape; opening it marks everything read.
+ */
+function NotificationsBell() {
+  const { getNotifications, unreadCount, markNotificationRead, markAllNotificationsRead } = useStarlete();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const items = getNotifications();
+
+  // Clicking a notification marks it read, navigates to its tab, and closes.
+  const openNotification = (n: { id: string; href?: string }) => {
+    markNotificationRead(n.id);
+    setOpen(false);
+    if (n.href) router.push(n.href);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("mousedown", onClick);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onClick);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="notif" ref={wrapRef}>
+      <button
+        className="icon-only notif-bell"
+        aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <Icon name="bell" />
+        {unreadCount > 0 && <span className="notif-badge" aria-hidden="true">{unreadCount > 9 ? "9+" : unreadCount}</span>}
+      </button>
+
+      {open && (
+        <div className="notif-panel" role="menu">
+          <div className="notif-head">
+            <strong>Notifications</strong>
+            {items.some((n) => !n.read) && (
+              <button className="text-button" onClick={() => markAllNotificationsRead()}>Mark all read</button>
+            )}
+          </div>
+          {items.length === 0 ? (
+            <p className="notif-empty muted-line">You&rsquo;re all caught up.</p>
+          ) : (
+            <ul className="notif-list">
+              {items.map((n) => (
+                <li
+                  key={n.id}
+                  className={n.read ? "notif-item" : "notif-item unread"}
+                  role="menuitem"
+                  tabIndex={0}
+                  onClick={() => openNotification(n)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openNotification(n);
+                    }
+                  }}
+                >
+                  <div className="notif-item-main">
+                    <strong>{n.title}</strong>
+                    <small>{timeAgo(n.createdAt)}</small>
+                  </div>
+                  <p>{n.body}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Header() {
   const pathname = usePathname();
@@ -38,6 +139,7 @@ function Header() {
           {role ? (
             <>
               <Link className={isActive("/dashboard") ? "active" : ""} href="/dashboard" onClick={close}>Dashboard</Link>
+              <NotificationsBell />
               <Link className="nav-user" href="/dashboard/edit" onClick={close}>{initials}</Link>
               <button className="icon-only" onClick={signOut} aria-label="Log out"><Icon name="logout" /></button>
             </>

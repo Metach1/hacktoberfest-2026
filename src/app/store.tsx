@@ -32,8 +32,43 @@ import {
   type Post,
   type ActorId,
 } from "@/src/app/data/posts";
+import { rejectionReasonLabel } from "@/src/app/lib/donations.mjs";
+import {
+  buildNotification,
+  notificationsForRole,
+  unreadCountForRole,
+  markRead as markReadRecord,
+  markAllRead as markAllReadRecord,
+  normalizeNotification,
+} from "@/src/app/lib/notifications.mjs";
 
 export type Role = "supporter" | "athlete";
+
+/** Who a notification is shown to; maps directly to the current role. */
+export type NotificationAudience = "athlete" | "supporter";
+
+/** Kinds of in-app notifications the demo emits. */
+export type NotificationType =
+  | "donation_pending"
+  | "post_like"
+  | "post_comment"
+  | "donation_confirmed"
+  | "donation_rejected"
+  | "new_post";
+
+/** An in-app notification (in-memory + localStorage only; no backend). */
+export interface Notification {
+  id: string;
+  audience: NotificationAudience;
+  type: NotificationType;
+  title: string;
+  body: string;
+  /** Epoch ms. */
+  createdAt: number;
+  read: boolean;
+  /** Optional in-app destination for the notification. */
+  href?: string;
+}
 
 /** A payment QR code an athlete publishes, labeled by payment method. */
 export interface QrCode {
@@ -76,11 +111,11 @@ export interface Donation {
 }
 
 /**
- * Bumped whenever persisted data shapes change. v5 adds supporter identity and
- * the reject lifecycle to donations (on top of v4's QR codes, donations, and
- * structured social posts).
+ * Bumped whenever persisted data shapes change. v6 adds in-app notifications
+ * (on top of v5's supporter identity + reject lifecycle, v4's QR codes,
+ * donations, and structured social posts).
  */
-const DATA_VERSION = "v5";
+const DATA_VERSION = "v6";
 
 /** Build a fictional QR entry for a method. */
 function makeQr(athleteId: number, method: string, label: string, accountNumber: string): QrCode {
@@ -139,6 +174,8 @@ interface StarleteState {
   qrCodes: Record<number, QrCode[]>;
   /** All QR-based donations across the demo (pending + confirmed). */
   donations: Donation[];
+  /** All in-app notifications across both audiences (scoped on read). */
+  notifications: Notification[];
 
   login: (role: Role) => void;
   logout: () => void;
@@ -212,6 +249,16 @@ interface StarleteState {
   toggleLike: (postId: string, actorId: ActorId) => void;
   /** Add a comment to a post. */
   addComment: (postId: string, authorId: ActorId, authorName: string, text: string) => void;
+
+  // Notifications (scoped to the current role's audience).
+  /** Notifications for the current role, newest first (empty when role null). */
+  getNotifications: () => Notification[];
+  /** Count of unread notifications for the current role. */
+  unreadCount: number;
+  /** Mark one notification read. */
+  markNotificationRead: (id: string) => void;
+  /** Mark every notification for the current role read. */
+  markAllNotificationsRead: () => void;
 }
 
 /** The id for the current actor, used for likes/comments in the demo. */
@@ -258,6 +305,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   const [donationPrefill, setDonationPrefill] = useState<Donation | null>(null);
   const [qrCodes, setQrCodes] = useState<Record<number, QrCode[]>>(() => seedQrCodes(seedAthletes));
   const [donations, setDonations] = useState<Donation[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
   // Hydrate persisted state from localStorage once on client mount.
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -269,6 +317,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       const savedQr = window.localStorage.getItem("starlete-qr");
       const savedDonations = window.localStorage.getItem("starlete-donations");
       const savedPosts = window.localStorage.getItem("starlete-posts");
+      const savedNotifications = window.localStorage.getItem("starlete-notifications");
       setRole(savedRole ?? null);
       if (savedVersion === DATA_VERSION || savedVersion === "v4" || savedVersion === "v3") {
         if (savedAthletes) setAthletes(JSON.parse(savedAthletes) as Athlete[]);
@@ -305,16 +354,24 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
           const reconciled = applyAutoConfirm(loaded) as Donation[];
           setDonations(reconciled);
         }
+        if (savedNotifications) {
+          const loadedNtf = JSON.parse(savedNotifications) as Partial<Notification>[];
+          setNotifications(
+            (loadedNtf ?? []).map((n, i) => normalizeNotification(n, `ntf-legacy-${i}`) as Notification),
+          );
+        }
       } else {
         // Reset stale caches when the combined payment and social data shape changes.
         setAthletes(seedAthletes);
         setPosts(seedPosts);
         setQrCodes(seedQrCodes(seedAthletes));
         setDonations([]);
+        setNotifications([]);
         window.localStorage.removeItem("starlete-athletes");
         window.localStorage.removeItem("starlete-posts");
         window.localStorage.removeItem("starlete-qr");
         window.localStorage.removeItem("starlete-donations");
+        window.localStorage.removeItem("starlete-notifications");
         window.localStorage.setItem("starlete-data-version", DATA_VERSION);
       }
     } catch {
@@ -334,10 +391,11 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       window.localStorage.setItem("starlete-posts", JSON.stringify(posts));
       window.localStorage.setItem("starlete-qr", JSON.stringify(qrCodes));
       window.localStorage.setItem("starlete-donations", JSON.stringify(donations));
+      window.localStorage.setItem("starlete-notifications", JSON.stringify(notifications));
     } catch {
       // ignore
     }
-  }, [athletes, posts, qrCodes, donations, mounted]);
+  }, [athletes, posts, qrCodes, donations, notifications, mounted]);
 
   // Periodically sweep for demo auto-confirm so a long-lived session confirms
   // donations that cross the 3-day window without a reload.
@@ -378,6 +436,14 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   const getAthlete = useCallback(
     (id: number) => reconciledAthletes.find((a) => a.id === id),
     [reconciledAthletes],
+  );
+
+  // Resolve an actor id to a display name for notification copy. The demo
+  // supporter has no real name, so it reads as a generic "A supporter".
+  const likerName = useCallback(
+    (actorId: ActorId): string =>
+      actorId === SUPPORTER_ID ? "A supporter" : getAthlete(actorId as number)?.name ?? "Someone",
+    [getAthlete],
   );
 
   const openDonation = useCallback((athlete: Athlete) => {
@@ -454,25 +520,69 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   // note in the docs: the demo cannot distinguish multiple real supporters.)
   const supporterId: ActorId = SUPPORTER_ID;
 
+  // Stamp a built notification payload with id/createdAt/read and prepend it
+  // (newest first). No-op when the builder returns null (nothing to emit).
+  const pushNotification = useCallback((event: { type: NotificationType; data: Record<string, unknown> }) => {
+    const payload = buildNotification(event) as Omit<Notification, "id" | "createdAt" | "read"> | null;
+    if (!payload) return;
+    const notification: Notification = {
+      ...payload,
+      id: newId("ntf"),
+      createdAt: Date.now(),
+      read: false,
+    };
+    setNotifications((list) => [notification, ...list]);
+  }, []);
+
   const submitDonation = useCallback<StarleteState["submitDonation"]>((input) => {
     const donation = createPendingDonation({ ...input, supporterId: SUPPORTER_ID }) as Donation;
     setDonations((list) => [donation, ...list]);
+    // Notify the athlete audience: a new pending donation needs review. Copy is
+    // athlete-facing, so it names the supporter the donation came FROM.
+    pushNotification({
+      type: "donation_pending",
+      data: { amount: donation.amount, supporterName: donation.supporterName },
+    });
     return donation;
-  }, []);
+  }, [pushNotification]);
 
   const confirmDonation = useCallback((donationId: string) => {
     setDonations((list) =>
-      list.map((d) => (d.id === donationId ? (confirmDonationRecord(d, "athlete") as Donation) : d)),
+      list.map((d) => {
+        if (d.id !== donationId) return d;
+        const next = confirmDonationRecord(d, "athlete") as Donation;
+        // Only notify the supporter when the status actually changed.
+        if (next.status !== d.status) {
+          pushNotification({
+            type: "donation_confirmed",
+            data: { amount: next.amount, athleteName: getAthlete(next.athleteId)?.name },
+          });
+        }
+        return next;
+      }),
     );
-  }, []);
+  }, [pushNotification, getAthlete]);
 
   const rejectDonation = useCallback((donationId: string, reason: string, note?: string) => {
     setDonations((list) =>
-      list.map((d) =>
-        d.id === donationId ? (rejectDonationRecord(d, reason, note ?? "") as Donation) : d,
-      ),
+      list.map((d) => {
+        if (d.id !== donationId) return d;
+        const next = rejectDonationRecord(d, reason, note ?? "") as Donation;
+        // Only notify the supporter when the status actually changed to rejected.
+        if (next.status !== d.status) {
+          pushNotification({
+            type: "donation_rejected",
+            data: {
+              amount: next.amount,
+              athleteName: getAthlete(next.athleteId)?.name,
+              reasonLabel: rejectionReasonLabel(next.rejectionReason ?? reason),
+            },
+          });
+        }
+        return next;
+      }),
     );
-  }, []);
+  }, [pushNotification, getAthlete]);
 
   const resubmitDonation = useCallback<StarleteState["resubmitDonation"]>(
     (donationId, patch) => {
@@ -525,7 +635,13 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       comments: [],
     };
     setPosts((prev) => [post, ...prev]);
-  }, []);
+    // Notify the supporter audience that a followed athlete posted. (Demo has
+    // no follow graph, so this reaches the whole supporter audience.)
+    pushNotification({
+      type: "new_post",
+      data: { athleteName: getAthlete(authorAthleteId)?.name, text: trimmed },
+    });
+  }, [pushNotification, getAthlete]);
 
   const editPost = useCallback((postId: string, text: string) => {
     const trimmed = text.trim();
@@ -551,37 +667,72 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
         const likedBy = liked
           ? p.likedBy.filter((id) => id !== actorId)
           : [...p.likedBy, actorId];
+        // Notify the athlete only when a like is ADDED (not removed) and the
+        // liker isn't the post's own author (no self-notification).
+        if (!liked && actorId !== p.authorAthleteId) {
+          pushNotification({
+            type: "post_like",
+            data: { actorName: likerName(actorId), text: p.text },
+          });
+        }
         return { ...p, likedBy, likes: p.likes + (liked ? -1 : 1) };
       }),
     );
-  }, []);
+  }, [pushNotification, likerName]);
 
   const addComment = useCallback(
     (postId: string, authorId: ActorId, authorName: string, text: string) => {
       const trimmed = text.trim();
       if (!trimmed) return;
       setPosts((prev) =>
-        prev.map((p) =>
-          p.id === postId
-            ? {
-                ...p,
-                comments: [
-                  ...p.comments,
-                  {
-                    id: newId("cmt"),
-                    authorId,
-                    authorName,
-                    text: trimmed,
-                    createdAt: new Date().toISOString(),
-                  },
-                ],
-              }
-            : p,
-        ),
+        prev.map((p) => {
+          if (p.id !== postId) return p;
+          // Notify the athlete unless they commented on their own post.
+          if (authorId !== p.authorAthleteId) {
+            pushNotification({
+              type: "post_comment",
+              data: { actorName: authorName || likerName(authorId), text: trimmed },
+            });
+          }
+          return {
+            ...p,
+            comments: [
+              ...p.comments,
+              {
+                id: newId("cmt"),
+                authorId,
+                authorName,
+                text: trimmed,
+                createdAt: new Date().toISOString(),
+              },
+            ],
+          };
+        }),
       );
     },
-    [],
+    [pushNotification, likerName],
   );
+
+  // --- Notifications -------------------------------------------------------
+  // Everything is scoped to the current role's audience so an athlete never
+  // sees supporter notifications and vice-versa; a null role sees none.
+  const getNotifications = useCallback(
+    () => notificationsForRole(notifications, role) as Notification[],
+    [notifications, role],
+  );
+
+  const unreadCount = useMemo(
+    () => unreadCountForRole(notifications, role) as number,
+    [notifications, role],
+  );
+
+  const markNotificationRead = useCallback((id: string) => {
+    setNotifications((list) => markReadRecord(list, id) as Notification[]);
+  }, []);
+
+  const markAllNotificationsRead = useCallback(() => {
+    setNotifications((list) => markAllReadRecord(list, role) as Notification[]);
+  }, [role]);
 
   const value = useMemo<StarleteState>(
     () => ({
@@ -593,6 +744,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       donationPrefill,
       qrCodes,
       donations,
+      notifications,
       login,
       logout,
       getAthlete,
@@ -616,13 +768,18 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       deletePost,
       toggleLike,
       addComment,
+      getNotifications,
+      unreadCount,
+      markNotificationRead,
+      markAllNotificationsRead,
     }),
     [
-      mounted, role, reconciledAthletes, posts, donationTarget, donationPrefill, qrCodes, donations,
+      mounted, role, reconciledAthletes, posts, donationTarget, donationPrefill, qrCodes, donations, notifications,
       login, logout, getAthlete, openDonation, openResubmission, closeDonation,
       getQrCodes, addQrCode, replaceQrCode, removeQrCode,
       submitDonation, confirmDonation, rejectDonation, resubmitDonation, removeDonation, getDonationsForAthlete,
       supporterId, getDonationsForSupporter, addPost, editPost, deletePost, toggleLike, addComment,
+      getNotifications, unreadCount, markNotificationRead, markAllNotificationsRead,
     ],
   );
 
