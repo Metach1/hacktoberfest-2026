@@ -75,8 +75,11 @@ function Footer() {
 export function AppChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const authPage = pathname === "/login" || pathname === "/register";
+  // The landing page uses a deep-blue header/footer treatment; the marker class
+  // lets the shared chrome restyle without duplicating header/footer markup.
+  const home = pathname === "/";
   return (
-    <div className="app">
+    <div className={home ? "app home-app" : "app"}>
       {!authPage && <Header />}
       {children}
       {!authPage && <Footer />}

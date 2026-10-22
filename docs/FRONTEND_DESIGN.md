@@ -44,12 +44,12 @@ the look is self-contained and portable.
 | --- | --- | --- |
 | Landing (`/`) | Everyone | Hero headline, trust strip, featured athletes, How It Works, CTA. |
 | Discover (`/discover`) | Everyone | Interactive region map plus search, sport, and region filters over a card grid; the region is kept in the URL. |
-| Athlete profile | Everyone | Photo, bio, achievement, funding panel, updates, Support button. |
+| Athlete profile | Everyone | Photo, bio, achievement, funding panel with recent confirmed donations (See all / See top popups), updates, Support button. |
 | Login / Register | Visitors | Role toggle (Supporter / Athlete); athlete fields + minor consent. |
-| Supporter dashboard | Supporter | Picked-for-you athletes, trending, funding leaderboard, impact. |
-| Athlete dashboard | Athlete | Verification status, funds, goal, supporters, donations, posts, Create Post. |
+| Supporter dashboard | Supporter | Picked-for-you athletes, My payments (own submissions, scoped to the demo identity), trending, funding leaderboard, impact. |
+| Athlete dashboard | Athlete | Verification status, funds, goal, supporters, payment QR management, pending receipts (confirm/reject with reason), confirmed donations, payment history, and posts with create, edit, and delete of the athlete's own updates. |
 | Edit profile | Signed-in | Update name, location, bio, and (athlete) sport and goal. |
-| Donation flow (modal) | Supporter | Amount → payment method → review → processing → success. |
+| Donation flow (modal) | Supporter | Scan QR → upload receipt & enter amount → review → amount confirmation → pending. |
 
 ## Role rules
 
@@ -62,9 +62,13 @@ the look is self-contained and portable.
 
 1. A supporter discovers an athlete on the landing or Discover screen.
 2. They open the athlete profile and read the story and funding progress.
-3. They choose an amount and a simulated payment method, review, and confirm.
-4. A success screen shows a reference, and the athlete's raised total and
-   supporter count update immediately across the app.
+3. They scan the athlete's published payment QR with their own wallet app, pay
+   outside the demo, then upload the receipt and enter the amount they paid.
+   OCR pre-fills suggestions; the supporter reviews and confirms the amount
+   (a typo safeguard, not payment verification) before submitting.
+4. A pending screen shows a reference. The donation counts once the athlete
+   confirms receipt (or the demo auto-confirm timeout elapses), and the
+   athlete's raised total and supporter count then update across the app.
 
 ## Responsiveness
 

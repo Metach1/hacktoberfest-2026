@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { notFound } from "next/navigation";
 import { Icon, Progress, peso } from "@/src/app/shared/ui";
 import { PostCard } from "@/src/app/shared/post-card";
+import { DonationsPanel } from "@/src/app/shared/donations-panel";
 import { useStarlete } from "@/src/app/store";
 
 export function AthleteProfileScreen({ id }: { id: number }) {
@@ -50,6 +51,7 @@ export function AthleteProfileScreen({ id }: { id: number }) {
           <div className="support-stats"><span><b>{percent}%</b> funded</span><span><b>{athlete.supporters}</b> supporters</span></div>
           {role !== "athlete" && <button className="button full gold" onClick={onSupport}>Support {athlete.name.split(" ")[0]} <Icon name="heart" /></button>}
           <p className="safe-note"><Icon name="shield" size={16} /> Demo payments only. No real transaction.</p>
+          <DonationsPanel athleteId={athlete.id} />
         </aside>
       </section>
       <section className="profile-content">

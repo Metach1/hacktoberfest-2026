@@ -9,6 +9,11 @@ and this project aims to follow semantic versioning once it reaches a release.
 
 ### Added
 
+- Athletes can now edit and delete their own posts from the athlete dashboard.
+  Editing opens a prefilled modal (matching the create-post flow) and marks the
+  post as "edited"; deleting uses an inline confirm on the post card. Backed by
+  new owner-scoped `editPost` and `deletePost` store actions and an optional
+  `editedAt` field on `Post`.
 - Real App Router routes replacing the single-URL experience: `/`, `/discover`,
   `/athletes/:id` (all 30 seed athletes prerendered), `/login`, `/register`,
   `/dashboard`, and `/dashboard/edit`, plus a `not-found` page. Each screen now
