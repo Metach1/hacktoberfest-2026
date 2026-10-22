@@ -428,14 +428,29 @@ function PaymentHistory({ athleteId }: { athleteId: number }) {
   );
 }
 
-function AthleteDashboard({ athlete, posts, onCreate }: { athlete: Athlete; posts: Post[]; onCreate: (authorAthleteId: number, text: string) => void }) {
+function AthleteDashboard({ athlete, posts, onCreate, onEdit, onDelete }: { athlete: Athlete; posts: Post[]; onCreate: (authorAthleteId: number, text: string) => void; onEdit: (postId: string, text: string) => void; onDelete: (postId: string) => void }) {
   const { getDonationsForAthlete } = useStarlete();
   const [creating, setCreating] = useState(false);
   const [post, setPost] = useState("");
+  // Edit modal: the post being edited and its working text.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  // Inline delete confirmation: the post awaiting a Yes/Cancel on its own card.
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const percent = Math.round((athlete.raised / athlete.goal) * 100);
+  // Only the signed-in athlete's own posts are shown and editable here.
+  const myPosts = posts.filter(p => p.authorAthleteId === athlete.id);
+
+  const startEdit = (p: Post) => { setEditingId(p.id); setEditText(p.text); };
+  const cancelEdit = () => { setEditingId(null); setEditText(""); };
+  const saveEdit = () => {
+    if (editingId && editText.trim()) {
+      onEdit(editingId, editText);
+      cancelEdit();
+    }
+  };
   const donations = getDonationsForAthlete(athlete.id);
   const confirmed = donations.filter((d) => d.status === "confirmed");
-  const myPosts = posts.filter((p) => p.authorAthleteId === athlete.id);
   return (
     <main className="dashboard page-shell">
       <div className="dash-welcome"><div><span className="eyebrow">Athlete dashboard</span><h1>Keep going, {athlete.name.split(" ")[0]}.</h1><p>Your community is cheering with every step.</p></div><button className="button" onClick={() => setCreating(true)}><Icon name="plus" /> Create post</button></div>
@@ -462,19 +477,42 @@ function AthleteDashboard({ athlete, posts, onCreate }: { athlete: Athlete; post
                 </div>
               ))}
         </div>
-        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Your story</span><h2>Recent posts</h2></div><button className="text-button" onClick={() => setCreating(true)}>New post</button></div>{myPosts.length ? myPosts.map(p => <article className="dash-post" key={p.id}><small><TimeAgo iso={p.createdAt} /></small><strong>{p.text}</strong><span>{p.likes} cheers · {p.comments.length} comments</span></article>) : <p className="profile-bio">No posts yet. Share your first update!</p>}</div>
+        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Your story</span><h2>Recent posts</h2></div><button className="text-button" onClick={() => setCreating(true)}>New post</button></div>{myPosts.length ? myPosts.map(p => (
+          <article className="dash-post" key={p.id}>
+            <small><TimeAgo iso={p.createdAt} />{p.editedAt ? " · edited" : ""}</small>
+            <strong>{p.text}</strong>
+            <span>{p.likes} cheers · {p.comments.length} comments</span>
+            {confirmDeleteId === p.id ? (
+              <div className="post-actions">
+                <span className="confirm-text">Delete this post?</span>
+                <button className="text-button danger" onClick={() => { onDelete(p.id); setConfirmDeleteId(null); }}>Delete</button>
+                <button className="text-button" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
+              </div>
+            ) : (
+              <div className="post-actions">
+                <button className="text-button" onClick={() => startEdit(p)}>Edit</button>
+                <button className="text-button danger" onClick={() => setConfirmDeleteId(p.id)}>Delete</button>
+              </div>
+            )}
+          </article>
+        )) : <p className="profile-bio">No posts yet. Share your first update!</p>}</div>
+      </section>
+
+      <section className="dashboard-grid">
+        <PaymentHistory athleteId={athlete.id} />
       </section>
 
       <section className="dashboard-grid">
         <PaymentHistory athleteId={athlete.id} />
       </section>
       {creating && <div className="modal-backdrop"><div className="modal small-modal"><button className="modal-close" onClick={() => setCreating(false)}><Icon name="close" /></button><span className="eyebrow">Share an update</span><h2>Bring supporters along</h2><label>Post<textarea value={post} onChange={e => setPost(e.target.value)} placeholder="What happened in training today?" /></label><button className="button full" disabled={!post.trim()} onClick={() => { onCreate(athlete.id, post); setCreating(false); setPost(""); }}>Publish update</button></div></div>}
+      {editingId && <div className="modal-backdrop"><div className="modal small-modal"><button className="modal-close" onClick={cancelEdit}><Icon name="close" /></button><span className="eyebrow">Edit update</span><h2>Update your post</h2><label>Post<textarea value={editText} onChange={e => setEditText(e.target.value)} placeholder="What happened in training today?" /></label><button className="button full" disabled={!editText.trim()} onClick={saveEdit}>Save changes</button></div></div>}
     </main>
   );
 }
 
 export function DashboardScreen() {
-  const { role, athletes, posts, addPost, mounted } = useStarlete();
+  const { role, athletes, posts, addPost, editPost, deletePost, mounted } = useStarlete();
   const router = useRouter();
 
   useEffect(() => {
@@ -483,7 +521,7 @@ export function DashboardScreen() {
 
   if (!role) return null;
   if (role === "athlete") {
-    return <AthleteDashboard athlete={athletes[0]} posts={posts} onCreate={addPost} />;
+    return <AthleteDashboard athlete={athletes[0]} posts={posts} onCreate={addPost} onEdit={editPost} onDelete={deletePost} />;
   }
   return <SupporterDashboard athletes={athletes} />;
 }
