@@ -72,6 +72,10 @@ export function EditProfileScreen() {
       router.push("/dashboard");
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Couldn't save your profile.");
+    } finally {
+      // Always clear the saving flag. Client-side navigation can reuse this
+      // mounted component, so a stale saving=true would leave the button
+      // disabled ("Saving…") next time edit-profile is opened.
       setSaving(false);
     }
   };

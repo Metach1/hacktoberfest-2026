@@ -84,17 +84,28 @@ export async function updateMyProfile(input: UpdateMyProfileInput): Promise<void
   const uid = auth.user?.id;
   if (!uid) throw new Error("You must be signed in.");
 
-  const { data: prof } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle();
-  const role = prof?.role as "athlete" | "supporter" | undefined;
+  const { data: auth2 } = await supabase.auth.getUser();
+  const metaRole = (auth2.user?.user_metadata?.role as "athlete" | "supporter" | undefined) ?? undefined;
 
+  const { data: prof } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle();
+  const role = (prof?.role as "athlete" | "supporter" | undefined) ?? metaRole ?? "supporter";
+
+  // Upsert by primary key (id). This updates the existing row or creates the
+  // one-and-only row if it is somehow missing — it can never create a duplicate
+  // (id is the PK). Role is only set when the row doesn't exist yet; an existing
+  // role is preserved by passing the value we already read.
   const { error: pErr } = await supabase
     .from("profiles")
-    .update({
-      first_name: input.firstName.trim() || null,
-      last_name: input.lastName?.trim() || null,
-      bio: input.bio.trim() || null,
-    })
-    .eq("id", uid);
+    .upsert(
+      {
+        id: uid,
+        role,
+        first_name: input.firstName.trim() || null,
+        last_name: input.lastName?.trim() || null,
+        bio: input.bio.trim() || null,
+      },
+      { onConflict: "id" },
+    );
   if (pErr) throw new Error(pErr.message);
 
   if (role === "athlete") {
