@@ -46,7 +46,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const supabase = createClient();
     const { data, error: profileError } = await supabase
       .from("profiles")
-      .select("role, first_name")
+      .select("role, first_name, last_name")
       .eq("id", currentUser.id)
       .maybeSingle();
 
@@ -58,9 +58,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setError(null);
     const metaRole = currentUser.user_metadata?.role as Role | undefined;
     const metaName = currentUser.user_metadata?.first_name as string | undefined;
+    const profileName = [data?.first_name, data?.last_name].filter(Boolean).join(" ").trim();
     setRole((data?.role as Role | undefined) ?? metaRole ?? null);
     setDisplayName(
-      data?.first_name ?? metaName ?? currentUser.email?.split("@")[0] ?? null,
+      profileName || metaName || currentUser.email?.split("@")[0] || null,
     );
   }, []);
 

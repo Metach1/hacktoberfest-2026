@@ -7,6 +7,9 @@ import { AthleteCard, Icon, peso } from "@/src/app/shared/ui";
 import { useStarlete } from "@/src/app/store";
 import type { Athlete } from "@/src/app/data/athletes";
 import { regionName } from "@/src/app/lib/regions";
+import { isSupabaseConfigured } from "@/src/app/lib/supabase/client";
+import { toAthlete } from "@/src/app/lib/profile-adapter";
+import { getPublicAthleteProfiles } from "@/src/app/services/profile";
 import {
   REGION_MAP,
   countByRegion,
@@ -137,9 +140,9 @@ function PhilippinesMap({
 
 /** A single brief, text-only athlete row for the compact region/search list. */
 function AthleteRow({ athlete }: { athlete: Athlete }) {
-  const percent = Math.round((athlete.raised / athlete.goal) * 100);
+  const percent = athlete.goal > 0 ? Math.round((athlete.raised / athlete.goal) * 100) : 0;
   return (
-    <Link className="region-row" href={`/athletes/${athlete.id}`}>
+    <Link className="region-row" href={`/athletes/${athlete.profileId ?? athlete.id}`}>
       <div className="region-row-head">
         <strong>{athlete.name}</strong>
         {athlete.verified && <span className="verified" title="Verified athlete"><Icon name="check" size={11} /></span>}
@@ -152,16 +155,36 @@ function AthleteRow({ athlete }: { athlete: Athlete }) {
 }
 
 export function DiscoverScreen() {
-  const { athletes } = useStarlete();
+  const { athletes: demoAthletes } = useStarlete();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [registeredAthletes, setRegisteredAthletes] = useState<Athlete[]>([]);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
   const [sport, setSport] = useState("All sports");
   // Whether the full catalog grid is expanded. Reset whenever the active
   // selection/search changes so "Expand" always reflects the current results.
   const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    let active = true;
+    getPublicAthleteProfiles()
+      .then((profiles) => {
+        if (active) setRegisteredAthletes(profiles.map((profile, index) => toAthlete(profile, -(index + 1))));
+      })
+      .catch((error: unknown) => {
+        if (active) setProfileError(error instanceof Error ? error.message : "Could not load athlete profiles.");
+      });
+    return () => { active = false; };
+  }, []);
+
+  const athletes = useMemo(
+    () => [...demoAthletes, ...registeredAthletes],
+    [demoAthletes, registeredAthletes],
+  );
 
   // The selected region is held in the URL so it is shareable and works with
   // the browser back button. A valid region code is one that exists on the map.
@@ -228,6 +251,7 @@ export function DiscoverScreen() {
 
   return (
     <main className="page-shell">
+      {profileError && <p className="field-error" role="alert">{profileError}</p>}
       <div className="discover-hero">
         <span className="eyebrow light">Discover Filipino talent</span>
         <h1>Find a story to believe in.</h1>

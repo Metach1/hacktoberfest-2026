@@ -20,6 +20,8 @@ import { adaptAthletes } from "@/data/athlete-adapter.mjs";
 /** UI view shape used by the Startlete screens. */
 export interface Athlete {
   id: number;
+  /** Supabase user ID for registered athletes; demo athletes use their numeric ID. */
+  profileId?: string;
   name: string;
   sport: string;
   location: string;

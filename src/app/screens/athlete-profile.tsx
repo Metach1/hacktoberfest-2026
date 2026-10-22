@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { notFound } from "next/navigation";
@@ -7,20 +8,47 @@ import { Icon, Progress, peso } from "@/src/app/shared/ui";
 import { PostCard } from "@/src/app/shared/post-card";
 import { DonationsPanel } from "@/src/app/shared/donations-panel";
 import { useStarlete } from "@/src/app/store";
+import { getPublicAthleteProfile } from "@/src/app/services/profile";
+import { toAthlete } from "@/src/app/lib/profile-adapter";
+import type { Athlete } from "@/src/app/data/athletes";
 
-export function AthleteProfileScreen({ id }: { id: number }) {
+export function AthleteProfileScreen({ id }: { id: string }) {
   const { getAthlete, role, openDonation, posts, mounted } = useStarlete();
   const router = useRouter();
-  const athlete = getAthlete(id);
+  const numericId = /^\d+$/.test(id) ? Number(id) : null;
+  const demoAthlete = numericId == null ? undefined : getAthlete(numericId);
+  const [registeredAthlete, setRegisteredAthlete] = useState<Athlete | null>(null);
+  const [profileLoading, setProfileLoading] = useState(numericId == null);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (numericId != null) return;
+    let active = true;
+    getPublicAthleteProfile(id)
+      .then((profile) => {
+        if (active && profile) setRegisteredAthlete(toAthlete(profile, -1));
+      })
+      .catch((error: unknown) => {
+        if (active) setProfileError(error instanceof Error ? error.message : "Could not load this athlete profile.");
+      })
+      .finally(() => {
+        if (active) setProfileLoading(false);
+      });
+    return () => { active = false; };
+  }, [id, numericId]);
+
+  const athlete = demoAthlete ?? registeredAthlete;
 
   // Until the store hydrates, the athlete list may be the default seed; once
   // mounted, an unknown id is a genuine 404.
   if (!athlete) {
-    if (mounted) notFound();
+    if (profileLoading) return <main className="profile-page"><p className="muted-line">Loading athlete profile…</p></main>;
+    if (profileError) return <main className="profile-page"><p className="field-error" role="alert">{profileError}</p></main>;
+    if (mounted || numericId == null) notFound();
     return null;
   }
 
-  const percent = Math.round((athlete.raised / athlete.goal) * 100);
+  const percent = athlete.goal > 0 ? Math.round((athlete.raised / athlete.goal) * 100) : 0;
   const athletePosts = posts
     .filter((p) => p.authorAthleteId === athlete.id)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));

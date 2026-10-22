@@ -9,6 +9,8 @@ import type { Athlete } from "@/src/app/data/athletes";
 import { type Post } from "@/src/app/data/posts";
 import { TimeAgo } from "@/src/app/shared/time-ago";
 import { msUntilAutoConfirm } from "@/src/app/lib/donations.mjs";
+import { getMyProfile } from "@/src/app/services/profile";
+import { useSession } from "@/src/app/shared/session-provider";
 import {
   REJECTION_REASONS,
   rejectionReasonLabel,
@@ -732,7 +734,7 @@ function AthleteDashboard({ athlete, posts, onCreate, onEdit, onDelete }: { athl
   const [editText, setEditText] = useState("");
   // Inline delete confirmation: the post awaiting a Yes/Cancel on its own card.
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const percent = Math.round((athlete.raised / athlete.goal) * 100);
+  const percent = athlete.goal > 0 ? Math.round((athlete.raised / athlete.goal) * 100) : 0;
   // Only the signed-in athlete's own posts are shown and editable here.
   const myPosts = posts.filter(p => p.authorAthleteId === athlete.id);
 
@@ -808,15 +810,67 @@ function AthleteDashboard({ athlete, posts, onCreate, onEdit, onDelete }: { athl
 
 export function DashboardScreen() {
   const { role, athletes, posts, addPost, editPost, deletePost, mounted } = useStarlete();
+  const { user } = useSession();
   const router = useRouter();
+  const [profileValues, setProfileValues] = useState<{
+    name: string;
+    sport: string;
+    location: string;
+    image: string;
+    bio: string;
+    achievement: string;
+    fundingGoal: number | null;
+    verified: boolean;
+  } | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   useEffect(() => {
     if (mounted && !role) router.replace("/login");
   }, [mounted, role, router]);
 
+  useEffect(() => {
+    if (role !== "athlete" || !user) return;
+    let active = true;
+    getMyProfile()
+      .then((profile) => {
+        if (!active || !profile) return;
+        setProfileValues({
+          name: [profile.firstName, profile.lastName].filter(Boolean).join(" ") || athletes[0].name,
+          sport: profile.sport,
+          location: profile.location,
+          image: profile.profilePicture || athletes[0].image,
+          bio: profile.bio,
+          achievement: profile.achievement,
+          fundingGoal: profile.fundingGoal,
+          verified: profile.verified,
+        });
+      })
+      .catch((error: unknown) => {
+        if (active) setProfileError(error instanceof Error ? error.message : "Could not load your profile.");
+      });
+    return () => { active = false; };
+  }, [athletes, role, user]);
+
   if (!role) return null;
   if (role === "athlete") {
-    return <AthleteDashboard athlete={athletes[0]} posts={posts} onCreate={addPost} onEdit={editPost} onDelete={deletePost} />;
+    const demoAthlete = athletes[0];
+    const athlete: Athlete = profileValues ? {
+      ...demoAthlete,
+      name: profileValues.name,
+      sport: profileValues.sport || demoAthlete.sport,
+      location: profileValues.location || demoAthlete.location,
+      image: profileValues.image,
+      bio: profileValues.bio,
+      achievement: profileValues.achievement,
+      goal: profileValues.fundingGoal ?? 0,
+      verified: profileValues.verified,
+    } : demoAthlete;
+    return (
+      <>
+        {profileError && <p className="field-error page-shell" role="alert">{profileError}</p>}
+        <AthleteDashboard athlete={athlete} posts={posts} onCreate={addPost} onEdit={editPost} onDelete={deletePost} />
+      </>
+    );
   }
   return <SupporterDashboard athletes={athletes} />;
 }

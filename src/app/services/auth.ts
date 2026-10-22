@@ -9,14 +9,25 @@ interface SignUpInput {
   password: string;
   role: Role;
   firstName?: string;
+  lastName?: string;
+  sport?: string;
+  location?: string;
 }
 
-export async function signUp({ email, password, role, firstName }: SignUpInput) {
+export async function signUp({ email, password, role, firstName, lastName, sport, location }: SignUpInput) {
   const supabase = createClient();
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { role, first_name: firstName ?? null } },
+    options: {
+      data: {
+        role,
+        first_name: firstName ?? null,
+        last_name: lastName ?? null,
+        sport: role === "athlete" ? sport ?? null : null,
+        location: role === "athlete" ? location ?? null : null,
+      },
+    },
   });
   if (error) throw error;
   return data;
