@@ -17,6 +17,9 @@ import {
   applyAutoConfirm,
   confirmDonation as confirmDonationRecord,
   rejectDonation as rejectDonationRecord,
+  resubmitDonation as resubmitDonationRecord,
+  canResubmitDonation,
+  canDeleteDonation,
   confirmedTotals,
   createPendingDonation,
   DONATION_STATUS,
@@ -150,6 +153,12 @@ interface StarleteState {
   posts: Post[];
   /** The athlete currently targeted by the donation modal, if open. */
   donationTarget: Athlete | null;
+  /**
+   * When the donation modal was opened to retry a rejected donation, the
+   * original record whose details prefill the flow and which is resubmitted
+   * in place. `null` for a brand-new donation.
+   */
+  donationPrefill: Donation | null;
   /** Published payment QR codes keyed by athlete id. */
   qrCodes: Record<number, QrCode[]>;
   /** All QR-based donations across the demo (pending + confirmed). */
@@ -159,6 +168,12 @@ interface StarleteState {
   logout: () => void;
   getAthlete: (id: number) => Athlete | undefined;
   openDonation: (athlete: Athlete) => void;
+  /**
+   * Open the donation flow to edit and retry a REJECTED donation the current
+   * supporter owns. Returns false (and does nothing) if the donation can't be
+   * retried — e.g. it isn't rejected or isn't owned by this supporter.
+   */
+  openResubmission: (donationId: string) => boolean;
   closeDonation: () => void;
   // QR management (athlete side).
   getQrCodes: (athleteId: number) => QrCode[];
@@ -180,6 +195,31 @@ interface StarleteState {
   confirmDonation: (donationId: string) => void;
   /** Reject a pending donation with a required reason and optional note. */
   rejectDonation: (donationId: string, reason: string, note?: string) => void;
+  /**
+   * Edit and resubmit the current supporter's REJECTED donation in place,
+   * preserving its id/athlete/supporter, returning it to pending, clearing
+   * stale rejection/confirmation metadata, and restarting the auto-confirm
+   * window. No-op unless the donation is rejected and owned by this supporter.
+   */
+  resubmitDonation: (
+    donationId: string,
+    patch: {
+      amount: number;
+      method: string;
+      reference: string;
+      supporterName?: string;
+      receiptName?: string;
+      receiptPreview?: string;
+      note?: string;
+    },
+  ) => void;
+  /**
+   * Permanently remove the current supporter's PENDING or REJECTED donation
+   * from their history. No-op unless the donation is owned by this supporter
+   * and deletable (a CONFIRMED donation is never removed, so confirmed totals
+   * are never disturbed).
+   */
+  removeDonation: (donationId: string) => void;
   getDonationsForAthlete: (athleteId: number) => Donation[];
   /** The current demo supporter's stable identity. */
   supporterId: ActorId;
@@ -238,6 +278,8 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [posts, setPosts] = useState<Post[]>(seedPosts);
   const [donationTarget, setDonationTarget] = useState<Athlete | null>(null);
+  // When set, the donation modal is retrying this rejected record in place.
+  const [donationPrefill, setDonationPrefill] = useState<Donation | null>(null);
   const [qrCodes, setQrCodes] = useState<Record<number, QrCode[]>>(() => seedQrCodes(seedAthletes));
   const [donations, setDonations] = useState<Donation[]>([]);
 
@@ -347,8 +389,28 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
     [reconciledAthletes],
   );
 
-  const openDonation = useCallback((athlete: Athlete) => setDonationTarget(athlete), []);
-  const closeDonation = useCallback(() => setDonationTarget(null), []);
+  const openDonation = useCallback((athlete: Athlete) => {
+    setDonationPrefill(null);
+    setDonationTarget(athlete);
+  }, []);
+  const closeDonation = useCallback(() => {
+    setDonationTarget(null);
+    setDonationPrefill(null);
+  }, []);
+
+  const openResubmission = useCallback(
+    (donationId: string): boolean => {
+      const donation = donations.find((d) => d.id === donationId);
+      // Owner-only, rejected-only. A confirmed/pending donation is never retried.
+      if (!donation || !canResubmitDonation(donation, SUPPORTER_ID)) return false;
+      const athlete = reconciledAthletes.find((a) => a.id === donation.athleteId);
+      if (!athlete) return false;
+      setDonationPrefill(donation);
+      setDonationTarget(athlete);
+      return true;
+    },
+    [donations, reconciledAthletes],
+  );
 
   // --- QR management -------------------------------------------------------
   const getQrCodes = useCallback(
@@ -416,6 +478,28 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       list.map((d) =>
         d.id === donationId ? (rejectDonationRecord(d, reason, note ?? "") as Donation) : d,
       ),
+    );
+  }, []);
+
+  const resubmitDonation = useCallback<StarleteState["resubmitDonation"]>(
+    (donationId, patch) => {
+      setDonations((list) =>
+        list.map((d) =>
+          d.id === donationId
+            ? (resubmitDonationRecord(d, SUPPORTER_ID, patch) as Donation)
+            : d,
+        ),
+      );
+    },
+    [],
+  );
+
+  const removeDonation = useCallback((donationId: string) => {
+    // Owner- and status-guarded: only the current supporter's pending/rejected
+    // donations are removable. A confirmed donation is left intact so derived
+    // totals never change behind the athlete's back.
+    setDonations((list) =>
+      list.filter((d) => !(d.id === donationId && canDeleteDonation(d, SUPPORTER_ID))),
     );
   }, []);
 
@@ -513,12 +597,14 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       athletes: reconciledAthletes,
       posts,
       donationTarget,
+      donationPrefill,
       qrCodes,
       donations,
       login,
       logout,
       getAthlete,
       openDonation,
+      openResubmission,
       closeDonation,
       getQrCodes,
       addQrCode,
@@ -527,6 +613,8 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       submitDonation,
       confirmDonation,
       rejectDonation,
+      resubmitDonation,
+      removeDonation,
       getDonationsForAthlete,
       supporterId,
       getDonationsForSupporter,
@@ -537,10 +625,10 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       addComment,
     }),
     [
-      mounted, role, reconciledAthletes, posts, donationTarget, qrCodes, donations,
-      login, logout, getAthlete, openDonation, closeDonation,
+      mounted, role, reconciledAthletes, posts, donationTarget, donationPrefill, qrCodes, donations,
+      login, logout, getAthlete, openDonation, openResubmission, closeDonation,
       getQrCodes, addQrCode, replaceQrCode, removeQrCode,
-      submitDonation, confirmDonation, rejectDonation, getDonationsForAthlete,
+      submitDonation, confirmDonation, rejectDonation, resubmitDonation, removeDonation, getDonationsForAthlete,
       supporterId, getDonationsForSupporter, addPost, editPost, deletePost, toggleLike, addComment,
     ],
   );

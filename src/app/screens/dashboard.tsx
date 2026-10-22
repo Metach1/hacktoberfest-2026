@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { AthleteCard, Icon, MiniAthlete, Progress, peso } from "@/src/app/shared/ui";
 import { useStarlete, type Donation, type QrCode } from "@/src/app/store";
@@ -13,6 +14,146 @@ import {
   rejectionReasonLabel,
 } from "@/src/app/lib/donations.mjs";
 import { checkPaymentQr } from "@/src/app/lib/qr-decode";
+
+/**
+ * Read-only detail popup for one of the supporter's donations. Shows amount,
+ * athlete, method, reference, date, status, rejection reason/note (if any), and
+ * the receipt image when present. Dismissible via close, outside click, Escape.
+ */
+function PaymentDetail({
+  donation,
+  athleteName,
+  onClose,
+}: {
+  donation: Donation;
+  athleteName: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal small-modal" role="dialog" aria-modal="true" aria-label="Donation details" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-close" onClick={onClose} aria-label="Close"><Icon name="close" /></button>
+        <span className="eyebrow">Donation details</span>
+        <h2>{peso(donation.amount)} to {athleteName}</h2>
+        <div className="review-rows">
+          <span><small>Status</small><b style={{ textTransform: "capitalize" }}>{donation.status}</b></span>
+          <span><small>Method</small><b>{donation.method || "—"}</b></span>
+          <span><small>Reference</small><b>{donation.reference || "—"}</b></span>
+          <span><small>Date</small><b>{shortDate(donation.createdAt)}</b></span>
+        </div>
+        {donation.note && <p className="donor-note">“{donation.note}”</p>}
+        {donation.status === "rejected" && (
+          <p className="payment-reject">
+            Rejected · {rejectionReasonLabel(donation.rejectionReason ?? "")}
+            {donation.rejectionNote ? ` — ${donation.rejectionNote}` : ""}
+          </p>
+        )}
+        {donation.receiptPreview ? (
+          <div className="review-receipt"><img src={donation.receiptPreview} alt={donation.receiptName || "Receipt"} /></div>
+        ) : (
+          <p className="muted-line">No receipt image attached.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Three-dot (⋮) actions menu for a supporter payment row. Rejected donations
+ * get View / Edit & resubmit / Delete; pending and confirmed donations get
+ * View only (confirmed donations are never editable or deletable, so confirmed
+ * totals are never disturbed). The dropdown dismisses on outside click and
+ * Escape; Delete asks for confirmation first.
+ */
+function PaymentRowMenu({ donation, athleteName }: { donation: Donation; athleteName: string }) {
+  const { openResubmission, removeDonation } = useStarlete();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [viewing, setViewing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  const isRejected = donation.status === "rejected";
+  // Confirmed donations are View-only (not deletable); pending/rejected deletable.
+  const canDelete = donation.status !== "confirmed";
+
+  // Dismiss the dropdown on outside click and Escape.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("mousedown", onClick);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onClick);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
+
+  return (
+    <div className="payment-menu" ref={wrapRef}>
+      <button
+        className="icon-button"
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        aria-label="Payment actions"
+        onClick={() => setMenuOpen((v) => !v)}
+      >
+        <Icon name="dots" size={18} />
+      </button>
+
+      {menuOpen && (
+        <div className="payment-menu-pop" role="menu">
+          <button role="menuitem" onClick={() => { setMenuOpen(false); setViewing(true); }}>View</button>
+          {isRejected && (
+            <button role="menuitem" onClick={() => { setMenuOpen(false); openResubmission(donation.id); }}>
+              Edit &amp; resubmit
+            </button>
+          )}
+          {canDelete && (
+            <button role="menuitem" className="danger" onClick={() => { setMenuOpen(false); setConfirmingDelete(true); }}>
+              Delete
+            </button>
+          )}
+        </div>
+      )}
+
+      {viewing && (
+        <PaymentDetail donation={donation} athleteName={athleteName} onClose={() => setViewing(false)} />
+      )}
+
+      {confirmingDelete && (
+        <div className="modal-backdrop" onClick={() => setConfirmingDelete(false)}>
+          <div className="modal small-modal" role="dialog" aria-modal="true" aria-label="Delete donation" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setConfirmingDelete(false)} aria-label="Close"><Icon name="close" /></button>
+            <span className="eyebrow">Delete donation</span>
+            <h2>Remove this {donation.status} donation?</h2>
+            <p className="muted-line">
+              This removes the {peso(donation.amount)} donation to {athleteName} from your payment history. This can&rsquo;t be undone.
+            </p>
+            <div className="form-actions">
+              <button className="button secondary" onClick={() => setConfirmingDelete(false)}>Cancel</button>
+              <button className="button danger" onClick={() => { removeDonation(donation.id); setConfirmingDelete(false); }}>
+                Delete donation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function SupporterDashboard({ athletes }: { athletes: Athlete[] }) {
   const { getDonationsForSupporter, getAthlete } = useStarlete();
@@ -32,11 +173,13 @@ function SupporterDashboard({ athletes }: { athletes: Athlete[] }) {
             <div className="payment-history">
               {myPayments.map((d) => {
                 const athlete = getAthlete(d.athleteId);
+                const athleteName = athlete?.name ?? `Athlete #${d.athleteId}`;
                 return (
                   <div className="payment-row" key={d.id}>
                     <div className="payment-main">
-                      <strong>{athlete?.name ?? `Athlete #${d.athleteId}`}</strong>
+                      <strong>{athleteName}</strong>
                       <StatusBadge status={d.status} />
+                      <PaymentRowMenu donation={d} athleteName={athleteName} />
                     </div>
                     <div className="payment-meta">
                       <span>{peso(d.amount)}</span>
@@ -252,6 +395,18 @@ function PendingDonations({ athleteId }: { athleteId: number }) {
   const [reason, setReason] = useState("");
   const [rejectNote, setRejectNote] = useState("");
   const [confirmReject, setConfirmReject] = useState(false);
+  // The receipt image shown at full size in a zoomable viewer, if any.
+  const [fullReceipt, setFullReceipt] = useState<Donation | null>(null);
+
+  // Close the full-size receipt viewer on Escape (mirrors the QR viewer).
+  useEffect(() => {
+    if (!fullReceipt) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFullReceipt(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fullReceipt]);
 
   const startReject = (d: Donation) => {
     setOpen(null);
@@ -318,9 +473,21 @@ function PendingDonations({ athleteId }: { athleteId: number }) {
               <span><small>Auto-confirm in</small><b>{formatRemaining(msUntilAutoConfirm(open))}</b></span>
             </div>
             {open.note && <p className="donor-note">“{open.note}”</p>}
-            {open.receiptPreview
-              ? <div className="review-receipt"><img src={open.receiptPreview} alt={open.receiptName || "Receipt"} /></div>
-              : <p className="muted-line">No receipt image attached.</p>}
+            {open.receiptPreview ? (
+              <div className="review-receipt">
+                <button
+                  type="button"
+                  className="receipt-zoom"
+                  onClick={() => setFullReceipt(open)}
+                  aria-label="View receipt at full size"
+                >
+                  <img src={open.receiptPreview} alt={open.receiptName || "Receipt"} />
+                  <span className="receipt-zoom-hint"><Icon name="search" size={14} /> View full size</span>
+                </button>
+              </div>
+            ) : (
+              <p className="muted-line">No receipt image attached.</p>
+            )}
             <p className="safe-note"><Icon name="shield" /> Confirming records this demo donation toward your total. OCR and this flow do not verify real payments.</p>
             <div className="form-actions">
               <button className="button secondary danger" onClick={() => startReject(open)}>Reject…</button>
@@ -377,6 +544,33 @@ function PendingDonations({ athleteId }: { athleteId: number }) {
             )}
           </div>
         </div>
+      )}
+
+      {/* Full-size receipt viewer — modeled on the QR fullscreen viewer: a
+          portaled, dark-backdrop dialog that fits large images in the viewport
+          and dismisses via close button, outside click, and Escape. */}
+      {fullReceipt?.receiptPreview && createPortal(
+        <div className="receipt-fullscreen-backdrop" onClick={() => setFullReceipt(null)}>
+          <div
+            className="receipt-fullscreen-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Receipt at full size"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="modal-close"
+              aria-label="Close full-size receipt"
+              onClick={() => setFullReceipt(null)}
+            >
+              <Icon name="close" />
+            </button>
+            <span className="eyebrow">Receipt from {fullReceipt.supporterName}</span>
+            <img src={fullReceipt.receiptPreview} alt={fullReceipt.receiptName || "Receipt"} />
+            {fullReceipt.receiptName && <strong>{fullReceipt.receiptName}</strong>}
+          </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

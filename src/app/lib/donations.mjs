@@ -168,6 +168,95 @@ export function canRejectDonation(donation) {
 }
 
 /**
+ * Whether the given supporter may edit and resubmit a donation right now.
+ *
+ * Only a REJECTED donation can be retried, and only by its owning supporter.
+ * A CONFIRMED donation can never be retried (its total is already counted), and
+ * a PENDING one is already under review. Ownership is checked against the
+ * donation's stored `supporterId`; a `null`/absent owner on the donation never
+ * matches a concrete supporter id.
+ *
+ * @param {Object} donation
+ * @param {string|number|null} supporterId  The supporter attempting the retry.
+ * @returns {boolean}
+ */
+export function canResubmitDonation(donation, supporterId) {
+  if (!donation || donation.status !== DONATION_STATUS.REJECTED) return false;
+  return donation.supporterId != null && donation.supporterId === supporterId;
+}
+
+/**
+ * Whether the given supporter may delete a donation from their history.
+ *
+ * Only PENDING or REJECTED donations the supporter owns may be deleted. A
+ * CONFIRMED donation is NEVER deletable: it has already been counted toward an
+ * athlete's confirmed totals, and removing it would silently change those
+ * totals. Ownership is checked against the donation's stored `supporterId`; a
+ * `null`/absent owner never matches a concrete supporter id.
+ *
+ * @param {Object} donation
+ * @param {string|number|null} supporterId  The supporter attempting the delete.
+ * @returns {boolean}
+ */
+export function canDeleteDonation(donation, supporterId) {
+  if (!donation) return false;
+  if (donation.status === DONATION_STATUS.CONFIRMED) return false;
+  return donation.supporterId != null && donation.supporterId === supporterId;
+}
+
+/**
+ * Resubmit a REJECTED donation IN PLACE as a fresh PENDING submission, keeping
+ * the SAME record so athlete totals can never double-count it.
+ *
+ * The donation's identity is preserved exactly: `id`, `athleteId`, and
+ * `supporterId` are never changed. The supporter may edit the submission
+ * details via `patch` (amount, method, reference, supporterName, receiptName,
+ * receiptPreview, note); any field left out of `patch` keeps its prior value.
+ * Status returns to PENDING, `createdAt` is reset to `at` so the demo
+ * auto-confirm window restarts, and all stale rejection AND confirmation
+ * metadata is cleared.
+ *
+ * Guarded: only the owning supporter may retry, and only a rejected donation —
+ * a confirmed or pending donation is returned UNCHANGED so a counted donation
+ * is never reopened. The amount (post-patch) must still be a positive number.
+ *
+ * @param {Object} donation
+ * @param {string|number|null} supporterId  The supporter attempting the retry.
+ * @param {Object} [patch]  Edited submission fields (see above).
+ * @param {number} [at]     Epoch ms for the new createdAt; defaults to now.
+ * @returns {Object} the reset pending record, or the original if not allowed
+ * @throws {Error} if the resulting amount is not a positive number
+ */
+export function resubmitDonation(donation, supporterId, patch = {}, at = Date.now()) {
+  if (!canResubmitDonation(donation, supporterId)) return donation;
+  const amount = Number(patch.amount ?? donation.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Donation amount must be a positive number");
+  }
+  return {
+    ...donation,
+    // Preserve identity: id, athleteId, supporterId are intentionally untouched.
+    amount,
+    method: patch.method ?? donation.method,
+    reference: patch.reference ?? donation.reference,
+    supporterName: (patch.supporterName ?? donation.supporterName)?.trim() || ANONYMOUS_DONOR_NAME,
+    receiptName: patch.receiptName ?? donation.receiptName,
+    receiptPreview: patch.receiptPreview ?? donation.receiptPreview,
+    note: patch.note ?? donation.note,
+    status: DONATION_STATUS.PENDING,
+    // Restart the demo auto-confirm timing from the resubmission moment.
+    createdAt: at,
+    // Clear stale confirmation metadata (it was never confirmed, but be safe).
+    confirmedAt: null,
+    confirmedBy: null,
+    // Clear stale rejection metadata so the retried record looks fresh.
+    rejectedAt: null,
+    rejectionReason: null,
+    rejectionNote: "",
+  };
+}
+
+/**
  * Whether a pending donation is past the demo auto-confirm window.
  *
  * @param {Object} donation

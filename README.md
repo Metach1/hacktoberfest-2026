@@ -109,6 +109,31 @@ supporter sees on their rejected payment. Rejected and pending donations never
 count toward an athlete's confirmed totals or supporter count, and a donation
 can never be both confirmed and rejected.
 
+When reviewing a pending receipt, the athlete can open the uploaded image at
+**full size** in a popup (modeled on the full-size QR viewer): large images fit
+the viewport and it dismisses via close button, outside click, or Escape. The
+confirm and reject controls stay available throughout the review, and a
+donation with no receipt image is handled gracefully (no viewer is offered).
+
+Each row in the supporter's **My payments** has a three-dot (⋮) actions menu,
+gated by status: a **rejected** donation offers **View**, **Edit & resubmit**,
+and **Delete**; a **pending** donation offers **View** and **Delete**; a
+**confirmed** donation offers **View** only. Confirmed donations are never
+editable or deletable, so an athlete's confirmed totals can't be changed from
+here. **View** opens a read-only detail (amount, athlete, method, reference,
+date, status, rejection reason/note, and the receipt image if present).
+**Delete** asks for confirmation and removes only the owning supporter's
+pending/rejected donation. The menu dismisses on outside click or Escape.
+
+**Edit & resubmit** reopens the donation flow prefilled with the rejected
+submission's details; the supporter can edit any field and attach a replacement
+receipt (which re-runs the same validation/OCR filtering). Resubmitting updates
+the **same** donation record in place — its id, athlete, and supporter are
+preserved — returning it to **pending**, clearing the stale rejection metadata,
+and restarting the auto-confirm timing. Only the owning supporter can retry, a
+donation can't be retried once confirmed, and because it stays one record it is
+counted at most once in an athlete's totals.
+
 Both dashboards show payment history: the athlete sees **Recent payments**
 (confirmed, pending, rejected, with the rejection reason) and the supporter sees
 **My payments** scoped to their own submissions.

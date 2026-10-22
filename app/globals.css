@@ -303,6 +303,21 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .qr-fullscreen-dialog { position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 100%; max-height: calc(100vh - 40px); overflow: auto; padding: 28px; border-radius: 16px; background: white; text-align: center; }
 .qr-fullscreen-dialog img { display: block; width: min(80vw, 560px); height: min(65vh, 560px); max-height: calc(100vh - 180px); object-fit: contain; background: white; }
 .qr-fullscreen-dialog strong { color: var(--ink); }
+/* Full-size receipt viewer — mirrors the QR fullscreen viewer so a large
+   receipt image fits the viewport (object-fit: contain) and is scrollable if
+   it still overflows. */
+/* z-index 200 so the receipt viewer always sits above the athlete review
+   modal (.modal-backdrop is z-index 100) when opened from inside it. */
+.receipt-fullscreen-backdrop { position: fixed; z-index: 200; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(3,17,31,.9); }
+.receipt-fullscreen-dialog { position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 100%; max-height: calc(100vh - 40px); overflow: auto; padding: 28px; border-radius: 16px; background: white; text-align: center; }
+.receipt-fullscreen-dialog img { display: block; width: min(86vw, 680px); height: auto; max-height: calc(100vh - 180px); object-fit: contain; background: white; }
+.receipt-fullscreen-dialog strong { color: var(--ink); word-break: break-word; }
+/* Clickable receipt thumbnail in the athlete review modal. */
+.receipt-zoom { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; position: relative; }
+.receipt-zoom img { display: block; width: 100%; border-radius: 10px; }
+.receipt-zoom-hint { position: absolute; right: 10px; bottom: 10px; display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 999px; background: rgba(3,17,31,.78); color: #fff; font-size: 12px; }
+/* Action row under a rejected supporter payment (edit & resubmit). */
+.payment-actions { display: flex; gap: 8px; margin-top: 8px; }
 .checkout-head { text-align: center; border-bottom: 1px solid var(--line); padding-bottom: 22px; }
 .checkout-head h2 { margin: 0 0 20px; font-size: 27px; }
 .stepper { display: flex; justify-content: center; align-items: center; }
@@ -573,8 +588,17 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .status-badge.rejected { background: #fdecea; color: #c0392b; }
 .payment-history { display: flex; flex-direction: column; }
 .payment-row { padding: 12px 0; border-top: 1px solid var(--line); font-size: 12px; }
-.payment-main { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.payment-main strong { font-size: 13px; }
+.payment-main { display: flex; align-items: center; gap: 10px; }
+.payment-main strong { font-size: 13px; margin-right: auto; }
+/* Three-dot actions menu on a supporter payment row. */
+.payment-menu { position: relative; display: inline-flex; }
+.icon-button { background: none; border: 0; border-radius: 8px; width: 30px; height: 30px; display: grid; place-items: center; color: var(--muted); cursor: pointer; }
+.icon-button:hover { background: #f0f2f4; color: var(--ink); }
+.payment-menu-pop { position: absolute; z-index: 20; top: calc(100% + 4px); right: 0; min-width: 160px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 30px rgba(0,0,0,.14); padding: 6px; display: flex; flex-direction: column; }
+.payment-menu-pop button { text-align: left; background: none; border: 0; border-radius: 8px; padding: 9px 11px; font-size: 13px; color: var(--ink); cursor: pointer; }
+.payment-menu-pop button:hover { background: #f0f2f4; }
+.payment-menu-pop button.danger { color: #c0392b; }
+.payment-menu-pop button.danger:hover { background: #fdecea; }
 .payment-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--muted); margin-top: 4px; }
 .payment-meta span:first-child { color: var(--ink); font-weight: 700; }
 .payment-reject { margin: 6px 0 0; color: #c0392b; font-size: 11px; }

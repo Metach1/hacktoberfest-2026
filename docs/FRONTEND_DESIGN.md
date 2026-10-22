@@ -46,10 +46,10 @@ the look is self-contained and portable.
 | Discover (`/discover`) | Everyone | Interactive region map plus search, sport, and region filters over a card grid; the region is kept in the URL. |
 | Athlete profile | Everyone | Photo, bio, achievement, funding panel with recent confirmed donations (See all / See top popups), updates, Support button. |
 | Login / Register | Visitors | Role toggle (Supporter / Athlete); athlete fields + minor consent. |
-| Supporter dashboard | Supporter | Picked-for-you athletes, My payments (own submissions, scoped to the demo identity), trending, funding leaderboard, impact. |
-| Athlete dashboard | Athlete | Verification status, funds, goal, supporters, payment QR management, pending receipts (confirm/reject with reason), confirmed donations, payment history, and posts with create, edit, and delete of the athlete's own updates. |
+| Supporter dashboard | Supporter | Picked-for-you athletes, My payments (own submissions, scoped to the demo identity, each row with a three-dot menu: View always; Edit & resubmit on rejected; Delete on pending/rejected — confirmed is View-only), trending, funding leaderboard, impact. |
+| Athlete dashboard | Athlete | Verification status, funds, goal, supporters, payment QR management, pending receipts (confirm/reject with reason, open the receipt at full size in a viewer), confirmed donations, payment history, and posts with create, edit, and delete of the athlete's own updates. |
 | Edit profile | Signed-in | Update name, location, bio, and (athlete) sport and goal. |
-| Donation flow (modal) | Supporter | Scan QR → upload receipt & enter amount → review → amount confirmation → pending. |
+| Donation flow (modal) | Supporter | Scan QR → upload receipt & enter amount → review → amount confirmation → pending. Reopens prefilled to edit & resubmit a rejected donation in place (same record). |
 
 ## Role rules
 
