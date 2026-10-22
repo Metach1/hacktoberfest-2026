@@ -51,19 +51,32 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return;
     }
     const supabase = createClient();
-    const { data } = await supabase
+    let { data } = await supabase
       .from("profiles")
       .select("role, first_name")
       .eq("id", currentUser.id)
       .maybeSingle();
 
-    // Prefer the profile role; fall back to auth metadata (set at signup) so a
-    // just-registered user has a role even before the trigger row is read.
     const metaRole = (currentUser.user_metadata?.role as Role | undefined) ?? null;
+    const metaName = (currentUser.user_metadata?.first_name as string | undefined) ?? null;
+
+    // Defensive backstop: if this user somehow has no profile row (e.g. an
+    // account created before the signup trigger existed, or an imported user),
+    // create one now so interactions that FK to profiles don't fail. New
+    // signups normally get their row from the handle_new_user() trigger.
+    if (!data) {
+      const { data: created } = await supabase
+        .from("profiles")
+        .insert({ id: currentUser.id, role: metaRole ?? "supporter", first_name: metaName })
+        .select("role, first_name")
+        .maybeSingle();
+      if (created) data = created;
+    }
+
     setRole((data?.role as Role | undefined) ?? metaRole);
     setDisplayName(
       data?.first_name ??
-        (currentUser.user_metadata?.first_name as string | undefined) ??
+        metaName ??
         currentUser.email?.split("@")[0] ??
         null,
     );
