@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AthleteCard, Icon, MiniAthlete, Progress, peso } from "@/src/app/shared/ui";
 import { useStarlete, type Donation, type QrCode } from "@/src/app/store";
+import { useSession } from "@/src/app/shared/session-provider";
+import { useAsync } from "@/src/app/shared/async-state";
+import { getMyProfile, type MyProfile } from "@/src/app/services/profile";
+import { getFeed, createPost, editPost as editPostSvc, deletePost as deletePostSvc, type FeedPost } from "@/src/app/services/feed";
 import type { Athlete } from "@/src/app/data/athletes";
-import { type Post } from "@/src/app/data/posts";
 import { TimeAgo } from "@/src/app/shared/time-ago";
 import { msUntilAutoConfirm } from "@/src/app/lib/donations.mjs";
 import {
@@ -428,64 +431,75 @@ function PaymentHistory({ athleteId }: { athleteId: number }) {
   );
 }
 
-function AthleteDashboard({ athlete, posts, onCreate, onEdit, onDelete }: { athlete: Athlete; posts: Post[]; onCreate: (authorAthleteId: number, text: string) => void; onEdit: (postId: string, text: string) => void; onDelete: (postId: string) => void }) {
-  const { getDonationsForAthlete } = useStarlete();
+function AthleteDashboard() {
+  const { displayName } = useSession();
+  // The signed-in athlete's real profile (name, funding goal, etc.).
+  const { data: profile } = useAsync<MyProfile | null>(() => getMyProfile(), []);
+  // The signed-in athlete's own posts, loaded from the database feed.
+  const { data: feed, loading: postsLoading, reload: reloadPosts } = useAsync<FeedPost[]>(() => getFeed(), []);
+
   const [creating, setCreating] = useState(false);
   const [post, setPost] = useState("");
-  // Edit modal: the post being edited and its working text.
+  const [posting, setPosting] = useState(false);
+  const [postError, setPostError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
-  // Inline delete confirmation: the post awaiting a Yes/Cancel on its own card.
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const percent = Math.round((athlete.raised / athlete.goal) * 100);
-  // Only the signed-in athlete's own posts are shown and editable here.
-  const myPosts = posts.filter(p => p.authorAthleteId === athlete.id);
 
-  const startEdit = (p: Post) => { setEditingId(p.id); setEditText(p.text); };
-  const cancelEdit = () => { setEditingId(null); setEditText(""); };
-  const saveEdit = () => {
-    if (editingId && editText.trim()) {
-      onEdit(editingId, editText);
-      cancelEdit();
+  const firstName = (displayName ?? profile?.firstName ?? "there").split(" ")[0];
+  const goal = profile?.fundingGoal ?? null;
+
+  // Only this athlete's own posts (owner-managed, canManage == true).
+  const myPosts = (feed ?? []).filter((p) => p.canManage);
+
+  const publish = async () => {
+    const text = post.trim();
+    if (!text) return;
+    setPosting(true); setPostError(null);
+    try {
+      await createPost(text);
+      setPost(""); setCreating(false);
+      reloadPosts();
+    } catch (e) {
+      setPostError(e instanceof Error ? e.message : "Couldn't publish your update.");
+    } finally {
+      setPosting(false);
     }
   };
-  const donations = getDonationsForAthlete(athlete.id);
-  const confirmed = donations.filter((d) => d.status === "confirmed");
+
+  const startEdit = (p: FeedPost) => { setEditingId(p.id); setEditText(p.content); };
+  const cancelEdit = () => { setEditingId(null); setEditText(""); };
+  const saveEdit = async () => {
+    if (!editingId || !editText.trim()) return;
+    try {
+      await editPostSvc(editingId, editText);
+      cancelEdit();
+      reloadPosts();
+    } catch { /* surfaced inline below if needed */ }
+  };
+  const doDelete = async (id: string) => {
+    try { await deletePostSvc(id); setConfirmDeleteId(null); reloadPosts(); } catch { /* no-op */ }
+  };
+
   return (
     <main className="dashboard page-shell">
-      <div className="dash-welcome"><div><span className="eyebrow">Athlete dashboard</span><h1>Keep going, {athlete.name.split(" ")[0]}.</h1><p>Your community is cheering with every step.</p></div><button className="button" onClick={() => setCreating(true)}><Icon name="plus" /> Create post</button></div>
-      <div className="status-banner"><span className="status-icon"><Icon name="shield" /></span><div><strong>Your profile is verified</strong><p>Supporters can see your verified badge and fund your journey.</p></div><span className="verified-label">Verified athlete</span></div>
-      <section className="stat-grid"><div className="stat-card dark"><small>Total funds received</small><strong>{peso(athlete.raised)}</strong><span>confirmed donations only</span></div><div className="stat-card"><small>Funding goal</small><strong>{peso(athlete.goal)}</strong><Progress value={percent} /><span>{percent}% funded</span></div><div className="stat-card"><small>Your community</small><strong>{athlete.supporters}</strong><span>supporters behind you</span></div></section>
-
-      <section className="dashboard-grid">
-        <PendingDonations athleteId={athlete.id} />
-        <QrManager athleteId={athlete.id} />
+      <div className="dash-welcome"><div><span className="eyebrow">Athlete dashboard</span><h1>Keep going, {firstName}.</h1><p>Your community is cheering with every step.</p></div><button className="button" onClick={() => setCreating(true)}><Icon name="plus" /> Create post</button></div>
+      <section className="stat-grid">
+        <div className="stat-card dark"><small>Funding goal</small><strong>{goal != null ? peso(goal) : "Not set"}</strong><span>{goal != null ? "set in your profile" : "add one in Edit profile"}</span></div>
+        <div className="stat-card"><small>Your posts</small><strong>{myPosts.length}</strong><span>updates shared</span></div>
       </section>
 
       <section className="dashboard-grid">
-        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Community support</span><h2>Confirmed donations</h2></div></div>
-          {confirmed.length === 0
-            ? <div className="empty-note small"><p>No confirmed donations yet. Confirm a pending receipt to see it here.</p></div>
-            : confirmed.map((d) => (
-                <div className="donation-row" key={d.id}>
-                  <span className="donor-avatar"><Icon name="heart" /></span>
-                  <div>
-                    <strong>{d.supporterName}</strong>
-                    <small>{timeAgo(d.confirmedAt ?? d.createdAt)}{d.confirmedBy === "auto" ? " · auto-confirmed (demo)" : ""}</small>
-                  </div>
-                  <b>+{peso(d.amount)}</b>
-                </div>
-              ))}
-        </div>
-        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Your story</span><h2>Recent posts</h2></div><button className="text-button" onClick={() => setCreating(true)}>New post</button></div>{myPosts.length ? myPosts.map(p => (
+        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Your story</span><h2>Recent posts</h2></div><button className="text-button" onClick={() => setCreating(true)}>New post</button></div>
+          {postsLoading ? <p className="profile-bio">Loading your posts…</p> : myPosts.length ? myPosts.map(p => (
           <article className="dash-post" key={p.id}>
             <small><TimeAgo iso={p.createdAt} />{p.editedAt ? " · edited" : ""}</small>
-            <strong>{p.text}</strong>
-            <span>{p.likes} cheers · {p.comments.length} comments</span>
+            <strong>{p.content}</strong>
+            <span>{p.likeCount} cheers · {p.comments.length} comments</span>
             {confirmDeleteId === p.id ? (
               <div className="post-actions">
                 <span className="confirm-text">Delete this post?</span>
-                <button className="text-button danger" onClick={() => { onDelete(p.id); setConfirmDeleteId(null); }}>Delete</button>
+                <button className="text-button danger" onClick={() => doDelete(p.id)}>Delete</button>
                 <button className="text-button" onClick={() => setConfirmDeleteId(null)}>Cancel</button>
               </div>
             ) : (
@@ -497,31 +511,25 @@ function AthleteDashboard({ athlete, posts, onCreate, onEdit, onDelete }: { athl
           </article>
         )) : <p className="profile-bio">No posts yet. Share your first update!</p>}</div>
       </section>
-
-      <section className="dashboard-grid">
-        <PaymentHistory athleteId={athlete.id} />
-      </section>
-
-      <section className="dashboard-grid">
-        <PaymentHistory athleteId={athlete.id} />
-      </section>
-      {creating && <div className="modal-backdrop"><div className="modal small-modal"><button className="modal-close" onClick={() => setCreating(false)}><Icon name="close" /></button><span className="eyebrow">Share an update</span><h2>Bring supporters along</h2><label>Post<textarea value={post} onChange={e => setPost(e.target.value)} placeholder="What happened in training today?" /></label><button className="button full" disabled={!post.trim()} onClick={() => { onCreate(athlete.id, post); setCreating(false); setPost(""); }}>Publish update</button></div></div>}
+      {creating && <div className="modal-backdrop"><div className="modal small-modal"><button className="modal-close" onClick={() => setCreating(false)}><Icon name="close" /></button><span className="eyebrow">Share an update</span><h2>Bring supporters along</h2><label>Post<textarea value={post} onChange={e => setPost(e.target.value)} placeholder="What happened in training today?" /></label>{postError && <p className="field-error" role="alert">{postError}</p>}<button className="button full" disabled={!post.trim() || posting} onClick={publish}>{posting ? "Publishing…" : "Publish update"}</button></div></div>}
       {editingId && <div className="modal-backdrop"><div className="modal small-modal"><button className="modal-close" onClick={cancelEdit}><Icon name="close" /></button><span className="eyebrow">Edit update</span><h2>Update your post</h2><label>Post<textarea value={editText} onChange={e => setEditText(e.target.value)} placeholder="What happened in training today?" /></label><button className="button full" disabled={!editText.trim()} onClick={saveEdit}>Save changes</button></div></div>}
     </main>
   );
 }
 
 export function DashboardScreen() {
-  const { role, athletes, posts, addPost, editPost, deletePost, mounted } = useStarlete();
+  const { role, user, loading: sessionLoading } = useSession();
+  const { athletes } = useStarlete();
   const router = useRouter();
 
   useEffect(() => {
-    if (mounted && !role) router.replace("/login");
-  }, [mounted, role, router]);
+    if (!sessionLoading && !user) router.replace("/login");
+  }, [sessionLoading, user, router]);
 
-  if (!role) return null;
+  if (sessionLoading) return <main className="dashboard page-shell"><div className="empty"><h3>Loading your dashboard…</h3></div></main>;
+  if (!user || !role) return null;
   if (role === "athlete") {
-    return <AthleteDashboard athlete={athletes[0]} posts={posts} onCreate={addPost} onEdit={editPost} onDelete={deletePost} />;
+    return <AthleteDashboard />;
   }
   return <SupporterDashboard athletes={athletes} />;
 }
