@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AthleteCard, Icon, MiniAthlete, Progress, peso } from "@/src/app/shared/ui";
 import { useStarlete, type Donation, type QrCode } from "@/src/app/store";
@@ -164,7 +165,7 @@ function SupporterDashboard({ athletes, displayName }: { athletes: Athlete[]; di
   const myPayments = getDonationsForSupporter();
   return (
     <main className="dashboard page-shell">
-      <div className="dash-welcome"><div><span className="eyebrow">Supporter dashboard</span><h1>Magandang araw, {displayName || "supporter"}.</h1><p>There are new stories waiting for your support.</p></div><div className="impact-chip"><Icon name="heart" /><span><small>Your total impact</small><b>₱4,500 given</b></span></div></div>
+      <div className="dash-welcome"><div><span className="eyebrow">Supporter dashboard</span><h1>Magandang araw, {displayName || "supporter"}.</h1><p>There are new stories waiting for your support.</p></div><div className="dash-welcome-actions"><Link className="button secondary" href="/discover?view=all"><Icon name="users" size={16} /> View all athletes</Link><div className="impact-chip"><Icon name="heart" /><span><small>Your total impact</small><b>₱4,500 given</b></span></div></div></div>
       <section><div className="section-head"><div><span className="eyebrow">Picked for you</span><h2>Athletes making moves</h2></div></div><div className="card-grid">{athletes.slice(0, 3).map(a => <AthleteCard key={a.id} athlete={a} />)}</div></section>
       <section className="dashboard-grid">
         <div className="dash-card">

@@ -8,6 +8,7 @@ import { DonationModal } from "@/src/app/shared/donation";
 import { useSession } from "@/src/app/shared/session-provider";
 import { useStarlete } from "@/src/app/store";
 import { getInitials } from "@/src/app/lib/profile-display.mjs";
+import { REGION_MAP } from "@/src/app/lib/region-map";
 
 /** Relative "time ago" label for a notification's epoch-ms timestamp. */
 function timeAgo(ts: number): string {
@@ -121,6 +122,29 @@ function Header() {
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
+  // The Discover link is region-aware: when the user is on an athlete profile
+  // that was opened from a region (/athletes/<id>?from=<regionCode>), Discover
+  // returns to that region — matching the profile's "Back to athletes". In
+  // every other context it resets to the plain /discover full map.
+  //
+  // The destination is computed FRESH at click time from the live URL
+  // (window.location), not from a render-time snapshot. A render-time
+  // useSearchParams value could go stale after a soft navigation and leak the
+  // region context onto an unrelated page; reading at click time guarantees it
+  // reflects the current page.
+  const goToDiscover = () => {
+    close();
+    let dest = "/discover";
+    const match = /^\/athletes\/[^/]+$/.test(window.location.pathname);
+    if (match) {
+      const from = new URLSearchParams(window.location.search).get("from");
+      if (from && REGION_MAP.regions.some((r) => r.regionCode === from)) {
+        dest = `/discover?region=${encodeURIComponent(from)}`;
+      }
+    }
+    router.push(dest);
+  };
+
   const initials = getInitials(displayName);
 
   const signOut = async () => {
@@ -135,7 +159,7 @@ function Header() {
       <div className="header-inner">
         <Logo />
         <nav className={open ? "nav open" : "nav"}>
-          <Link className={isActive("/discover") ? "active" : ""} href="/discover" onClick={close}>Discover</Link>
+          <button type="button" className={isActive("/discover") ? "nav-link active" : "nav-link"} onClick={goToDiscover}>Discover</button>
           <Link className={isActive("/feed") ? "active" : ""} href="/feed" onClick={close}>Feed</Link>
           <Link href="/#how" onClick={close}>How it works</Link>
           {role ? (

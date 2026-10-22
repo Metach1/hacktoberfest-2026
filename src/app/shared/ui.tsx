@@ -51,11 +51,13 @@ export function Progress({ value }: { value: number }) {
   return <div className="progress"><span style={{ width: `${Math.min(safeValue, 100)}%` }} /></div>;
 }
 
-/** Athlete summary card that links to the athlete's profile route. */
-export function AthleteCard({ athlete }: { athlete: Athlete }) {
+/** Athlete summary card; `from` preserves discovery-region navigation. */
+export function AthleteCard({ athlete, from }: { athlete: Athlete; from?: string | null }) {
   const percent = athlete.goal > 0 ? Math.round((athlete.raised / athlete.goal) * 100) : 0;
+  const profilePath = `/athletes/${athlete.profileId ?? athlete.id}`;
+  const href = from ? `${profilePath}?from=${encodeURIComponent(from)}` : profilePath;
   return (
-    <Link className="athlete-card" href={`/athletes/${athlete.profileId ?? athlete.id}`}>
+    <Link className="athlete-card" href={href}>
       <div className="card-image">
         <img src={athlete.image} alt={`${athlete.name}, ${athlete.sport} athlete`} />
         <span className="sport-pill">{athlete.sport}</span>

@@ -257,6 +257,7 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .dash-welcome { display: flex; align-items: center; justify-content: space-between; margin-bottom: 40px; }
 .dash-welcome h1, .settings-head h1 { font-size: 42px; margin: 0 0 8px; }
 .dash-welcome p, .settings-head p { color: var(--muted); margin: 0; }
+.dash-welcome-actions { display: flex; align-items: center; gap: 14px; }
 .impact-chip { background: var(--navy); color: var(--gold); border-radius: 15px; padding: 15px 20px; display: flex; gap: 12px; align-items: center; }
 .impact-chip span { display: flex; flex-direction: column; }
 .impact-chip small { color: #9baec2; font-size: 9px; }
@@ -425,6 +426,7 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
   .role-switch, .field-row { grid-template-columns: 1fr; }
   .dash-welcome { align-items: flex-start; flex-direction: column; gap: 20px; }
   .dash-welcome h1, .settings-head h1 { font-size: 34px; }
+  .dash-welcome-actions { flex-direction: column; align-items: stretch; gap: 12px; width: 100%; }
   .impact-chip { width: 100%; }
   .dashboard { padding: 45px 18px 70px; }
   .stat-grid, .dashboard-grid { grid-template-columns: 1fr; }
@@ -444,7 +446,9 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .explorer-panel { position: relative; z-index: 2; }
 .explorer-panel > .eyebrow { margin-bottom: 10px; }
 .explorer-panel h2 { font-size: 34px; line-height: 1.08; margin: 0 0 12px; color: var(--navy); }
-.explorer-sub { margin: 0 0 20px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.explorer-sub { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.view-all-button { margin: 0 0 18px; font-size: 13px; }
+.results-count { color: var(--muted); font-weight: 600; }
 .explorer-controls { display: flex; flex-direction: column; gap: 10px; }
 .explorer-controls .search-box { background: white; border: 1px solid var(--line); border-radius: 12px; padding: 0 14px; }
 .explorer-controls .search-box input { background: transparent; }

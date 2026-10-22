@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { notFound } from "next/navigation";
 import { Icon, Progress, peso } from "@/src/app/shared/ui";
 import { PostCard } from "@/src/app/shared/post-card";
@@ -11,6 +11,7 @@ import { useStarlete } from "@/src/app/store";
 import { getPublicAthleteProfile } from "@/src/app/services/profile";
 import { toAthlete } from "@/src/app/lib/profile-adapter";
 import type { Athlete } from "@/src/app/data/athletes";
+import { REGION_MAP } from "@/src/app/lib/region-map";
 
 export function AthleteProfileScreen({ id }: { id: string }) {
   const { getAthlete, role, openDonation, posts, postsLoading, postError, mounted } = useStarlete();
@@ -38,6 +39,15 @@ export function AthleteProfileScreen({ id }: { id: string }) {
   }, [id, numericId]);
 
   const athlete = demoAthlete ?? registeredAthlete;
+  const searchParams = useSearchParams();
+
+  // "Back to athletes" returns to the region the user came from, when a valid
+  // `?from=<regionCode>` was threaded through the originating link. Otherwise it
+  // falls back to the full Discover map.
+  const fromParam = searchParams.get("from");
+  const backHref = fromParam && REGION_MAP.regions.some((r) => r.regionCode === fromParam)
+    ? `/discover?region=${encodeURIComponent(fromParam)}`
+    : "/discover";
 
   // Until the store hydrates, the athlete list may be the default seed; once
   // mounted, an unknown id is a genuine 404.
@@ -65,7 +75,7 @@ export function AthleteProfileScreen({ id }: { id: string }) {
 
   return (
     <main className="profile-page">
-      <Link className="back-button" href="/discover"><Icon name="back" /> Back to athletes</Link>
+      <Link className="back-button" href={backHref}><Icon name="back" /> Back to athletes</Link>
       <section className="profile-hero">
         <div className="profile-photo"><img src={athlete.image} alt={athlete.name} /><span>Photo from athlete profile</span></div>
         <div className="profile-summary">
