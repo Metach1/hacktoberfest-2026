@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon, Logo } from "@/src/app/shared/ui";
 import { DonationModal } from "@/src/app/shared/donation";
+import { useSession } from "@/src/app/shared/session-provider";
 import { useStarlete } from "@/src/app/store";
 
 /** Relative "time ago" label for a notification's epoch-ms timestamp. */
@@ -112,6 +113,7 @@ function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const { role, logout, athletes } = useStarlete();
+  const { signOut: endSession } = useSession();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 
@@ -122,7 +124,8 @@ function Header() {
     ? athletes[0]?.name.split(" ").map(p => p[0]).slice(0, 2).join("").toUpperCase()
     : "JD";
 
-  const signOut = () => {
+  const signOut = async () => {
+    await endSession();
     logout();
     close();
     router.push("/");
