@@ -18,6 +18,9 @@ export interface MyProfile {
   profilePicture: string;
   // Athlete-only (empty/zero for supporters):
   sport: string;
+  /** Canonical region code (e.g. "NCR", "Region XI"); "" if unset. */
+  regionCode: string;
+  /** Display location label (region name). */
   location: string;
   fundingGoal: number | null;
 }
@@ -38,15 +41,17 @@ export async function getMyProfile(): Promise<MyProfile | null> {
   if (!prof) return null;
 
   let sport = "";
+  let regionCode = "";
   let location = "";
   let fundingGoal: number | null = null;
   if (prof.role === "athlete") {
     const { data: ap } = await supabase
       .from("athlete_profiles")
-      .select("sport, location, funding_goal")
+      .select("sport, region_code, location, funding_goal")
       .eq("user_id", uid)
       .maybeSingle();
     sport = ap?.sport ?? "";
+    regionCode = ap?.region_code ?? "";
     location = ap?.location ?? "";
     fundingGoal = ap?.funding_goal ?? null;
   }
@@ -59,6 +64,7 @@ export async function getMyProfile(): Promise<MyProfile | null> {
     bio: prof.bio ?? "",
     profilePicture: prof.profile_picture ?? "",
     sport,
+    regionCode,
     location,
     fundingGoal,
   };
@@ -70,6 +76,9 @@ export interface UpdateMyProfileInput {
   bio: string;
   // Athlete-only:
   sport?: string;
+  /** Canonical region code chosen from the dropdown. */
+  regionCode?: string;
+  /** Display location label (region name), derived from regionCode. */
   location?: string;
   fundingGoal?: number | null;
 }
@@ -118,6 +127,7 @@ export async function updateMyProfile(input: UpdateMyProfileInput): Promise<void
         {
           user_id: uid,
           sport: input.sport?.trim() || null,
+          region_code: input.regionCode?.trim() || null,
           location: input.location?.trim() || null,
           funding_goal: input.fundingGoal ?? null,
         },

@@ -6,6 +6,7 @@ import { Icon } from "@/src/app/shared/ui";
 import { useSession } from "@/src/app/shared/session-provider";
 import { useAsync, ErrorState } from "@/src/app/shared/async-state";
 import { getMyProfile, updateMyProfile } from "@/src/app/services/profile";
+import { REGIONS, regionName } from "@/src/app/lib/regions";
 
 export function EditProfileScreen() {
   const { role, user, loading: sessionLoading, refresh } = useSession();
@@ -23,7 +24,7 @@ export function EditProfileScreen() {
   const [lastName, setLastName] = useState("");
   const [bio, setBio] = useState("");
   const [sport, setSport] = useState("");
-  const [location, setLocation] = useState("");
+  const [regionCode, setRegionCode] = useState("");
   const [goal, setGoal] = useState("");
   const [seeded, setSeeded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -36,7 +37,7 @@ export function EditProfileScreen() {
       setLastName(profile.lastName);
       setBio(profile.bio);
       setSport(profile.sport);
-      setLocation(profile.location);
+      setRegionCode(profile.regionCode);
       setGoal(profile.fundingGoal != null ? String(profile.fundingGoal) : "");
       setSeeded(true);
     }
@@ -65,7 +66,8 @@ export function EditProfileScreen() {
         lastName,
         bio,
         sport: isAthlete ? sport : undefined,
-        location: isAthlete ? location : undefined,
+        regionCode: isAthlete ? (regionCode || undefined) : undefined,
+        location: isAthlete ? (regionCode ? regionName(regionCode) ?? undefined : undefined) : undefined,
         fundingGoal: isAthlete ? (goal.trim() === "" ? null : goalValue) : undefined,
       });
       await refresh(); // update header display name
@@ -96,7 +98,12 @@ export function EditProfileScreen() {
               </div>
               {isAthlete && (
                 <div className="field-row">
-                  <label>Location<input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="City / Province" /></label>
+                  <label>Region
+                    <select value={regionCode} onChange={(e) => setRegionCode(e.target.value)}>
+                      <option value="">Select a region…</option>
+                      {REGIONS.map((r) => <option key={r.regionCode} value={r.regionCode}>{r.name}</option>)}
+                    </select>
+                  </label>
                 </div>
               )}
               <label>Bio<textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder={isAthlete ? "Tell supporters about your journey." : "Tell the community about yourself."} /></label>
