@@ -42,7 +42,9 @@ export interface QrCode {
   method: string;
   /** Account display name / handle shown under the QR (fictional). */
   label: string;
-  /** Image data URL or path for the QR graphic (fictional placeholder). */
+  /** Mandatory account number / handle supporters pay to (fictional). */
+  accountNumber: string;
+  /** Image data URL or path for the QR graphic; "" when none was uploaded. */
   image: string;
 }
 
@@ -80,41 +82,15 @@ export interface Donation {
  */
 const DATA_VERSION = "v5";
 
-/**
- * A tiny, dependency-free inline-SVG "QR" placeholder as a data URL. It is NOT
- * a scannable code — the demo never processes payments — but it gives each
- * method a distinct, deterministic graphic without any remote asset.
- */
-function placeholderQr(seed: string): string {
-  let h = 0;
-  for (let i = 0; i < seed.length; i += 1) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  const cells: string[] = [];
-  const grid = 7;
-  for (let y = 0; y < grid; y += 1) {
-    for (let x = 0; x < grid; x += 1) {
-      // Deterministic pseudo-random fill from the seed hash.
-      const bit = (h >>> ((y * grid + x) % 31)) & 1;
-      const corner =
-        (x < 2 && y < 2) || (x > grid - 3 && y < 2) || (x < 2 && y > grid - 3);
-      if (bit || corner) {
-        cells.push(`<rect x="${x * 8 + 6}" y="${y * 8 + 6}" width="8" height="8"/>`);
-      }
-    }
-  }
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">` +
-    `<rect width="80" height="80" rx="10" fill="#fff"/>` +
-    `<g fill="#0b1f33">${cells.join("")}</g></svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-}
-
 /** Build a fictional QR entry for a method. */
-function makeQr(athleteId: number, method: string, label: string): QrCode {
+function makeQr(athleteId: number, method: string, label: string, accountNumber: string): QrCode {
   return {
     id: `qr-${athleteId}-${method.toLowerCase().replace(/\s+/g, "-")}`,
     method,
     label,
-    image: placeholderQr(`${athleteId}-${method}`),
+    accountNumber,
+    // No placeholder graphic — a QR without an uploaded image has no image.
+    image: "",
   };
 }
 
@@ -128,8 +104,8 @@ function seedQrCodes(athletes: Athlete[]): Record<number, QrCode[]> {
   const first = athletes[0];
   if (first) {
     map[first.id] = [
-      makeQr(first.id, "GCash", "J. Santos · 0917•••1234"),
-      makeQr(first.id, "Maya", "J. Santos · 0917•••1234"),
+      makeQr(first.id, "GCash", "J. Santos", "0917 123 4567"),
+      makeQr(first.id, "Maya", "J. Santos", "0918 765 4321"),
     ];
   }
   return map;
@@ -177,7 +153,7 @@ interface StarleteState {
   closeDonation: () => void;
   // QR management (athlete side).
   getQrCodes: (athleteId: number) => QrCode[];
-  addQrCode: (athleteId: number, method: string, label: string, image?: string) => void;
+  addQrCode: (athleteId: number, method: string, label: string, accountNumber: string, image?: string) => void;
   replaceQrCode: (athleteId: number, qrId: string, patch: Partial<Omit<QrCode, "id">>) => void;
   removeQrCode: (athleteId: number, qrId: string) => void;
 
@@ -296,7 +272,22 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       setRole(savedRole ?? null);
       if (savedVersion === DATA_VERSION || savedVersion === "v4" || savedVersion === "v3") {
         if (savedAthletes) setAthletes(JSON.parse(savedAthletes) as Athlete[]);
-        if (savedQr) setQrCodes(JSON.parse(savedQr) as Record<number, QrCode[]>);
+        if (savedQr) {
+          // Normalize older QR records to the current shape: default a missing
+          // accountNumber to "" and a missing image to "" (no placeholder).
+          const loadedQr = JSON.parse(savedQr) as Record<number, Partial<QrCode>[]>;
+          const normalizedQr: Record<number, QrCode[]> = {};
+          for (const [athleteId, list] of Object.entries(loadedQr)) {
+            normalizedQr[Number(athleteId)] = (list ?? []).map((q) => ({
+              id: String(q.id ?? `qr-${athleteId}-${Date.now()}`),
+              method: q.method ?? "",
+              label: q.label ?? "",
+              accountNumber: q.accountNumber ?? "",
+              image: q.image ?? "",
+            }));
+          }
+          setQrCodes(normalizedQr);
+        }
         if (savedPosts) {
           const loadedPosts: unknown = JSON.parse(savedPosts);
           if (Array.isArray(loadedPosts) && loadedPosts.every((post) => typeof post === "string")) {
@@ -419,14 +410,16 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   );
 
   const addQrCode = useCallback(
-    (athleteId: number, method: string, label: string, image?: string) => {
+    (athleteId: number, method: string, label: string, accountNumber: string, image?: string) => {
       setQrCodes((map) => {
         const existing = map[athleteId] ?? [];
         const qr: QrCode = {
           id: `qr-${athleteId}-${Date.now()}`,
           method,
           label,
-          image: image || placeholderQr(`${athleteId}-${method}-${Date.now()}`),
+          accountNumber,
+          // No placeholder graphic — when no image is uploaded, store "".
+          image: image ?? "",
         };
         return { ...map, [athleteId]: [...existing, qr] };
       });

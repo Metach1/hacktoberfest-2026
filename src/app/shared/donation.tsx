@@ -337,14 +337,30 @@ export function DonationModal() {
                 </div>
                 {activeQr && (
                   <div className="qr-display">
-                    <img src={activeQr.image} alt={`${activeQr.method} QR code`} width={160} height={160} />
-                    <div className="qr-meta">
-                      <strong>{activeQr.method}</strong>
-                      <small>{activeQr.label}</small>
-                    </div>
-                    <button className="text-button" onClick={() => setShowFullQr(true)}>
-                      View in full
-                    </button>
+                    {activeQr.image ? (
+                      <>
+                        <img src={activeQr.image} alt={`${activeQr.method} QR code`} width={160} height={160} />
+                        <div className="qr-meta">
+                          <strong>{activeQr.method}</strong>
+                          <small>{activeQr.label}</small>
+                          {activeQr.accountNumber && <small>{activeQr.accountNumber}</small>}
+                        </div>
+                        <button className="text-button" onClick={() => setShowFullQr(true)}>
+                          View in full
+                        </button>
+                      </>
+                    ) : (
+                      // No QR image: surface the account name and number large so
+                      // supporters can read and type them easily.
+                      <>
+                        <p className="qr-no-image-note muted-line">No QR image provided. Use the account details below to pay.</p>
+                        <div className="qr-no-image-details">
+                          <span className="qr-no-image-method">{activeQr.method}</span>
+                          <strong className="qr-no-image-name">{activeQr.label}</strong>
+                          {activeQr.accountNumber && <span className="qr-no-image-number">{activeQr.accountNumber}</span>}
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
                 <p className="safe-note">
@@ -602,7 +618,7 @@ export function DonationModal() {
         )}
       </div>
     </div>
-    {showFullQr && activeQr && createPortal(
+    {showFullQr && activeQr?.image && createPortal(
       <div className="qr-fullscreen-backdrop" onClick={() => setShowFullQr(false)}>
         <div
           className="qr-fullscreen-dialog"
@@ -621,6 +637,7 @@ export function DonationModal() {
           <span className="eyebrow">{activeQr.method}</span>
           <img src={activeQr.image} alt={`${activeQr.method} QR code`} />
           <strong>{activeQr.label}</strong>
+          {activeQr.accountNumber && <small>{activeQr.accountNumber}</small>}
         </div>
       </div>,
       document.body,

@@ -12,6 +12,7 @@ import { msUntilAutoConfirm } from "@/src/app/lib/donations.mjs";
 import {
   REJECTION_REASONS,
   rejectionReasonLabel,
+  isValidAccountNumber,
 } from "@/src/app/lib/donations.mjs";
 import { checkPaymentQr } from "@/src/app/lib/qr-decode";
 
@@ -248,12 +249,14 @@ function QrManager({ athleteId }: { athleteId: number }) {
   const [adding, setAdding] = useState(false);
   const [method, setMethod] = useState("GCash");
   const [label, setLabel] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
   const [image, setImage] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
   // Staged edits for the QR being edited; committed together on Save so the
-  // method, label, and image change in one atomic replaceQrCode call.
+  // method, label, account number, and image change in one atomic update.
   const [editMethod, setEditMethod] = useState("GCash");
   const [editLabel, setEditLabel] = useState("");
+  const [editAccountNumber, setEditAccountNumber] = useState("");
   const [editImage, setEditImage] = useState("");
   // QR image validation feedback.
   const [qrChecking, setQrChecking] = useState(false);
@@ -263,7 +266,11 @@ function QrManager({ athleteId }: { athleteId: number }) {
   const addFileRef = useRef<HTMLInputElement | null>(null);
   const editFileRef = useRef<HTMLInputElement | null>(null);
 
-  const methods = ["GCash", "Maya", "GrabPay", "BPI", "BDO", "LandBank", "UnionBank", "Bank transfer"];
+  const methods = ["GCash", "Maya", "MariBank", "GrabPay", "BPI", "BDO", "LandBank", "UnionBank", "Bank transfer"];
+
+  // Validity of the add/edit account-number fields (digits-only, 8–19 digits).
+  const addAccountValid = isValidAccountNumber(accountNumber.trim());
+  const editAccountValid = isValidAccountNumber(editAccountNumber.trim());
 
   /**
    * Validate an uploaded QR image before accepting it: decode it locally and
@@ -299,11 +306,13 @@ function QrManager({ athleteId }: { athleteId: number }) {
   };
 
   const submitAdd = () => {
-    if (!label.trim()) return;
-    addQrCode(athleteId, method, label.trim(), image || undefined);
+    // Account name is mandatory; account number must be a valid 8–19 digit number.
+    if (!label.trim() || !addAccountValid) return;
+    addQrCode(athleteId, method, label.trim(), accountNumber.trim(), image || undefined);
     setAdding(false);
     setMethod("GCash");
     setLabel("");
+    setAccountNumber("");
     setImage("");
     setQrError("");
     setQrNotice("");
@@ -313,6 +322,7 @@ function QrManager({ athleteId }: { athleteId: number }) {
     setEditing(qr.id);
     setEditMethod(qr.method);
     setEditLabel(qr.label);
+    setEditAccountNumber(qr.accountNumber);
     setEditImage("");
     setQrError("");
     setQrNotice("");
@@ -320,16 +330,22 @@ function QrManager({ athleteId }: { athleteId: number }) {
 
   const cancelEdit = () => {
     setEditing(null);
+    setEditAccountNumber("");
     setEditImage("");
     setQrError("");
     setQrNotice("");
   };
 
   const saveEdit = (qrId: string) => {
-    if (!editLabel.trim()) return;
-    // One atomic update: method, label, and (if a new image was chosen) image.
-    // The QR id is preserved by replaceQrCode.
-    const patch: Partial<Omit<QrCode, "id">> = { method: editMethod, label: editLabel.trim() };
+    // Account name is mandatory; account number must be a valid 8–19 digit number.
+    if (!editLabel.trim() || !editAccountValid) return;
+    // One atomic update: method, label, account number, and (if a new image was
+    // chosen) image. The QR id is preserved by replaceQrCode.
+    const patch: Partial<Omit<QrCode, "id">> = {
+      method: editMethod,
+      label: editLabel.trim(),
+      accountNumber: editAccountNumber.trim(),
+    };
     if (editImage) patch.image = editImage;
     replaceQrCode(athleteId, qrId, patch);
     cancelEdit();
@@ -361,8 +377,15 @@ function QrManager({ athleteId }: { athleteId: number }) {
                 </select>
               </label>
               <label>
-                Account name / handle
-                <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} placeholder="e.g. J. Santos · 0917•••1234" autoFocus />
+                Account name
+                <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} placeholder="e.g. J. Santos" autoFocus />
+              </label>
+              <label>
+                Account number
+                <input value={editAccountNumber} onChange={(e) => setEditAccountNumber(e.target.value)} inputMode="numeric" placeholder="e.g. 0917 123 4567" />
+                {editAccountNumber.trim() && !editAccountValid && (
+                  <small className="form-error">Account number must be 8–19 digits.</small>
+                )}
               </label>
               <div className="qr-upload-field">
                 <span className="qr-upload-label">QR image</span>
@@ -389,15 +412,18 @@ function QrManager({ athleteId }: { athleteId: number }) {
               {qrNotice && <p className="field-hint">{qrNotice}</p>}
               <div className="form-actions">
                 <button className="button secondary" onClick={cancelEdit}>Cancel</button>
-                <button className="button" disabled={!editLabel.trim() || qrChecking} onClick={() => saveEdit(qr.id)}>Save changes</button>
+                <button className="button" disabled={!editLabel.trim() || !editAccountValid || qrChecking} onClick={() => saveEdit(qr.id)}>Save changes</button>
               </div>
             </div>
           ) : (
             <div className="qr-manage-row" key={qr.id}>
-              <img src={qr.image} alt={`${qr.method} QR`} width={56} height={56} />
+              {qr.image
+                ? <img src={qr.image} alt={`${qr.method} QR`} width={56} height={56} />
+                : <span className="qr-no-image" aria-label="No QR image"><Icon name="plus" size={18} /><small>No QR</small></span>}
               <div className="qr-manage-meta">
                 <strong>{qr.method}</strong>
                 <small>{qr.label}</small>
+                <small>{qr.accountNumber}</small>
               </div>
               <div className="qr-manage-actions">
                 <button className="text-button" onClick={() => startEdit(qr)}>Edit</button>
@@ -417,11 +443,18 @@ function QrManager({ athleteId }: { athleteId: number }) {
             </select>
           </label>
           <label>
-            Account name / handle
-            <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. J. Santos · 0917•••1234" />
+            Account name
+            <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. J. Santos" />
+          </label>
+          <label>
+            Account number
+            <input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} inputMode="numeric" placeholder="e.g. 0917 123 4567" />
+            {accountNumber.trim() && !addAccountValid && (
+              <small className="form-error">Account number must be 8–19 digits.</small>
+            )}
           </label>
           <div className="qr-upload-field">
-            <span className="qr-upload-label">QR image <span className="qr-upload-optional">(optional — a placeholder is generated if omitted)</span></span>
+            <span className="qr-upload-label">QR image <span className="qr-upload-optional">(optional)</span></span>
             <input ref={addFileRef} type="file" accept="image/*" hidden onChange={(e) => validateAndSetImage(e.target.files?.[0], setImage)} />
             {image ? (
               <div className="receipt-preview">
@@ -444,8 +477,8 @@ function QrManager({ athleteId }: { athleteId: number }) {
           {qrError && <p className="form-error">{qrError}</p>}
           {qrNotice && <p className="field-hint">{qrNotice}</p>}
           <div className="form-actions">
-            <button className="button secondary" onClick={() => { setAdding(false); setImage(""); setQrError(""); setQrNotice(""); }}>Cancel</button>
-            <button className="button" disabled={!label.trim() || qrChecking} onClick={submitAdd}>Save QR</button>
+            <button className="button secondary" onClick={() => { setAdding(false); setAccountNumber(""); setImage(""); setQrError(""); setQrNotice(""); }}>Cancel</button>
+            <button className="button" disabled={!label.trim() || !addAccountValid || qrChecking} onClick={submitAdd}>Save QR</button>
           </div>
         </div>
       )}

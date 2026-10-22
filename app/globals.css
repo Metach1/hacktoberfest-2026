@@ -556,6 +556,15 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .qr-manage-list { display: flex; flex-direction: column; gap: 10px; }
 .qr-manage-row { display: flex; align-items: center; gap: 12px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
 .qr-manage-row img { width: 56px; height: 56px; object-fit: contain; border-radius: 8px; border: 1px solid var(--line); background: white; }
+.qr-no-image { width: 56px; height: 56px; flex: none; display: grid; place-items: center; gap: 2px; border-radius: 8px; border: 1px dashed var(--line); background: #fafbfc; color: var(--muted); }
+.qr-no-image small { font-size: 9px; }
+.qr-no-image-note { margin: 0 0 4px; max-width: 220px; text-align: center; }
+/* When a QR has no image, show the account name/number prominently so
+   supporters can read and type them easily. */
+.qr-no-image-details { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; background: #fafbfc; text-align: center; }
+.qr-no-image-method { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.qr-no-image-name { font-size: 20px; color: var(--ink); }
+.qr-no-image-number { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 22px; font-weight: 700; letter-spacing: .04em; color: var(--ink); user-select: all; }
 .qr-manage-meta { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .qr-manage-meta small { color: var(--muted); font-size: 11px; }
 .qr-manage-meta input { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 12px; }

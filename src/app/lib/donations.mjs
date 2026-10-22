@@ -441,6 +441,32 @@ export function topDonorsForAthlete(donations, athleteId, limit) {
 /** Minimum claimed donation amount (pesos) the supporter flow accepts. */
 export const MIN_DONATION_AMOUNT = 50;
 
+/** Min/max digit count for a published payment-QR account number. */
+export const MIN_ACCOUNT_NUMBER_DIGITS = 8;
+export const MAX_ACCOUNT_NUMBER_DIGITS = 19;
+
+/**
+ * Whether an athlete-entered account number is valid. The value may contain
+ * spaces or dashes as separators (e.g. "0917 123 4567"); those are stripped
+ * before counting. What remains must be DIGITS ONLY, between
+ * MIN_ACCOUNT_NUMBER_DIGITS and MAX_ACCOUNT_NUMBER_DIGITS inclusive. A pure
+ * predicate so the QR manager UI and tests share one rule.
+ *
+ * @param {string|null|undefined} raw
+ * @returns {boolean}
+ */
+export function isValidAccountNumber(raw) {
+  if (raw == null) return false;
+  // Allow spaces and dashes as separators only.
+  if (!/^[\d\s-]+$/.test(raw)) return false;
+  const digits = raw.replace(/[\s-]/g, "");
+  return (
+    /^\d+$/.test(digits) &&
+    digits.length >= MIN_ACCOUNT_NUMBER_DIGITS &&
+    digits.length <= MAX_ACCOUNT_NUMBER_DIGITS
+  );
+}
+
 /**
  * Parse a supporter-entered claimed amount (a raw input string) into a number.
  * Returns 0 for blank/invalid input so callers can treat it as "not yet
