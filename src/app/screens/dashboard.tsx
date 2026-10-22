@@ -9,6 +9,7 @@ import { useSession } from "@/src/app/shared/session-provider";
 import { useAsync } from "@/src/app/shared/async-state";
 import { getMyProfile, type MyProfile } from "@/src/app/services/profile";
 import { getFeed, createPost, editPost as editPostSvc, deletePost as deletePostSvc, type FeedPost } from "@/src/app/services/feed";
+import { getMyQrCodes, addMyQrCode, updateMyQrCode, removeMyQrCode, type QrCodeRow, type QrInput } from "@/src/app/services/qr";
 import type { Athlete } from "@/src/app/data/athletes";
 import { TimeAgo } from "@/src/app/shared/time-ago";
 import { msUntilAutoConfirm } from "@/src/app/lib/donations.mjs";
@@ -248,9 +249,11 @@ function StatusBadge({ status }: { status: Donation["status"] }) {
   return <span className={`status-badge ${status}`}>{label}</span>;
 }
 
-function QrManager({ athleteId }: { athleteId: number }) {
-  const { getQrCodes, addQrCode, replaceQrCode, removeQrCode } = useStarlete();
-  const codes = getQrCodes(athleteId);
+function QrManager() {
+  // The signed-in athlete's own QR codes, backed by Supabase (owner = them).
+  const { data: codesData, loading: codesLoading, error: codesError, reload: reloadCodes } =
+    useAsync<QrCodeRow[]>(() => getMyQrCodes(), []);
+  const codes = codesData ?? [];
   const [adding, setAdding] = useState(false);
   const [method, setMethod] = useState("GCash");
   const [label, setLabel] = useState("");
@@ -310,10 +313,16 @@ function QrManager({ athleteId }: { athleteId: number }) {
     }
   };
 
-  const submitAdd = () => {
+  const submitAdd = async () => {
     // Account name is mandatory; account number must be a valid 8–19 digit number.
     if (!label.trim() || !addAccountValid) return;
-    addQrCode(athleteId, method, label.trim(), accountNumber.trim(), image || undefined);
+    try {
+      await addMyQrCode({ method, label: label.trim(), accountNumber: accountNumber.trim(), image: image || undefined });
+    } catch (e) {
+      setQrError(e instanceof Error ? e.message : "Couldn't save the QR code.");
+      return;
+    }
+    reloadCodes();
     setAdding(false);
     setMethod("GCash");
     setLabel("");
@@ -323,7 +332,7 @@ function QrManager({ athleteId }: { athleteId: number }) {
     setQrNotice("");
   };
 
-  const startEdit = (qr: QrCode) => {
+  const startEdit = (qr: QrCodeRow) => {
     setEditing(qr.id);
     setEditMethod(qr.method);
     setEditLabel(qr.label);
@@ -341,19 +350,32 @@ function QrManager({ athleteId }: { athleteId: number }) {
     setQrNotice("");
   };
 
-  const saveEdit = (qrId: string) => {
+  const saveEdit = async (qrId: string) => {
     // Account name is mandatory; account number must be a valid 8–19 digit number.
     if (!editLabel.trim() || !editAccountValid) return;
-    // One atomic update: method, label, account number, and (if a new image was
-    // chosen) image. The QR id is preserved by replaceQrCode.
-    const patch: Partial<Omit<QrCode, "id">> = {
+    const patch: Partial<QrInput> = {
       method: editMethod,
       label: editLabel.trim(),
       accountNumber: editAccountNumber.trim(),
     };
     if (editImage) patch.image = editImage;
-    replaceQrCode(athleteId, qrId, patch);
+    try {
+      await updateMyQrCode(qrId, patch);
+    } catch (e) {
+      setQrError(e instanceof Error ? e.message : "Couldn't update the QR code.");
+      return;
+    }
+    reloadCodes();
     cancelEdit();
+  };
+
+  const removeCode = async (qrId: string) => {
+    try {
+      await removeMyQrCode(qrId);
+      reloadCodes();
+    } catch (e) {
+      setQrError(e instanceof Error ? e.message : "Couldn't remove the QR code.");
+    }
   };
 
   return (
@@ -362,9 +384,12 @@ function QrManager({ athleteId }: { athleteId: number }) {
         <div><span className="eyebrow">Get paid</span><h2>Your payment QR codes</h2></div>
         <button className="text-button" onClick={() => setAdding(true)}>Add QR</button>
       </div>
-      <p className="muted-line">Supporters scan these to pay you directly. Dummy data only — no real accounts.</p>
+      <p className="muted-line">Supporters scan these to pay you directly.</p>
 
-      {codes.length === 0 && !adding && (
+      {codesLoading && <p className="field-hint">Loading your QR codes…</p>}
+      {codesError && <p className="form-error">{codesError}</p>}
+
+      {!codesLoading && codes.length === 0 && !adding && (
         <div className="empty-note small">
           <p>No QR codes yet. Add a GCash, Maya, or bank QR so supporters can pay you.</p>
           <button className="button small" onClick={() => setAdding(true)}><Icon name="plus" size={16} /> Add your first QR</button>
@@ -372,7 +397,7 @@ function QrManager({ athleteId }: { athleteId: number }) {
       )}
 
       <div className="qr-manage-list">
-        {codes.map((qr: QrCode) =>
+        {codes.map((qr: QrCodeRow) =>
           editing === qr.id ? (
             <div className="qr-edit-form" key={qr.id}>
               <label>
@@ -432,7 +457,7 @@ function QrManager({ athleteId }: { athleteId: number }) {
               </div>
               <div className="qr-manage-actions">
                 <button className="text-button" onClick={() => startEdit(qr)}>Edit</button>
-                <button className="text-button danger" onClick={() => removeQrCode(athleteId, qr.id)}>Remove</button>
+                <button className="text-button danger" onClick={() => removeCode(qr.id)}>Remove</button>
               </div>
             </div>
           ),
@@ -820,7 +845,7 @@ function AthleteDashboard() {
       {/* QR payment codes + incoming donations (demo catalog athlete). */}
       <section className="dashboard-grid">
         <PendingDonations athleteId={demoAthleteId} />
-        <QrManager athleteId={demoAthleteId} />
+        <QrManager />
       </section>
 
       <section className="dashboard-grid">
