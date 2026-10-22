@@ -1,108 +1,79 @@
 # Startlete Backend
 
-This document describes the backend architecture **as it actually is today**,
-and what is planned next. It is written to be accurate, not aspirational.
+## Current architecture
 
-## Summary
+Supabase Auth and Postgres are used for user accounts, profiles, athlete QR
+details, posts, and direct-transfer reports. All writes use the browser's public
+anon key and are constrained by Row Level Security (RLS); the app does not use
+or expose a service-role key.
 
-- **Database-backed today (Supabase + RLS):** authentication, user profiles
-  (incl. athlete profiles with region/sport/funding goal), and the social feed
-  (posts, comments, reactions) with real per-user ownership.
-- **Still on the client store (next slices):** the Discover map's athlete source
-  and the QR/donation lifecycle. The database schema for these already exists in
-  `supabase/migrations/`; wiring is in progress.
+Athlete discovery reads registered `profiles` with role `athlete`, their
+`athlete_profiles`, their public QR codes, and confirmed direct-transfer
+reports. An athlete is listed only after publishing at least one QR code.
+Public profile routes use the athlete account UUID.
 
-Features are being migrated to the database in verified vertical slices, keeping
-the app building green at every step.
+## Direct QR transfers
 
-## Schema status
+Supporters scan an athlete's published QR in their own GCash/Maya wallet app.
+After making a transfer, an authenticated supporter may submit the claimed
+amount, payment method, and transaction reference. The transfer report is
+stored in `public.donations` with `status = 'pending'`. The receiving athlete
+can review it in their dashboard and confirm or reject it.
 
-The live database matches the production schema in
-`supabase/migrations/0006_full_backend.sql` across all feature tables
-(profiles, athlete_profiles, athletes, posts, comments, reactions, qr_codes,
-donations). One historical drift was reconciled: an earlier-created
-`athlete_profiles` was missing `created_at`/`updated_at`; those columns and the
-`moddatetime` trigger were added to match 0006. A fresh deploy from the
-migrations produces the correct shape directly.
+This is not payment processing. Startlete does not initiate, hold, settle, or
+verify transfers, and a supporter-submitted report is not proof that money was
+sent. Only an athlete's confirmation changes the public confirmed totals.
 
-## What is database-backed today (Supabase)
+## Security and visibility
 
-**Authentication & identity**
-- Sign up, log in, log out via **Supabase Auth** (email + password). Supabase
-  handles password hashing, JWT issuance, refresh tokens, and session
-  persistence — we do not hand-roll any of that.
-- Each auth user gets a row in `public.profiles` (via a signup trigger) carrying
-  their `role` (`athlete` | `supporter`).
-- Sessions are refreshed on every request by `proxy.ts` (Next.js 16 Proxy,
-  formerly Middleware) using `@supabase/ssr`.
-- The current user and role are exposed app-wide through `SessionProvider`
-  (`src/app/shared/session-provider.tsx`); the header and auth screens read
-  from it.
+- Athlete names, profile details intended for public display, and published QR
+  details are publicly readable.
+- Supporters can read their own reports; athletes can read reports addressed to
+  them; only confirmed report totals are used publicly.
+- A supporter cannot submit a report as another user, to a supporter account,
+  or to their own account.
+- Only the recipient athlete may confirm or reject a pending report. Database
+  policies and a transition trigger protect its immutable amount, recipient,
+  supporter, method, and reference.
+- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are configured
+  locally in `.env.local`. Never expose a service-role key.
 
-**Security**
-- Authorization is enforced in the database by **Row Level Security** policies,
-  not by client-side checks. A client claiming a role is irrelevant; Postgres
-  checks the authenticated user against the policies.
-- Only the public anon key is used in the app. The Supabase **service-role key
-  is never used or shipped**.
-- Policies: public read on public data; writes restricted to the owning user;
-  roles cannot be self-escalated (enforced by a trigger); athletes-only for
-  posting; supporters-only for donating.
+## Migrations
 
-**Files**
-- `src/app/lib/supabase/client.ts` — browser client
-- `src/app/lib/supabase/server.ts` — server client (`@supabase/ssr`)
-- `src/app/lib/supabase/proxy-session.ts` + `proxy.ts` — session refresh
-- `src/app/services/auth.ts` — signUp / signIn / signOut
-- `src/app/shared/session-provider.tsx` — session/role state
+Apply files in numeric order in the Supabase SQL editor or with the Supabase
+CLI:
 
-## Database schema (migrations)
-
-Run in the Supabase SQL editor in order. All are additive and reversible.
-
-| File | Purpose |
+| Migration | Purpose |
 | --- | --- |
-| `supabase/migrations/0001_init.sql` | Core tables: profiles, athlete_profiles, posts, comments, reactions, donations; signup trigger. |
-| `supabase/migrations/0002_rls.sql` | Enable RLS + policies on the core tables. |
-| `supabase/migrations/0003_feature_schema.sql` | Feature gaps: `public_id` bridge, `qr_codes` table, expanded `donations` lifecycle/receipt columns. |
-| `supabase/migrations/0003_feature_schema_down.sql` | Reversible rollback of 0003. |
-| `supabase/migrations/0004_feature_rls.sql` | RLS for `qr_codes` and the donation lifecycle update policy. |
+| `0001_init.sql` | Profiles, athlete profile basics, core social tables, signup trigger. |
+| `0002_rls.sql` | Initial row-level access policies. |
+| `0003_feature_schema.sql` | QR codes and donation lifecycle fields. |
+| `0004_feature_rls.sql` | QR and donation policies. |
+| `0006_full_backend.sql` | User-owned social, QR, and donation schema. |
+| `0007_full_backend_rls.sql` | Ownership-enforcing policies. |
+| `0008_qr_account_number.sql` | Athlete payment account display field. |
+| `0009_remove_seeded_showcase_data.sql` | Delete seeded fictional catalog and showcase records. |
+| `0010_direct_transfer_controls.sql` | Restrict direct-transfer reporting and review transitions. |
+| `0011_reconcile_athlete_profiles.sql` | Add athlete profile columns skipped when `0006` encountered the table created by `0001`. |
 
-The schema therefore already models users, profiles, posts, comments,
-reactions, QR codes, and the full donation lifecycle. **0001 and 0002 are
-required** for auth to work. 0003/0004 prepare the database for the social and
-donation features that currently run client-side.
+Migration `0009` removes only rows marked as seeded (including seeded profiles)
+and associated showcase records; it preserves rows owned by registered
+accounts. Applying migrations is an explicit database operation; code changes
+do not run them against a hosted Supabase project. Apply through `0011` before
+using the current app; it adds the missing `bio`, `achievement`, `created_at`,
+and `updated_at` columns to `athlete_profiles` on existing databases.
 
-## What runs on the client store today (not yet DB-backed)
+The signup trigger creates `profiles` rows. Athlete-specific profile fields
+are managed in `athlete_profiles`; payment QR details are managed in
+`qr_codes`; transfer reports are stored in `donations`.
 
-These features work and persist via `localStorage` through
-`StarleteProvider` (`src/app/store.tsx`):
+## Related code
 
-- Athlete catalog (30 fictional athletes)
-- Social feed: posts, likes, comments (create/edit/delete)
-- QR payment codes (athlete-published)
-- Donation lifecycle: pending → confirmed/rejected, auto-confirm, receipts,
-  supporter "my payments"
-
-All of this data is **fictional demo data** (see `data/README.md`).
-
-## Next steps (to make the above DB-backed)
-
-The main remaining work is an identity-model decision: the app models athletes
-as a **numeric catalog** (not login accounts), while `profiles` keys off
-`auth.users` UUIDs. Wiring the social core to the DB means introducing an
-`athletes` catalog table (content, not users) and repointing
-posts/comments/reactions/qr_codes/donations at it, then converting the store's
-synchronous reads/writes to async Supabase calls with loading/error states.
-This was intentionally deferred rather than rushed.
-
-## Environment
-
-Local only, in `.env.local` (gitignored):
-
-```
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-```
-
-Placeholders are documented in `.env.example`.
+- `src/app/lib/supabase/client.ts` — browser Supabase client
+- `src/app/shared/session-provider.tsx` — auth session and role
+- `src/app/services/auth.ts` — sign-up, sign-in, sign-out
+- `src/app/services/profile.ts` — signed-in profile reads and updates
+- `src/app/services/public-athletes.ts` — public athlete directory and QR reads
+- `src/app/services/qr.ts` — athlete-owned QR management
+- `src/app/services/donations.ts` — supporter reports and athlete review
+- `src/app/services/feed.ts` — social feed
