@@ -501,6 +501,10 @@ function AthleteDashboard({ athlete, posts, onCreate, onEdit, onDelete }: { athl
       <section className="dashboard-grid">
         <PaymentHistory athleteId={athlete.id} />
       </section>
+
+      <section className="dashboard-grid">
+        <PaymentHistory athleteId={athlete.id} />
+      </section>
       {creating && <div className="modal-backdrop"><div className="modal small-modal"><button className="modal-close" onClick={() => setCreating(false)}><Icon name="close" /></button><span className="eyebrow">Share an update</span><h2>Bring supporters along</h2><label>Post<textarea value={post} onChange={e => setPost(e.target.value)} placeholder="What happened in training today?" /></label><button className="button full" disabled={!post.trim()} onClick={() => { onCreate(athlete.id, post); setCreating(false); setPost(""); }}>Publish update</button></div></div>}
       {editingId && <div className="modal-backdrop"><div className="modal small-modal"><button className="modal-close" onClick={cancelEdit}><Icon name="close" /></button><span className="eyebrow">Edit update</span><h2>Update your post</h2><label>Post<textarea value={editText} onChange={e => setEditText(e.target.value)} placeholder="What happened in training today?" /></label><button className="button full" disabled={!editText.trim()} onClick={saveEdit}>Save changes</button></div></div>}
     </main>
