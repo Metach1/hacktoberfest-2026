@@ -48,11 +48,19 @@ src/
       ui.tsx                 Icon, Logo, Progress, AthleteCard, peso, photos
       chrome.tsx             Header, Footer, AppChrome (shared layout chrome)
       donation.tsx           Global simulated-donation modal
+      donations-panel.tsx    Public-profile confirmed-donations section (recent + See all / See top popups)
     data/
       athletes.ts            Typed adapter: seed JSON -> UI `Athlete` view shape
     lib/
       regions.ts             Typed access to the 18-region taxonomy
       region-map.ts          Typed access to the generated region paths + helpers
+      donations.mjs          Pure donation lifecycle + claimed-amount helpers (shared with tests)
+      receipt-parse.mjs      Pure OCR-text -> field suggestions parser (shared with tests)
+      ocr.ts                 Browser-only Tesseract.js receipt OCR (dynamic import)
+      payment-qr.mjs         Pure EMVCo / QR Ph payment-QR validator (shared with tests)
+      qr-decode.ts           Browser-only jsQR decode + local payment-QR validation
+      receipt-filter.mjs     Pure accept/reject/uncertain receipt policy (shared with tests)
+      moderation.ts          Optional browser-only explicit-image moderation (nsfwjs, graceful fallback)
 data/
   athletes.json              Generated fictional profiles used by the app
   seed.mjs                   Deterministic profile generator and validation
