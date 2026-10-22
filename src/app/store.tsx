@@ -54,6 +54,10 @@ interface StarleteState {
   completeDonation: (athleteId: number, amount: number) => void;
   /** Publish a new post authored by the given athlete. */
   addPost: (authorAthleteId: number, text: string) => void;
+  /** Update the text of an existing post (owner-scoped by the caller). */
+  editPost: (postId: string, text: string) => void;
+  /** Permanently remove a post. */
+  deletePost: (postId: string) => void;
   /** Toggle a like on a post for the current actor (supporter or athlete). */
   toggleLike: (postId: string, actorId: ActorId) => void;
   /** Add a comment to a post. */
@@ -159,6 +163,22 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
     setPosts((prev) => [post, ...prev]);
   }, []);
 
+  const editPost = useCallback((postId: string, text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === postId
+          ? { ...p, text: trimmed, editedAt: new Date().toISOString() }
+          : p,
+      ),
+    );
+  }, []);
+
+  const deletePost = useCallback((postId: string) => {
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+  }, []);
+
   const toggleLike = useCallback((postId: string, actorId: ActorId) => {
     setPosts((prev) =>
       prev.map((p) => {
@@ -213,10 +233,12 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       closeDonation,
       completeDonation,
       addPost,
+      editPost,
+      deletePost,
       toggleLike,
       addComment,
     }),
-    [mounted, role, athletes, posts, donationTarget, login, logout, getAthlete, openDonation, closeDonation, completeDonation, addPost, toggleLike, addComment],
+    [mounted, role, athletes, posts, donationTarget, login, logout, getAthlete, openDonation, closeDonation, completeDonation, addPost, editPost, deletePost, toggleLike, addComment],
   );
 
   return <StarleteContext.Provider value={value}>{children}</StarleteContext.Provider>;

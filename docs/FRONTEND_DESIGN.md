@@ -47,7 +47,7 @@ the look is self-contained and portable.
 | Athlete profile | Everyone | Photo, bio, achievement, funding panel, updates, Support button. |
 | Login / Register | Visitors | Role toggle (Supporter / Athlete); athlete fields + minor consent. |
 | Supporter dashboard | Supporter | Picked-for-you athletes, trending, funding leaderboard, impact. |
-| Athlete dashboard | Athlete | Verification status, funds, goal, supporters, donations, posts, Create Post. |
+| Athlete dashboard | Athlete | Verification status, funds, goal, supporters, donations, and posts with create, edit, and delete of the athlete's own updates. |
 | Edit profile | Signed-in | Update name, location, bio, and (athlete) sport and goal. |
 | Donation flow (modal) | Supporter | Amount → payment method → review → processing → success. |
 

@@ -31,6 +31,8 @@ export interface Post {
   text: string;
   /** ISO timestamp. */
   createdAt: string;
+  /** ISO timestamp of the last edit, if the post has been edited. */
+  editedAt?: string;
   /** Total like count (derived from `likedBy`). */
   likes: number;
   /** Actor ids that have liked this post, used to toggle and prevent dupes. */
