@@ -730,6 +730,14 @@ function PaymentHistory({ athleteId }: { athleteId: number }) {
 
 function AthleteDashboard() {
   const { displayName } = useSession();
+  // QR codes + donations (from the store/catalog model) are keyed by a numeric
+  // athlete id. The real-user model has no numeric id, so for these sections we
+  // use the demo catalog athlete — this restores the working QR/donation
+  // features for submission. NOTE: a follow-up migrates QR/donations to the
+  // real signed-in athlete (Supabase); until then these sections operate on the
+  // demo catalog athlete, not the logged-in user's own payment data.
+  const { athletes, getDonationsForAthlete } = useStarlete();
+  const demoAthleteId = athletes[0]?.id ?? 1;
   // The signed-in athlete's real profile (name, funding goal, etc.).
   const { data: profile } = useAsync<MyProfile | null>(() => getMyProfile(), []);
   // The signed-in athlete's own posts, loaded from the database feed.
@@ -808,6 +816,32 @@ function AthleteDashboard() {
           </article>
         )) : <p className="profile-bio">No posts yet. Share your first update!</p>}</div>
       </section>
+
+      {/* QR payment codes + incoming donations (demo catalog athlete). */}
+      <section className="dashboard-grid">
+        <PendingDonations athleteId={demoAthleteId} />
+        <QrManager athleteId={demoAthleteId} />
+      </section>
+
+      <section className="dashboard-grid">
+        <div className="dash-card">
+          <div className="section-head"><div><span className="eyebrow">Community support</span><h2>Confirmed donations</h2></div></div>
+          {(() => {
+            const confirmed = getDonationsForAthlete(demoAthleteId).filter((d) => d.status === "confirmed");
+            return confirmed.length === 0
+              ? <div className="empty-note small"><p>No confirmed donations yet. Confirm a pending receipt to see it here.</p></div>
+              : confirmed.map((d) => (
+                  <div className="donation-row" key={d.id}>
+                    <span className="donor-avatar"><Icon name="heart" /></span>
+                    <div><strong>{d.supporterName}</strong><small>{timeAgo(d.confirmedAt ?? d.createdAt)}</small></div>
+                    <b>+{peso(d.amount)}</b>
+                  </div>
+                ));
+          })()}
+        </div>
+        <PaymentHistory athleteId={demoAthleteId} />
+      </section>
+
       {creating && <div className="modal-backdrop"><div className="modal small-modal"><button className="modal-close" onClick={() => setCreating(false)}><Icon name="close" /></button><span className="eyebrow">Share an update</span><h2>Bring supporters along</h2><label>Post<textarea value={post} onChange={e => setPost(e.target.value)} placeholder="What happened in training today?" /></label>{postError && <p className="field-error" role="alert">{postError}</p>}<button className="button full" disabled={!post.trim() || posting} onClick={publish}>{posting ? "Publishing…" : "Publish update"}</button></div></div>}
       {editingId && <div className="modal-backdrop"><div className="modal small-modal"><button className="modal-close" onClick={cancelEdit}><Icon name="close" /></button><span className="eyebrow">Edit update</span><h2>Update your post</h2><label>Post<textarea value={editText} onChange={e => setEditText(e.target.value)} placeholder="What happened in training today?" /></label><button className="button full" disabled={!editText.trim()} onClick={saveEdit}>Save changes</button></div></div>}
     </main>
