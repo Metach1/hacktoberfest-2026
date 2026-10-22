@@ -88,6 +88,7 @@ export function EditProfileScreen() {
     setUploading(true);
     try {
       setProfilePicture(await uploadMyProfilePicture(file));
+      await refresh();
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Could not upload your profile picture.");
     } finally {

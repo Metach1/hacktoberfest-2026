@@ -158,13 +158,13 @@ function PaymentRowMenu({ donation, athleteName }: { donation: Donation; athlete
   );
 }
 
-function SupporterDashboard({ athletes }: { athletes: Athlete[] }) {
+function SupporterDashboard({ athletes, displayName }: { athletes: Athlete[]; displayName: string | null }) {
   const { getDonationsForSupporter, getAthlete } = useStarlete();
   const top = [...athletes].sort((a, b) => b.raised - a.raised);
   const myPayments = getDonationsForSupporter();
   return (
     <main className="dashboard page-shell">
-      <div className="dash-welcome"><div><span className="eyebrow">Supporter dashboard</span><h1>Magandang araw, Jamie.</h1><p>There are new stories waiting for your support.</p></div><div className="impact-chip"><Icon name="heart" /><span><small>Your total impact</small><b>₱4,500 given</b></span></div></div>
+      <div className="dash-welcome"><div><span className="eyebrow">Supporter dashboard</span><h1>Magandang araw, {displayName || "supporter"}.</h1><p>There are new stories waiting for your support.</p></div><div className="impact-chip"><Icon name="heart" /><span><small>Your total impact</small><b>₱4,500 given</b></span></div></div>
       <section><div className="section-head"><div><span className="eyebrow">Picked for you</span><h2>Athletes making moves</h2></div></div><div className="card-grid">{athletes.slice(0, 3).map(a => <AthleteCard key={a.id} athlete={a} />)}</div></section>
       <section className="dashboard-grid">
         <div className="dash-card">
@@ -810,7 +810,7 @@ function AthleteDashboard({ athlete, posts, onCreate, onEdit, onDelete }: { athl
 
 export function DashboardScreen() {
   const { role, athletes, posts, addPost, editPost, deletePost, mounted } = useStarlete();
-  const { user } = useSession();
+  const { user, displayName } = useSession();
   const router = useRouter();
   const [profileValues, setProfileValues] = useState<{
     name: string;
@@ -872,5 +872,5 @@ export function DashboardScreen() {
       </>
     );
   }
-  return <SupporterDashboard athletes={athletes} />;
+  return <SupporterDashboard athletes={athletes} displayName={displayName} />;
 }

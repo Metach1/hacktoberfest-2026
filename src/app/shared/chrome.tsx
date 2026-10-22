@@ -7,6 +7,7 @@ import { Icon, Logo } from "@/src/app/shared/ui";
 import { DonationModal } from "@/src/app/shared/donation";
 import { useSession } from "@/src/app/shared/session-provider";
 import { useStarlete } from "@/src/app/store";
+import { getInitials } from "@/src/app/lib/profile-display.mjs";
 
 /** Relative "time ago" label for a notification's epoch-ms timestamp. */
 function timeAgo(ts: number): string {
@@ -112,17 +113,15 @@ function NotificationsBell() {
 function Header() {
   const pathname = usePathname();
   const router = useRouter();
-  const { role, logout, athletes } = useStarlete();
-  const { signOut: endSession } = useSession();
+  const { role, logout } = useStarlete();
+  const { signOut: endSession, displayName, profilePicture } = useSession();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
-  const initials = role === "athlete"
-    ? athletes[0]?.name.split(" ").map(p => p[0]).slice(0, 2).join("").toUpperCase()
-    : "JD";
+  const initials = getInitials(displayName);
 
   const signOut = async () => {
     await endSession();
@@ -143,7 +142,17 @@ function Header() {
             <>
               <Link className={isActive("/dashboard") ? "active" : ""} href="/dashboard" onClick={close}>Dashboard</Link>
               <NotificationsBell />
-              <Link className="nav-user" href="/dashboard/edit" onClick={close}>{initials}</Link>
+              <Link
+                className="nav-user"
+                href="/dashboard/edit"
+                onClick={close}
+                aria-label={displayName ? `Edit profile for ${displayName}` : "Edit profile"}
+                title={displayName ?? "Edit profile"}
+              >
+                {profilePicture
+                  ? <img src={profilePicture} alt="" />
+                  : initials}
+              </Link>
               <button className="icon-only" onClick={signOut} aria-label="Log out"><Icon name="logout" /></button>
             </>
           ) : (
