@@ -56,7 +56,8 @@ async function main() {
   lines.push("");
 
   // --- seed posts + comments -------------------------------------------------
-  // Mirror the app's seed feed: a few athlete-authored posts with comments.
+  // Showcase posts attached to CATALOG athletes (catalog_athlete_id). These are
+  // owner-less showcase rows (owner_id null), read-only, removed at launch.
   const day = 86_400_000;
   const now = Date.now();
   const seedPosts = [
@@ -66,30 +67,30 @@ async function main() {
     { athlete: athletes[2]?.id ?? 3, text: "New shoes, new goals. Chasing a spot on the national team this season.", daysAgo: 5, comments: [["Nina A.", "Rooting for you!"]] },
   ];
 
-  lines.push("-- Seed posts (+ their comments). Uses a DO block to capture new post ids.");
+  lines.push("-- Seed showcase posts (+ comments). Owner-less, attached to catalog athletes.");
   lines.push("do $$");
   lines.push("declare pid uuid;");
   lines.push("begin");
   for (const p of seedPosts) {
     const created = new Date(now - p.daysAgo * day).toISOString();
     lines.push(
-      `  insert into public.posts (athlete_id, content, created_at, seeded) values (${p.athlete}, ${s(p.text)}, ${s(created)}, true) returning id into pid;`,
+      `  insert into public.posts (catalog_athlete_id, content, created_at, seeded) values (${p.athlete}, ${s(p.text)}, ${s(created)}, true) returning id into pid;`,
     );
     p.comments.forEach(([name, text], i) => {
       const cCreated = new Date(now - p.daysAgo * day + (i + 1) * 3_600_000).toISOString();
       lines.push(
-        `  insert into public.comments (post_id, author_name, content, created_at, seeded) values (pid, ${s(name)}, ${s(text)}, ${s(cCreated)}, true);`,
+        `  insert into public.comments (post_id, owner_id, author_name, content, created_at, seeded) values (pid, null, ${s(name)}, ${s(text)}, ${s(cCreated)}, true);`,
       );
     });
   }
   lines.push("end $$;");
   lines.push("");
 
-  // --- seed QR codes for the first athlete -----------------------------------
+  // --- seed QR codes for the first catalog athlete ---------------------------
   const first = athletes[0];
   if (first) {
-    lines.push("-- Seed QR codes for the demo athlete.");
-    lines.push("insert into public.qr_codes (athlete_id, method, label, image, seeded) values");
+    lines.push("-- Seed showcase QR codes for a catalog athlete (owner-less).");
+    lines.push("insert into public.qr_codes (catalog_athlete_id, method, label, image, seeded) values");
     lines.push(
       `  (${first.id}, 'GCash', 'J. Santos · 0917•••1234', '/athlete-placeholder.svg', true),`,
     );
@@ -104,10 +105,10 @@ async function main() {
 
   // Teardown script.
   const teardown = [
-    "-- Remove ALL seeded demo data. Safe to run before launch.",
-    "delete from public.donations where supporter_key is not null and athlete_id in (select id from public.athletes where seeded);",
-    "delete from public.qr_codes where seeded;",
-    "delete from public.reactions where seeded;",
+    "-- Remove ALL seeded showcase data. Safe to run before real launch.",
+    "-- Order respects FKs (donations/qr/comments/reactions reference posts/athletes).",
+    "delete from public.donations where catalog_athlete_id in (select id from public.athletes where seeded);",
+    "delete from public.qr_codes where seeded or catalog_athlete_id in (select id from public.athletes where seeded);",
     "delete from public.comments where seeded;",
     "delete from public.posts where seeded;",
     "delete from public.athletes where seeded;",
