@@ -1,17 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { notFound } from "next/navigation";
 import { Icon, Progress, peso } from "@/src/app/shared/ui";
 import { PostCard } from "@/src/app/shared/post-card";
 import { DonationsPanel } from "@/src/app/shared/donations-panel";
 import { useStarlete } from "@/src/app/store";
+import { REGION_MAP } from "@/src/app/lib/region-map";
 
 export function AthleteProfileScreen({ id }: { id: number }) {
   const { getAthlete, role, openDonation, posts, mounted } = useStarlete();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const athlete = getAthlete(id);
+
+  // "Back to athletes" returns to the region the user came from, when a valid
+  // `?from=<regionCode>` was threaded through the originating link. Otherwise it
+  // falls back to the full Discover map.
+  const fromParam = searchParams.get("from");
+  const backHref = fromParam && REGION_MAP.regions.some((r) => r.regionCode === fromParam)
+    ? `/discover?region=${encodeURIComponent(fromParam)}`
+    : "/discover";
 
   // Until the store hydrates, the athlete list may be the default seed; once
   // mounted, an unknown id is a genuine 404.
@@ -35,7 +45,7 @@ export function AthleteProfileScreen({ id }: { id: number }) {
 
   return (
     <main className="profile-page">
-      <Link className="back-button" href="/discover"><Icon name="back" /> Back to athletes</Link>
+      <Link className="back-button" href={backHref}><Icon name="back" /> Back to athletes</Link>
       <section className="profile-hero">
         <div className="profile-photo"><img src={athlete.image} alt={athlete.name} /><span>Photo from athlete profile</span></div>
         <div className="profile-summary">

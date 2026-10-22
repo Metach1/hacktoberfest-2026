@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { AthleteProfileScreen } from "@/src/app/screens/athlete-profile";
 import { athletes } from "@/src/app/data/athletes";
@@ -13,5 +14,11 @@ export default async function AthletePage({ params }: PageProps<"/athletes/[id]"
   if (!Number.isInteger(numericId) || numericId <= 0) {
     notFound();
   }
-  return <AthleteProfileScreen id={numericId} />;
+  // AthleteProfileScreen reads the `from` search param via useSearchParams,
+  // which must sit inside a Suspense boundary for prerendering.
+  return (
+    <Suspense>
+      <AthleteProfileScreen id={numericId} />
+    </Suspense>
+  );
 }

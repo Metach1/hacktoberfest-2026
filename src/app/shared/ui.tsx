@@ -50,11 +50,16 @@ export function Progress({ value }: { value: number }) {
   return <div className="progress"><span style={{ width: `${Math.min(value, 100)}%` }} /></div>;
 }
 
-/** Athlete summary card that links to the athlete's profile route. */
-export function AthleteCard({ athlete }: { athlete: Athlete }) {
+/**
+ * Athlete summary card that links to the athlete's profile route. When `from`
+ * is a region code, it is threaded into the link as `?from=<code>` so the
+ * profile's "Back to athletes" can return to that region on Discover.
+ */
+export function AthleteCard({ athlete, from }: { athlete: Athlete; from?: string | null }) {
   const percent = Math.round((athlete.raised / athlete.goal) * 100);
+  const href = from ? `/athletes/${athlete.id}?from=${encodeURIComponent(from)}` : `/athletes/${athlete.id}`;
   return (
-    <Link className="athlete-card" href={`/athletes/${athlete.id}`}>
+    <Link className="athlete-card" href={href}>
       <div className="card-image">
         <img src={athlete.image} alt={`${athlete.name}, ${athlete.sport} athlete`} />
         <span className="sport-pill">{athlete.sport}</span>

@@ -441,7 +441,9 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .explorer-panel { position: relative; z-index: 2; }
 .explorer-panel > .eyebrow { margin-bottom: 10px; }
 .explorer-panel h2 { font-size: 34px; line-height: 1.08; margin: 0 0 12px; color: var(--navy); }
-.explorer-sub { margin: 0 0 20px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.explorer-sub { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.view-all-button { margin: 0 0 18px; font-size: 13px; }
+.results-count { color: var(--muted); font-weight: 600; }
 .explorer-controls { display: flex; flex-direction: column; gap: 10px; }
 .explorer-controls .search-box { background: white; border: 1px solid var(--line); border-radius: 12px; padding: 0 14px; }
 .explorer-controls .search-box input { background: transparent; }

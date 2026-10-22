@@ -135,11 +135,16 @@ function PhilippinesMap({
   );
 }
 
-/** A single brief, text-only athlete row for the compact region/search list. */
-function AthleteRow({ athlete }: { athlete: Athlete }) {
+/**
+ * A single brief, text-only athlete row for the compact region/search list.
+ * `from` threads the active region code into the profile link so the profile's
+ * "Back to athletes" can restore that region.
+ */
+function AthleteRow({ athlete, from }: { athlete: Athlete; from?: string | null }) {
   const percent = Math.round((athlete.raised / athlete.goal) * 100);
+  const href = from ? `/athletes/${athlete.id}?from=${encodeURIComponent(from)}` : `/athletes/${athlete.id}`;
   return (
-    <Link className="region-row" href={`/athletes/${athlete.id}`}>
+    <Link className="region-row" href={href}>
       <div className="region-row-head">
         <strong>{athlete.name}</strong>
         {athlete.verified && <span className="verified" title="Verified athlete"><Icon name="check" size={11} /></span>}
@@ -162,6 +167,8 @@ export function DiscoverScreen() {
   // Whether the full catalog grid is expanded. Reset whenever the active
   // selection/search changes so "Expand" always reflects the current results.
   const [expanded, setExpanded] = useState(false);
+  // Independent "browse every athlete" modal, unaffected by region/search/sport.
+  const [viewAll, setViewAll] = useState(false);
 
   // The selected region is held in the URL so it is shareable and works with
   // the browser back button. A valid region code is one that exists on the map.
@@ -206,7 +213,7 @@ export function DiscoverScreen() {
   // elements the user is meant to interact with. The expanded catalog modal has
   // its own dismissal, so pause this while it is open.
   useEffect(() => {
-    if (!listActive || expanded) return;
+    if (!listActive || expanded || viewAll) return;
     const INTERACTIVE = "[data-region], .region-list, .search-box, select, input, button, a";
     const onPointerDown = (e: PointerEvent) => {
       const target = e.target as Element | null;
@@ -222,7 +229,17 @@ export function DiscoverScreen() {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [listActive, expanded, clearSelection]);
+  }, [listActive, expanded, viewAll, clearSelection]);
+
+  // Close either catalog modal on Escape.
+  useEffect(() => {
+    if (!expanded && !viewAll) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { setExpanded(false); setViewAll(false); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [expanded, viewAll]);
 
   const headingName = selectedRegionName ?? "the Philippines";
 
@@ -240,6 +257,10 @@ export function DiscoverScreen() {
           <span className="eyebrow">Explore by region</span>
           <h2>Athletes across<br />{headingName}</h2>
           <p className="explorer-sub">Select a region on the map, or search, to meet the athletes training there.</p>
+
+          <button type="button" className="text-button view-all-button" onClick={() => setViewAll(true)}>
+            <Icon name="users" size={16} /> View all athletes ({athletes.length})
+          </button>
 
           <div className="explorer-controls">
             <label className="search-box"><Icon name="search" /><input value={search} onChange={(e) => onSearchChange(e.target.value)} placeholder="Search athletes, sports, or cities" /></label>
@@ -267,7 +288,7 @@ export function DiscoverScreen() {
               </div>
               <div className="region-list-scroll">
                 {filtered.length ? (
-                  filtered.map((a) => <AthleteRow key={a.id} athlete={a} />)
+                  filtered.map((a) => <AthleteRow key={a.id} athlete={a} from={selectedRegion} />)
                 ) : (
                   <p className="region-empty">{selectedRegionName ? `No athletes in ${selectedRegionName} yet.` : "No athletes match your search."}</p>
                 )}
@@ -296,8 +317,27 @@ export function DiscoverScreen() {
               </div>
             </div>
             <div className="catalog-sheet-scroll">
-              <div className="card-grid">{filtered.map((a) => <AthleteCard key={a.id} athlete={a} />)}</div>
+              <div className="card-grid">{filtered.map((a) => <AthleteCard key={a.id} athlete={a} from={selectedRegion} />)}</div>
               {!filtered.length && <div className="empty"><h3>No athletes found</h3><p>Try broadening your search, choosing another region, or clearing a filter.</p></div>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Browse every registered athlete, unfiltered. Same sheet pattern as the
+          region catalog, but it never sets a region. */}
+      {viewAll && (
+        <div className="modal-backdrop catalog-backdrop" onClick={() => setViewAll(false)}>
+          <div className="catalog-sheet" role="dialog" aria-modal="true" aria-label="All athletes" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="modal-close" onClick={() => setViewAll(false)} aria-label="Close catalog"><Icon name="close" /></button>
+            <div className="results-head">
+              <div>
+                <span className="eyebrow">Athlete community</span>
+                <h2>All athletes <span className="results-count">({athletes.length})</span></h2>
+              </div>
+            </div>
+            <div className="catalog-sheet-scroll">
+              <div className="card-grid">{athletes.map((a) => <AthleteCard key={a.id} athlete={a} />)}</div>
             </div>
           </div>
         </div>
