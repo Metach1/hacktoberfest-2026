@@ -9,6 +9,17 @@ and this project aims to follow semantic versioning once it reaches a release.
 
 ### Added
 
+- Database-backed authentication via Supabase: real sign up / log in / log out
+  with hashed passwords, sessions, and a `profiles` table, replacing the demo
+  role-picker. Sessions refresh via `proxy.ts` (Next.js 16 Proxy) and are
+  exposed app-wide through a `SessionProvider`. Authorization is enforced by
+  Postgres Row Level Security; only the anon key is used (never the
+  service-role key).
+- Database schema (in `supabase/migrations/`) modeling profiles, posts,
+  comments, reactions, QR codes, and the full donation lifecycle, with RLS and
+  reversible migrations. Auth uses this schema today; the social and donation
+  features still run on the client store and are wired to the schema next. See
+  `docs/BACKEND.md` for the accurate current state.
 - Athletes can now edit and delete their own posts from the athlete dashboard.
   Editing opens a prefilled modal (matching the create-post flow) and marks the
   post as "edited"; deleting uses an inline confirm on the post card. Backed by
