@@ -562,9 +562,17 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .qr-manage-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .qr-manage-actions .danger { color: #c0392b; }
 .link-file { color: var(--blue); font-weight: 700; font-size: 12px; cursor: pointer; }
-.qr-add-form { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 16px; }
-.qr-add-form label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 700; margin-bottom: 12px; }
-.qr-add-preview { width: 72px; height: 72px; object-fit: contain; background: #fff; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 12px; }
+.qr-add-form, .qr-edit-form { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 16px; }
+.qr-edit-form { border: 1px solid var(--line); border-radius: 12px; border-top: 1px solid var(--line); padding: 14px; background: #fafbfc; }
+.qr-add-form label, .qr-edit-form label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 700; margin-bottom: 12px; }
+.qr-edit-form select { border: 1px solid var(--line); border-radius: 10px; min-height: 46px; padding: 0 12px; background: white; }
+/* QR image upload field: a styled dropzone / preview (shared with the donation
+   flow's .receipt-dropzone / .receipt-preview) rather than a raw file input. */
+.qr-upload-field { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.qr-upload-label { font-size: 12px; font-weight: 700; }
+.qr-upload-optional { font-weight: 400; color: var(--muted); }
+.qr-upload-field .receipt-dropzone { cursor: pointer; }
+.qr-upload-field .field-hint { text-align: left; margin: 0; }
 
 /* Athlete: pending donations */
 .count-pill { background: var(--gold); color: var(--navy); border-radius: 999px; min-width: 24px; height: 24px; padding: 0 8px; display: inline-grid; place-items: center; font-weight: 800; font-size: 12px; }

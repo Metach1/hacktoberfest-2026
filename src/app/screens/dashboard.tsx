@@ -250,11 +250,18 @@ function QrManager({ athleteId }: { athleteId: number }) {
   const [label, setLabel] = useState("");
   const [image, setImage] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
+  // Staged edits for the QR being edited; committed together on Save so the
+  // method, label, and image change in one atomic replaceQrCode call.
+  const [editMethod, setEditMethod] = useState("GCash");
   const [editLabel, setEditLabel] = useState("");
+  const [editImage, setEditImage] = useState("");
   // QR image validation feedback.
   const [qrChecking, setQrChecking] = useState(false);
   const [qrError, setQrError] = useState("");
   const [qrNotice, setQrNotice] = useState("");
+  // Hidden file inputs driving the styled dropzones (add + edit).
+  const addFileRef = useRef<HTMLInputElement | null>(null);
+  const editFileRef = useRef<HTMLInputElement | null>(null);
 
   const methods = ["GCash", "Maya", "GrabPay", "BPI", "BDO", "LandBank", "UnionBank", "Bank transfer"];
 
@@ -302,6 +309,32 @@ function QrManager({ athleteId }: { athleteId: number }) {
     setQrNotice("");
   };
 
+  const startEdit = (qr: QrCode) => {
+    setEditing(qr.id);
+    setEditMethod(qr.method);
+    setEditLabel(qr.label);
+    setEditImage("");
+    setQrError("");
+    setQrNotice("");
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
+    setEditImage("");
+    setQrError("");
+    setQrNotice("");
+  };
+
+  const saveEdit = (qrId: string) => {
+    if (!editLabel.trim()) return;
+    // One atomic update: method, label, and (if a new image was chosen) image.
+    // The QR id is preserved by replaceQrCode.
+    const patch: Partial<Omit<QrCode, "id">> = { method: editMethod, label: editLabel.trim() };
+    if (editImage) patch.image = editImage;
+    replaceQrCode(athleteId, qrId, patch);
+    cancelEdit();
+  };
+
   return (
     <div className="dash-card">
       <div className="section-head">
@@ -318,40 +351,61 @@ function QrManager({ athleteId }: { athleteId: number }) {
       )}
 
       <div className="qr-manage-list">
-        {codes.map((qr: QrCode) => (
-          <div className="qr-manage-row" key={qr.id}>
-            <img src={qr.image} alt={`${qr.method} QR`} width={56} height={56} />
-            <div className="qr-manage-meta">
-              <strong>{qr.method}</strong>
-              {editing === qr.id ? (
-                <input
-                  value={editLabel}
-                  onChange={(e) => setEditLabel(e.target.value)}
-                  placeholder="Account name / handle"
-                  autoFocus
-                />
-              ) : (
+        {codes.map((qr: QrCode) =>
+          editing === qr.id ? (
+            <div className="qr-edit-form" key={qr.id}>
+              <label>
+                Payment method
+                <select value={editMethod} onChange={(e) => setEditMethod(e.target.value)}>
+                  {methods.map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </label>
+              <label>
+                Account name / handle
+                <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} placeholder="e.g. J. Santos · 0917•••1234" autoFocus />
+              </label>
+              <div className="qr-upload-field">
+                <span className="qr-upload-label">QR image</span>
+                <input ref={editFileRef} type="file" accept="image/*" hidden onChange={(e) => validateAndSetImage(e.target.files?.[0], setEditImage)} />
+                {(editImage || qr.image) ? (
+                  <div className="receipt-preview">
+                    <img src={editImage || qr.image} alt={`${editMethod} QR preview`} />
+                    <div>
+                      <strong>{editImage ? "New image selected" : "Current image"}</strong>
+                      <button type="button" className="text-button" onClick={() => editFileRef.current?.click()}>Replace image</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" className="receipt-dropzone" onClick={() => editFileRef.current?.click()}>
+                    <Icon name="plus" size={22} />
+                    <strong>Upload QR image</strong>
+                    <small>GCash, Maya, or bank (QR Ph) · PNG, JPG, or WebP</small>
+                  </button>
+                )}
+                <small className="field-hint">We check that it&rsquo;s a supported GCash, Maya, or bank (QR Ph) code. This isn&rsquo;t payment verification.</small>
+              </div>
+              {qrChecking && <p className="field-hint">Checking the QR code…</p>}
+              {qrError && <p className="form-error">{qrError}</p>}
+              {qrNotice && <p className="field-hint">{qrNotice}</p>}
+              <div className="form-actions">
+                <button className="button secondary" onClick={cancelEdit}>Cancel</button>
+                <button className="button" disabled={!editLabel.trim() || qrChecking} onClick={() => saveEdit(qr.id)}>Save changes</button>
+              </div>
+            </div>
+          ) : (
+            <div className="qr-manage-row" key={qr.id}>
+              <img src={qr.image} alt={`${qr.method} QR`} width={56} height={56} />
+              <div className="qr-manage-meta">
+                <strong>{qr.method}</strong>
                 <small>{qr.label}</small>
-              )}
+              </div>
+              <div className="qr-manage-actions">
+                <button className="text-button" onClick={() => startEdit(qr)}>Edit</button>
+                <button className="text-button danger" onClick={() => removeQrCode(athleteId, qr.id)}>Remove</button>
+              </div>
             </div>
-            <div className="qr-manage-actions">
-              {editing === qr.id ? (
-                <>
-                  <label className="link-file">
-                    Replace image
-                    <input type="file" accept="image/*" hidden onChange={(e) => validateAndSetImage(e.target.files?.[0], (v) => replaceQrCode(athleteId, qr.id, { image: v }))} />
-                  </label>
-                  <button className="text-button" onClick={() => { if (editLabel.trim()) replaceQrCode(athleteId, qr.id, { label: editLabel.trim() }); setEditing(null); }}>Save</button>
-                </>
-              ) : (
-                <>
-                  <button className="text-button" onClick={() => { setEditing(qr.id); setEditLabel(qr.label); }}>Edit</button>
-                  <button className="text-button danger" onClick={() => removeQrCode(athleteId, qr.id)}>Remove</button>
-                </>
-              )}
-            </div>
-          </div>
-        ))}
+          ),
+        )}
       </div>
 
       {adding && (
@@ -366,15 +420,29 @@ function QrManager({ athleteId }: { athleteId: number }) {
             Account name / handle
             <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. J. Santos · 0917•••1234" />
           </label>
-          <label className="qr-upload-field">
-            QR image (optional — a placeholder is generated if omitted)
-            <input type="file" accept="image/*" onChange={(e) => validateAndSetImage(e.target.files?.[0], setImage)} />
+          <div className="qr-upload-field">
+            <span className="qr-upload-label">QR image <span className="qr-upload-optional">(optional — a placeholder is generated if omitted)</span></span>
+            <input ref={addFileRef} type="file" accept="image/*" hidden onChange={(e) => validateAndSetImage(e.target.files?.[0], setImage)} />
+            {image ? (
+              <div className="receipt-preview">
+                <img src={image} alt="QR preview" />
+                <div>
+                  <strong>Image selected</strong>
+                  <button type="button" className="text-button" onClick={() => addFileRef.current?.click()}>Replace image</button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" className="receipt-dropzone" onClick={() => addFileRef.current?.click()}>
+                <Icon name="plus" size={22} />
+                <strong>Upload QR image</strong>
+                <small>GCash, Maya, or bank (QR Ph) · PNG, JPG, or WebP</small>
+              </button>
+            )}
             <small className="field-hint">We check that it&rsquo;s a supported GCash, Maya, or bank (QR Ph) code. This isn&rsquo;t payment verification.</small>
-          </label>
+          </div>
           {qrChecking && <p className="field-hint">Checking the QR code…</p>}
           {qrError && <p className="form-error">{qrError}</p>}
           {qrNotice && <p className="field-hint">{qrNotice}</p>}
-          {image && <img className="qr-add-preview" src={image} alt="QR preview" width={72} height={72} />}
           <div className="form-actions">
             <button className="button secondary" onClick={() => { setAdding(false); setImage(""); setQrError(""); setQrNotice(""); }}>Cancel</button>
             <button className="button" disabled={!label.trim() || qrChecking} onClick={submitAdd}>Save QR</button>
