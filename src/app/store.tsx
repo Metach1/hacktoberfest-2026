@@ -40,6 +40,10 @@ import {
   markRead as markReadRecord,
   markAllRead as markAllReadRecord,
   normalizeNotification,
+  donationStatusNotification,
+  donationResubmissionNotification,
+  postLikeNotification,
+  postCommentNotification,
 } from "@/src/app/lib/notifications.mjs";
 
 export type Role = "supporter" | "athlete";
@@ -547,54 +551,40 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   }, [pushNotification]);
 
   const confirmDonation = useCallback((donationId: string) => {
-    setDonations((list) =>
-      list.map((d) => {
-        if (d.id !== donationId) return d;
-        const next = confirmDonationRecord(d, "athlete") as Donation;
-        // Only notify the supporter when the status actually changed.
-        if (next.status !== d.status) {
-          pushNotification({
-            type: "donation_confirmed",
-            data: { amount: next.amount, athleteName: getAthlete(next.athleteId)?.name },
-          });
-        }
-        return next;
-      }),
-    );
-  }, [pushNotification, getAthlete]);
+    const donation = donations.find((item) => item.id === donationId);
+    if (!donation) return;
+    const next = confirmDonationRecord(donation, "athlete") as Donation;
+    setDonations((list) => list.map((item) => (item.id === donationId ? next : item)));
+    const event = donationStatusNotification(donation, "confirmed", {
+      amount: donation.amount,
+      athleteName: getAthlete(donation.athleteId)?.name,
+    });
+    if (event) pushNotification(event);
+  }, [donations, pushNotification, getAthlete]);
 
   const rejectDonation = useCallback((donationId: string, reason: string, note?: string) => {
-    setDonations((list) =>
-      list.map((d) => {
-        if (d.id !== donationId) return d;
-        const next = rejectDonationRecord(d, reason, note ?? "") as Donation;
-        // Only notify the supporter when the status actually changed to rejected.
-        if (next.status !== d.status) {
-          pushNotification({
-            type: "donation_rejected",
-            data: {
-              amount: next.amount,
-              athleteName: getAthlete(next.athleteId)?.name,
-              reasonLabel: rejectionReasonLabel(next.rejectionReason ?? reason),
-            },
-          });
-        }
-        return next;
-      }),
-    );
-  }, [pushNotification, getAthlete]);
+    const donation = donations.find((item) => item.id === donationId);
+    if (!donation) return;
+    const next = rejectDonationRecord(donation, reason, note ?? "") as Donation;
+    setDonations((list) => list.map((item) => (item.id === donationId ? next : item)));
+    const event = donationStatusNotification(donation, "rejected", {
+      amount: donation.amount,
+      athleteName: getAthlete(donation.athleteId)?.name,
+      reasonLabel: rejectionReasonLabel(next.rejectionReason ?? reason),
+    });
+    if (event) pushNotification(event);
+  }, [donations, pushNotification, getAthlete]);
 
   const resubmitDonation = useCallback<StarleteState["resubmitDonation"]>(
     (donationId, patch) => {
-      setDonations((list) =>
-        list.map((d) =>
-          d.id === donationId
-            ? (resubmitDonationRecord(d, SUPPORTER_ID, patch) as Donation)
-            : d,
-        ),
-      );
+      const donation = donations.find((item) => item.id === donationId);
+      if (!donation) return;
+      const next = resubmitDonationRecord(donation, SUPPORTER_ID, patch) as Donation;
+      setDonations((list) => list.map((item) => (item.id === donationId ? next : item)));
+      const event = donationResubmissionNotification(donation, next);
+      if (event) pushNotification(event);
     },
-    [],
+    [donations, pushNotification],
   );
 
   const removeDonation = useCallback((donationId: string) => {
@@ -660,57 +650,53 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toggleLike = useCallback((postId: string, actorId: ActorId) => {
+    const post = posts.find((item) => item.id === postId);
+    if (!post) return;
+    const alreadyLiked = post.likedBy.includes(actorId);
     setPosts((prev) =>
-      prev.map((p) => {
-        if (p.id !== postId) return p;
-        const liked = p.likedBy.includes(actorId);
-        const likedBy = liked
-          ? p.likedBy.filter((id) => id !== actorId)
-          : [...p.likedBy, actorId];
-        // Notify the athlete only when a like is ADDED (not removed) and the
-        // liker isn't the post's own author (no self-notification).
-        if (!liked && actorId !== p.authorAthleteId) {
-          pushNotification({
-            type: "post_like",
-            data: { actorName: likerName(actorId), text: p.text },
-          });
-        }
-        return { ...p, likedBy, likes: p.likes + (liked ? -1 : 1) };
-      }),
+      prev.map((item) =>
+        item.id === postId
+          ? {
+              ...item,
+              likedBy: alreadyLiked
+                ? item.likedBy.filter((id) => id !== actorId)
+                : [...item.likedBy, actorId],
+              likes: item.likes + (alreadyLiked ? -1 : 1),
+            }
+          : item,
+      ),
     );
-  }, [pushNotification, likerName]);
+    const event = postLikeNotification(post, actorId, likerName(actorId));
+    if (event) pushNotification(event);
+  }, [posts, pushNotification, likerName]);
 
   const addComment = useCallback(
     (postId: string, authorId: ActorId, authorName: string, text: string) => {
       const trimmed = text.trim();
       if (!trimmed) return;
+      const post = posts.find((item) => item.id === postId);
+      if (!post) return;
+      const comment = {
+        id: newId("cmt"),
+        authorId,
+        authorName,
+        text: trimmed,
+        createdAt: new Date().toISOString(),
+      };
       setPosts((prev) =>
-        prev.map((p) => {
-          if (p.id !== postId) return p;
-          // Notify the athlete unless they commented on their own post.
-          if (authorId !== p.authorAthleteId) {
-            pushNotification({
-              type: "post_comment",
-              data: { actorName: authorName || likerName(authorId), text: trimmed },
-            });
-          }
-          return {
-            ...p,
-            comments: [
-              ...p.comments,
-              {
-                id: newId("cmt"),
-                authorId,
-                authorName,
-                text: trimmed,
-                createdAt: new Date().toISOString(),
-              },
-            ],
-          };
-        }),
+        prev.map((item) =>
+          item.id === postId ? { ...item, comments: [...item.comments, comment] } : item,
+        ),
       );
+      const event = postCommentNotification(
+        post,
+        authorId,
+        authorName || likerName(authorId),
+        trimmed,
+      );
+      if (event) pushNotification(event);
     },
-    [pushNotification, likerName],
+    [posts, pushNotification, likerName],
   );
 
   // --- Notifications -------------------------------------------------------

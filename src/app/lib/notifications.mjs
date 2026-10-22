@@ -112,6 +112,52 @@ export function buildNotification(event) {
   }
 }
 
+/**
+ * Build a donation decision event only for a pending donation that can
+ * transition to the requested terminal status.
+ *
+ * @param {Record<string, unknown>} data
+ * @returns {{type: "donation_confirmed", data: Record<string, unknown>}|{type: "donation_rejected", data: Record<string, unknown>}|null}
+ */
+export function donationStatusNotification(donation, status, data) {
+  if (!donation || donation.status !== "pending") return null;
+  if (status === "confirmed") return { type: "donation_confirmed", data };
+  if (status === "rejected") return { type: "donation_rejected", data };
+  return null;
+}
+
+/**
+ * Build the athlete-facing pending event only when a rejected donation was
+ * successfully resubmitted.
+ *
+ * @returns {{type: "donation_pending", data: {amount: number, supporterName: string}}|null}
+ */
+export function donationResubmissionNotification(previous, next) {
+  if (previous?.status !== "rejected" || next === previous || next?.status !== "pending") return null;
+  return {
+    type: "donation_pending",
+    data: { amount: next.amount, supporterName: next.supporterName },
+  };
+}
+
+/**
+ * Build a like event only when an external actor adds a like.
+ * @returns {{type: "post_like", data: {actorName: string, text: string}}|null}
+ */
+export function postLikeNotification(post, actorId, actorName) {
+  if (!post || post.likedBy.includes(actorId) || actorId === post.authorAthleteId) return null;
+  return { type: "post_like", data: { actorName, text: post.text } };
+}
+
+/**
+ * Build a comment event only when someone other than the post author comments.
+ * @returns {{type: "post_comment", data: {actorName: string, text: string}}|null}
+ */
+export function postCommentNotification(post, authorId, actorName, text) {
+  if (!post || authorId === post.authorAthleteId) return null;
+  return { type: "post_comment", data: { actorName, text } };
+}
+
 /** Audience that maps to a given role (null role -> no audience). */
 export function audienceForRole(role) {
   if (role === "athlete") return "athlete";

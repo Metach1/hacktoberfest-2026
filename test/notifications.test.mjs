@@ -8,7 +8,16 @@ import {
   markRead,
   markAllRead,
   audienceForRole,
+  donationStatusNotification,
+  donationResubmissionNotification,
+  postLikeNotification,
+  postCommentNotification,
 } from "../src/app/lib/notifications.mjs";
+import {
+  createPendingDonation,
+  rejectDonation,
+  resubmitDonation,
+} from "../src/app/lib/donations.mjs";
 
 /**
  * Pure notification logic. The store stamps id/createdAt/read and emits from
@@ -78,36 +87,100 @@ test("markRead marks a single notification; markAllRead scopes to the role", () 
   assert.equal(unreadCountForRole(afterAll, "supporter"), 1, "supporter unaffected");
 });
 
-// --- Store-level emission rules (mirrored reducers) --------------------------
+// --- Pure action-to-event rules used by the store ----------------------------
 
-/** Mirrors toggleLike's emit rule: only when a like is ADDED and liker != author. */
-function likeEmits({ alreadyLiked, actorId, authorAthleteId }) {
-  return !alreadyLiked && actorId !== authorAthleteId;
-}
+test("donation decisions produce one event only for a pending donation", () => {
+  const pending = { id: "d1", status: "pending" };
+  const confirmedEvent = donationStatusNotification(pending, "confirmed", { amount: 500 });
+  assert.deepEqual(confirmedEvent, { type: "donation_confirmed", data: { amount: 500 } });
+  assert.equal(
+    donationStatusNotification({ ...pending, status: "confirmed" }, "confirmed", {}),
+    null,
+    "idempotent confirm emits nothing",
+  );
 
-test("liking emits only when adding a like and not the post's author", () => {
-  assert.equal(likeEmits({ alreadyLiked: false, actorId: "supporter", authorAthleteId: 1 }), true);
-  assert.equal(likeEmits({ alreadyLiked: true, actorId: "supporter", authorAthleteId: 1 }), false, "removing a like emits nothing");
-  assert.equal(likeEmits({ alreadyLiked: false, actorId: 1, authorAthleteId: 1 }), false, "author liking own post emits nothing");
+  const rejectedEvent = donationStatusNotification(pending, "rejected", { amount: 500, reasonLabel: "Wrong image" });
+  assert.deepEqual(rejectedEvent, {
+    type: "donation_rejected",
+    data: { amount: 500, reasonLabel: "Wrong image" },
+  });
+  assert.equal(
+    donationStatusNotification({ ...pending, status: "rejected" }, "rejected", {}),
+    null,
+    "idempotent reject emits nothing",
+  );
+  assert.equal(donationStatusNotification({ ...pending, status: "confirmed" }, "rejected", {}), null);
 });
 
-/** Mirrors addComment's emit rule: only when commenter != post author. */
-function commentEmits({ authorId, postAuthorAthleteId }) {
-  return authorId !== postAuthorAthleteId;
-}
+test("successful donation resubmission emits one pending event using edited values", () => {
+  const rejected = rejectDonation(
+    createPendingDonation({
+      athleteId: 1,
+      amount: 500,
+      supporterId: "supporter",
+      supporterName: "Original supporter",
+      createdAt: 100,
+    }),
+    "wrong_image",
+    "",
+    200,
+  );
+  const next = resubmitDonation(
+    rejected,
+    "supporter",
+    { amount: 750, supporterName: "Updated supporter" },
+    300,
+  );
+  const events = [donationResubmissionNotification(rejected, next)].filter(Boolean);
 
-test("commenting emits only when the commenter is not the post's author", () => {
-  assert.equal(commentEmits({ authorId: "supporter", postAuthorAthleteId: 1 }), true);
-  assert.equal(commentEmits({ authorId: 1, postAuthorAthleteId: 1 }), false, "author commenting on own post emits nothing");
+  assert.equal(events.length, 1);
+  assert.deepEqual(events[0], {
+    type: "donation_pending",
+    data: { amount: 750, supporterName: "Updated supporter" },
+  });
+  const notification = buildNotification(events[0]);
+  assert.equal(notification.audience, "athlete");
+  assert.match(notification.body, /₱750/);
+  assert.match(notification.body, /from Updated supporter/);
+  assert.equal(next.createdAt, 300, "resubmission refreshes the record timestamp");
 });
 
-/** Mirrors the "status actually changed" guard for confirm/reject emits. */
-function statusChangeEmits(before, after) {
-  return before !== after;
-}
+test("failed donation resubmissions emit no pending notification", () => {
+  const rejected = rejectDonation(
+    createPendingDonation({ athleteId: 1, amount: 500, supporterId: "supporter" }),
+    "wrong_image",
+  );
+  const wrongOwner = resubmitDonation(rejected, "another-supporter", { amount: 750 }, 300);
+  assert.equal(donationResubmissionNotification(rejected, wrongOwner), null);
 
-test("donation confirm/reject emits only when the status actually changed", () => {
-  assert.equal(statusChangeEmits("pending", "confirmed"), true);
-  assert.equal(statusChangeEmits("confirmed", "confirmed"), false, "idempotent confirm emits nothing");
-  assert.equal(statusChangeEmits("rejected", "rejected"), false);
+  const pending = createPendingDonation({ athleteId: 1, amount: 500, supporterId: "supporter" });
+  const noOp = resubmitDonation(pending, "supporter", { amount: 750 }, 300);
+  assert.equal(donationResubmissionNotification(pending, noOp), null);
+});
+
+test("liking produces one event only when adding another actor's like", () => {
+  const post = { authorAthleteId: 1, likedBy: [], text: "Training update" };
+  assert.deepEqual(postLikeNotification(post, "supporter", "A supporter"), {
+    type: "post_like",
+    data: { actorName: "A supporter", text: "Training update" },
+  });
+  assert.equal(
+    postLikeNotification({ ...post, likedBy: ["supporter"] }, "supporter", "A supporter"),
+    null,
+    "removing a like emits nothing",
+  );
+  assert.equal(postLikeNotification(post, 1, "Ana"), null, "author liking own post emits nothing");
+});
+
+test("commenting produces one event only when the commenter is not the author", () => {
+  const post = { authorAthleteId: 1 };
+  assert.deepEqual(postCommentNotification(post, "supporter", "A supporter", "Great work!"), {
+    type: "post_comment",
+    data: { actorName: "A supporter", text: "Great work!" },
+  });
+  assert.equal(
+    postCommentNotification(post, 1, "Ana", "My own post"),
+    null,
+    "author commenting on own post emits nothing",
+  );
 });
