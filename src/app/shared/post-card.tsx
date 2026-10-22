@@ -4,61 +4,156 @@ import { useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/src/app/shared/ui";
 import { TimeAgo } from "@/src/app/shared/time-ago";
-import { useStarlete, actorIdForRole } from "@/src/app/store";
-import { postAuthor, type Post } from "@/src/app/data/posts";
+import { useSession } from "@/src/app/shared/session-provider";
+import {
+  addComment as addCommentSvc,
+  toggleLike as toggleLikeSvc,
+  editPost as editPostSvc,
+  deletePost as deletePostSvc,
+  type FeedPost,
+} from "@/src/app/services/feed";
 
 /**
- * A single feed post with author header, like toggle, and a comment thread.
- * Reads interaction state/actions from the store so it works identically on the
- * global feed and on athlete profiles.
+ * A single feed post backed by Supabase data. Handles liking (optimistic),
+ * commenting, and owner-only edit/delete. Author link points to the catalog
+ * athlete profile when the post is a showcase post.
  *
- * `showAuthor` can be turned off on an athlete's own profile where every post
- * shares the same author shown in the page header.
+ * `onChanged` asks the parent to refresh the feed after a mutation that changes
+ * structure (new comment, edit, delete). Likes update optimistically in place.
  */
-export function PostCard({ post, showAuthor = true }: { post: Post; showAuthor?: boolean }) {
-  const { role, athletes, toggleLike, addComment } = useStarlete();
-  const actorId = actorIdForRole(role, athletes);
-  const author = postAuthor(post.authorAthleteId);
+export function PostCard({
+  post,
+  showAuthor = true,
+  onChanged,
+}: {
+  post: FeedPost;
+  showAuthor?: boolean;
+  onChanged?: () => void;
+}) {
+  const { user, displayName } = useSession();
+
+  const [liked, setLiked] = useState(post.likedByMe);
+  const [likeCount, setLikeCount] = useState(post.likeCount);
+  const [busyLike, setBusyLike] = useState(false);
 
   const [showComments, setShowComments] = useState(false);
   const [comment, setComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const liked = post.likedBy.includes(actorId);
-  const actorName = role === "athlete" ? athletes[0]?.name ?? "Athlete" : "Jamie";
+  const [editing, setEditing] = useState(false);
+  const [editText, setEditText] = useState(post.content);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  const submitComment = () => {
+  const profileHref = post.catalogAthleteId != null ? `/athletes/${post.catalogAthleteId}` : null;
+
+  const onToggleLike = async () => {
+    if (!user) { setActionError("Log in to like posts."); return; }
+    if (busyLike) return;
+    setBusyLike(true);
+    // Optimistic.
+    const next = !liked;
+    setLiked(next);
+    setLikeCount((c) => c + (next ? 1 : -1));
+    try {
+      await toggleLikeSvc(post.id, liked);
+    } catch (e) {
+      // Roll back on failure.
+      setLiked(liked);
+      setLikeCount((c) => c + (next ? -1 : 1));
+      setActionError(e instanceof Error ? e.message : "Couldn't update like.");
+    } finally {
+      setBusyLike(false);
+    }
+  };
+
+  const submitComment = async () => {
     const text = comment.trim();
+    if (!text || !user) { if (!user) setActionError("Log in to comment."); return; }
+    setSubmitting(true);
+    setActionError(null);
+    try {
+      await addCommentSvc(post.id, displayName ?? "Supporter", text);
+      setComment("");
+      setShowComments(true);
+      onChanged?.();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Couldn't add comment.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const saveEdit = async () => {
+    const text = editText.trim();
     if (!text) return;
-    addComment(post.id, actorId, actorName, text);
-    setComment("");
-    setShowComments(true);
+    setActionError(null);
+    try {
+      await editPostSvc(post.id, text);
+      setEditing(false);
+      onChanged?.();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Couldn't save changes.");
+    }
+  };
+
+  const doDelete = async () => {
+    setActionError(null);
+    try {
+      await deletePostSvc(post.id);
+      setConfirmDelete(false);
+      onChanged?.();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Couldn't delete post.");
+    }
   };
 
   return (
     <article className="feed-post">
       {showAuthor && (
         <header className="feed-post-head">
-          <Link className="feed-author" href={`/athletes/${post.authorAthleteId}`}>
-            {author.image ? <img src={author.image} alt="" /> : <span className="feed-avatar-fallback" aria-hidden="true">{author.name.charAt(0)}</span>}
-            <span className="feed-author-meta">
-              <strong>{author.name}{author.verified && <span className="verified inline-verified"><Icon name="check" size={11} /></span>}</strong>
-              <small>{author.sport} · <TimeAgo iso={post.createdAt} /></small>
+          {profileHref ? (
+            <Link className="feed-author" href={profileHref}>
+              {post.authorImage ? <img src={post.authorImage} alt="" /> : <span className="feed-avatar-fallback" aria-hidden="true">{post.authorName.charAt(0)}</span>}
+              <span className="feed-author-meta">
+                <strong>{post.authorName}{post.authorVerified && <span className="verified inline-verified"><Icon name="check" size={11} /></span>}</strong>
+                <small>{post.authorSport} · <TimeAgo iso={post.createdAt} />{post.editedAt ? " · edited" : ""}</small>
+              </span>
+            </Link>
+          ) : (
+            <span className="feed-author">
+              {post.authorImage ? <img src={post.authorImage} alt="" /> : <span className="feed-avatar-fallback" aria-hidden="true">{post.authorName.charAt(0)}</span>}
+              <span className="feed-author-meta">
+                <strong>{post.authorName}{post.authorVerified && <span className="verified inline-verified"><Icon name="check" size={11} /></span>}</strong>
+                <small>{post.authorSport} · <TimeAgo iso={post.createdAt} />{post.editedAt ? " · edited" : ""}</small>
+              </span>
             </span>
-          </Link>
+          )}
         </header>
       )}
-      {!showAuthor && <small className="feed-post-time"><TimeAgo iso={post.createdAt} /></small>}
+      {!showAuthor && <small className="feed-post-time"><TimeAgo iso={post.createdAt} />{post.editedAt ? " · edited" : ""}</small>}
 
-      <p className="feed-post-text">{post.text}</p>
+      {editing ? (
+        <div className="feed-edit">
+          <textarea value={editText} onChange={(e) => setEditText(e.target.value)} aria-label="Edit post" />
+          <div className="post-actions">
+            <button type="button" className="text-button" disabled={!editText.trim()} onClick={saveEdit}>Save</button>
+            <button type="button" className="text-button" onClick={() => { setEditing(false); setEditText(post.content); }}>Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <p className="feed-post-text">{post.content}</p>
+      )}
 
       <div className="feed-actions">
         <button
           type="button"
           className={liked ? "feed-action liked" : "feed-action"}
           aria-pressed={liked}
-          onClick={() => toggleLike(post.id, actorId)}
+          disabled={busyLike}
+          onClick={onToggleLike}
         >
-          <Icon name="heart" size={18} /> {post.likes} {post.likes === 1 ? "like" : "likes"}
+          <Icon name="heart" size={18} /> {likeCount} {likeCount === 1 ? "like" : "likes"}
         </button>
         <button
           type="button"
@@ -70,6 +165,25 @@ export function PostCard({ post, showAuthor = true }: { post: Post; showAuthor?:
         </button>
       </div>
 
+      {post.canManage && !editing && (
+        <div className="post-actions">
+          {confirmDelete ? (
+            <>
+              <span className="confirm-text">Delete this post?</span>
+              <button type="button" className="text-button danger" onClick={doDelete}>Delete</button>
+              <button type="button" className="text-button" onClick={() => setConfirmDelete(false)}>Cancel</button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="text-button" onClick={() => { setEditing(true); setEditText(post.content); }}>Edit</button>
+              <button type="button" className="text-button danger" onClick={() => setConfirmDelete(true)}>Delete</button>
+            </>
+          )}
+        </div>
+      )}
+
+      {actionError && <p className="field-error" role="alert">{actionError}</p>}
+
       {showComments && (
         <div className="feed-comments">
           {post.comments.map((c) => (
@@ -77,22 +191,14 @@ export function PostCard({ post, showAuthor = true }: { post: Post; showAuthor?:
               <span className="feed-comment-avatar" aria-hidden="true">{c.authorName.charAt(0)}</span>
               <div>
                 <strong>{c.authorName}</strong> <small><TimeAgo iso={c.createdAt} /></small>
-                <p>{c.text}</p>
+                <p>{c.content}</p>
               </div>
             </div>
           ))}
-          {role ? (
-            <form
-              className="feed-comment-form"
-              onSubmit={(e) => { e.preventDefault(); submitComment(); }}
-            >
-              <input
-                value={comment}
-                onChange={(e) => setComment(e.target.value)}
-                placeholder="Add a comment…"
-                aria-label="Add a comment"
-              />
-              <button type="submit" className="icon-only" aria-label="Post comment" disabled={!comment.trim()}>
+          {user ? (
+            <form className="feed-comment-form" onSubmit={(e) => { e.preventDefault(); submitComment(); }}>
+              <input value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Add a comment…" aria-label="Add a comment" />
+              <button type="submit" className="icon-only" aria-label="Post comment" disabled={!comment.trim() || submitting}>
                 <Icon name="send" size={18} />
               </button>
             </form>
