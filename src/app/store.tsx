@@ -17,6 +17,9 @@ import {
   applyAutoConfirm,
   confirmDonation as confirmDonationRecord,
   rejectDonation as rejectDonationRecord,
+  resubmitDonation as resubmitDonationRecord,
+  canResubmitDonation,
+  canDeleteDonation,
   confirmedTotals,
   createPendingDonation,
   DONATION_STATUS,
@@ -39,7 +42,9 @@ export interface QrCode {
   method: string;
   /** Account display name / handle shown under the QR (fictional). */
   label: string;
-  /** Image data URL or path for the QR graphic (fictional placeholder). */
+  /** Mandatory account number / handle supporters pay to (fictional). */
+  accountNumber: string;
+  /** Image data URL or path for the QR graphic; "" when none was uploaded. */
   image: string;
 }
 
@@ -77,41 +82,15 @@ export interface Donation {
  */
 const DATA_VERSION = "v5";
 
-/**
- * A tiny, dependency-free inline-SVG "QR" placeholder as a data URL. It is NOT
- * a scannable code — the demo never processes payments — but it gives each
- * method a distinct, deterministic graphic without any remote asset.
- */
-function placeholderQr(seed: string): string {
-  let h = 0;
-  for (let i = 0; i < seed.length; i += 1) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  const cells: string[] = [];
-  const grid = 7;
-  for (let y = 0; y < grid; y += 1) {
-    for (let x = 0; x < grid; x += 1) {
-      // Deterministic pseudo-random fill from the seed hash.
-      const bit = (h >>> ((y * grid + x) % 31)) & 1;
-      const corner =
-        (x < 2 && y < 2) || (x > grid - 3 && y < 2) || (x < 2 && y > grid - 3);
-      if (bit || corner) {
-        cells.push(`<rect x="${x * 8 + 6}" y="${y * 8 + 6}" width="8" height="8"/>`);
-      }
-    }
-  }
-  const svg =
-    `<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" viewBox="0 0 80 80">` +
-    `<rect width="80" height="80" rx="10" fill="#fff"/>` +
-    `<g fill="#0b1f33">${cells.join("")}</g></svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-}
-
 /** Build a fictional QR entry for a method. */
-function makeQr(athleteId: number, method: string, label: string): QrCode {
+function makeQr(athleteId: number, method: string, label: string, accountNumber: string): QrCode {
   return {
     id: `qr-${athleteId}-${method.toLowerCase().replace(/\s+/g, "-")}`,
     method,
     label,
-    image: placeholderQr(`${athleteId}-${method}`),
+    accountNumber,
+    // No placeholder graphic — a QR without an uploaded image has no image.
+    image: "",
   };
 }
 
@@ -125,8 +104,8 @@ function seedQrCodes(athletes: Athlete[]): Record<number, QrCode[]> {
   const first = athletes[0];
   if (first) {
     map[first.id] = [
-      makeQr(first.id, "GCash", "J. Santos · 0917•••1234"),
-      makeQr(first.id, "Maya", "J. Santos · 0917•••1234"),
+      makeQr(first.id, "GCash", "J. Santos", "0917 123 4567"),
+      makeQr(first.id, "Maya", "J. Santos", "0918 765 4321"),
     ];
   }
   return map;
@@ -150,6 +129,12 @@ interface StarleteState {
   posts: Post[];
   /** The athlete currently targeted by the donation modal, if open. */
   donationTarget: Athlete | null;
+  /**
+   * When the donation modal was opened to retry a rejected donation, the
+   * original record whose details prefill the flow and which is resubmitted
+   * in place. `null` for a brand-new donation.
+   */
+  donationPrefill: Donation | null;
   /** Published payment QR codes keyed by athlete id. */
   qrCodes: Record<number, QrCode[]>;
   /** All QR-based donations across the demo (pending + confirmed). */
@@ -159,10 +144,16 @@ interface StarleteState {
   logout: () => void;
   getAthlete: (id: number) => Athlete | undefined;
   openDonation: (athlete: Athlete) => void;
+  /**
+   * Open the donation flow to edit and retry a REJECTED donation the current
+   * supporter owns. Returns false (and does nothing) if the donation can't be
+   * retried — e.g. it isn't rejected or isn't owned by this supporter.
+   */
+  openResubmission: (donationId: string) => boolean;
   closeDonation: () => void;
   // QR management (athlete side).
   getQrCodes: (athleteId: number) => QrCode[];
-  addQrCode: (athleteId: number, method: string, label: string, image?: string) => void;
+  addQrCode: (athleteId: number, method: string, label: string, accountNumber: string, image?: string) => void;
   replaceQrCode: (athleteId: number, qrId: string, patch: Partial<Omit<QrCode, "id">>) => void;
   removeQrCode: (athleteId: number, qrId: string) => void;
 
@@ -180,6 +171,31 @@ interface StarleteState {
   confirmDonation: (donationId: string) => void;
   /** Reject a pending donation with a required reason and optional note. */
   rejectDonation: (donationId: string, reason: string, note?: string) => void;
+  /**
+   * Edit and resubmit the current supporter's REJECTED donation in place,
+   * preserving its id/athlete/supporter, returning it to pending, clearing
+   * stale rejection/confirmation metadata, and restarting the auto-confirm
+   * window. No-op unless the donation is rejected and owned by this supporter.
+   */
+  resubmitDonation: (
+    donationId: string,
+    patch: {
+      amount: number;
+      method: string;
+      reference: string;
+      supporterName?: string;
+      receiptName?: string;
+      receiptPreview?: string;
+      note?: string;
+    },
+  ) => void;
+  /**
+   * Permanently remove the current supporter's PENDING or REJECTED donation
+   * from their history. No-op unless the donation is owned by this supporter
+   * and deletable (a CONFIRMED donation is never removed, so confirmed totals
+   * are never disturbed).
+   */
+  removeDonation: (donationId: string) => void;
   getDonationsForAthlete: (athleteId: number) => Donation[];
   /** The current demo supporter's stable identity. */
   supporterId: ActorId;
@@ -238,6 +254,8 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [posts, setPosts] = useState<Post[]>(seedPosts);
   const [donationTarget, setDonationTarget] = useState<Athlete | null>(null);
+  // When set, the donation modal is retrying this rejected record in place.
+  const [donationPrefill, setDonationPrefill] = useState<Donation | null>(null);
   const [qrCodes, setQrCodes] = useState<Record<number, QrCode[]>>(() => seedQrCodes(seedAthletes));
   const [donations, setDonations] = useState<Donation[]>([]);
 
@@ -254,7 +272,22 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       setRole(savedRole ?? null);
       if (savedVersion === DATA_VERSION || savedVersion === "v4" || savedVersion === "v3") {
         if (savedAthletes) setAthletes(JSON.parse(savedAthletes) as Athlete[]);
-        if (savedQr) setQrCodes(JSON.parse(savedQr) as Record<number, QrCode[]>);
+        if (savedQr) {
+          // Normalize older QR records to the current shape: default a missing
+          // accountNumber to "" and a missing image to "" (no placeholder).
+          const loadedQr = JSON.parse(savedQr) as Record<number, Partial<QrCode>[]>;
+          const normalizedQr: Record<number, QrCode[]> = {};
+          for (const [athleteId, list] of Object.entries(loadedQr)) {
+            normalizedQr[Number(athleteId)] = (list ?? []).map((q) => ({
+              id: String(q.id ?? `qr-${athleteId}-${Date.now()}`),
+              method: q.method ?? "",
+              label: q.label ?? "",
+              accountNumber: q.accountNumber ?? "",
+              image: q.image ?? "",
+            }));
+          }
+          setQrCodes(normalizedQr);
+        }
         if (savedPosts) {
           const loadedPosts: unknown = JSON.parse(savedPosts);
           if (Array.isArray(loadedPosts) && loadedPosts.every((post) => typeof post === "string")) {
@@ -347,8 +380,28 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
     [reconciledAthletes],
   );
 
-  const openDonation = useCallback((athlete: Athlete) => setDonationTarget(athlete), []);
-  const closeDonation = useCallback(() => setDonationTarget(null), []);
+  const openDonation = useCallback((athlete: Athlete) => {
+    setDonationPrefill(null);
+    setDonationTarget(athlete);
+  }, []);
+  const closeDonation = useCallback(() => {
+    setDonationTarget(null);
+    setDonationPrefill(null);
+  }, []);
+
+  const openResubmission = useCallback(
+    (donationId: string): boolean => {
+      const donation = donations.find((d) => d.id === donationId);
+      // Owner-only, rejected-only. A confirmed/pending donation is never retried.
+      if (!donation || !canResubmitDonation(donation, SUPPORTER_ID)) return false;
+      const athlete = reconciledAthletes.find((a) => a.id === donation.athleteId);
+      if (!athlete) return false;
+      setDonationPrefill(donation);
+      setDonationTarget(athlete);
+      return true;
+    },
+    [donations, reconciledAthletes],
+  );
 
   // --- QR management -------------------------------------------------------
   const getQrCodes = useCallback(
@@ -357,14 +410,16 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   );
 
   const addQrCode = useCallback(
-    (athleteId: number, method: string, label: string, image?: string) => {
+    (athleteId: number, method: string, label: string, accountNumber: string, image?: string) => {
       setQrCodes((map) => {
         const existing = map[athleteId] ?? [];
         const qr: QrCode = {
           id: `qr-${athleteId}-${Date.now()}`,
           method,
           label,
-          image: image || placeholderQr(`${athleteId}-${method}-${Date.now()}`),
+          accountNumber,
+          // No placeholder graphic — when no image is uploaded, store "".
+          image: image ?? "",
         };
         return { ...map, [athleteId]: [...existing, qr] };
       });
@@ -416,6 +471,28 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       list.map((d) =>
         d.id === donationId ? (rejectDonationRecord(d, reason, note ?? "") as Donation) : d,
       ),
+    );
+  }, []);
+
+  const resubmitDonation = useCallback<StarleteState["resubmitDonation"]>(
+    (donationId, patch) => {
+      setDonations((list) =>
+        list.map((d) =>
+          d.id === donationId
+            ? (resubmitDonationRecord(d, SUPPORTER_ID, patch) as Donation)
+            : d,
+        ),
+      );
+    },
+    [],
+  );
+
+  const removeDonation = useCallback((donationId: string) => {
+    // Owner- and status-guarded: only the current supporter's pending/rejected
+    // donations are removable. A confirmed donation is left intact so derived
+    // totals never change behind the athlete's back.
+    setDonations((list) =>
+      list.filter((d) => !(d.id === donationId && canDeleteDonation(d, SUPPORTER_ID))),
     );
   }, []);
 
@@ -513,12 +590,14 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       athletes: reconciledAthletes,
       posts,
       donationTarget,
+      donationPrefill,
       qrCodes,
       donations,
       login,
       logout,
       getAthlete,
       openDonation,
+      openResubmission,
       closeDonation,
       getQrCodes,
       addQrCode,
@@ -527,6 +606,8 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       submitDonation,
       confirmDonation,
       rejectDonation,
+      resubmitDonation,
+      removeDonation,
       getDonationsForAthlete,
       supporterId,
       getDonationsForSupporter,
@@ -537,10 +618,10 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       addComment,
     }),
     [
-      mounted, role, reconciledAthletes, posts, donationTarget, qrCodes, donations,
-      login, logout, getAthlete, openDonation, closeDonation,
+      mounted, role, reconciledAthletes, posts, donationTarget, donationPrefill, qrCodes, donations,
+      login, logout, getAthlete, openDonation, openResubmission, closeDonation,
       getQrCodes, addQrCode, replaceQrCode, removeQrCode,
-      submitDonation, confirmDonation, rejectDonation, getDonationsForAthlete,
+      submitDonation, confirmDonation, rejectDonation, resubmitDonation, removeDonation, getDonationsForAthlete,
       supporterId, getDonationsForSupporter, addPost, editPost, deletePost, toggleLike, addComment,
     ],
   );

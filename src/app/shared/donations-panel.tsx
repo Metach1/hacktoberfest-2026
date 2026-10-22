@@ -9,8 +9,11 @@ import {
   topDonorsForAthlete,
 } from "@/src/app/lib/donations.mjs";
 
-/** A ranked donor row as returned by topDonorsForAthlete. */
+/** A ranked row as returned by topDonorsForAthlete. For named donors `id` is
+ *  the donor name; for anonymous donations it is the donation id, so each
+ *  anonymous donation gets its own stable-keyed row. */
 interface DonorRank {
+  id: string;
   donor: string;
   total: number;
   count: number;
@@ -136,7 +139,7 @@ export function DonationsPanel({ athleteId }: { athleteId: number }) {
         <Popup title="Top donors" onClose={() => setPopup(null)}>
           <ul className="donation-list scroll">
             {topDonors.map((donor, i) => (
-              <li className="donation-item" key={donor.donor}>
+              <li className="donation-item" key={donor.id}>
                 <span className={i === 0 ? "rank first" : "rank"}>{i + 1}</span>
                 <DonorAvatar name={donor.donor} />
                 <div className="donation-item-meta">

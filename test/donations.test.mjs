@@ -18,6 +18,9 @@ import {
   rejectionReasonLabel,
   rejectDonation,
   canRejectDonation,
+  canResubmitDonation,
+  resubmitDonation,
+  canDeleteDonation,
 } from "../src/app/lib/donations.mjs";
 
 test("createPendingDonation builds a pending record with defaults", () => {
@@ -314,4 +317,205 @@ test("donations are scoped to the correct athlete and supporter", () => {
   assert.ok(statuses.has(DONATION_STATUS.PENDING));
   assert.ok(statuses.has(DONATION_STATUS.CONFIRMED));
   assert.ok(statuses.has(DONATION_STATUS.REJECTED));
+});
+
+// --- Editing and resubmitting a rejected donation ---------------------------
+// A supporter can retry a rejected donation IN PLACE: same record (id, athlete,
+// supporter preserved), returned to pending, stale metadata cleared, and the
+// auto-confirm window restarted. Guarded owner-only and rejected-only so a
+// counted (confirmed) donation can never be reopened or double-counted.
+
+/** Helper: a rejected donation owned by the given supporter. */
+function rejected({ athleteId = 1, amount = 500, supporterId = "supporter", id = "r", at = 1000 } = {}) {
+  return rejectDonation(
+    createPendingDonation({ athleteId, amount, supporterId, createdAt: at, id }),
+    "wrong_image",
+    "Please re-upload",
+    at + 10,
+  );
+}
+
+test("canResubmitDonation: only the owning supporter may retry a rejected donation", () => {
+  const r = rejected({ supporterId: "supporter" });
+  assert.equal(canResubmitDonation(r, "supporter"), true);
+  assert.equal(canResubmitDonation(r, "other-supporter"), false, "not the owner");
+  assert.equal(canResubmitDonation(r, null), false);
+});
+
+test("canResubmitDonation: pending and confirmed donations can never be retried", () => {
+  const pending = createPendingDonation({ athleteId: 1, amount: 500, supporterId: "supporter" });
+  const confirmed = confirmDonation(pending, "athlete", 2000);
+  assert.equal(canResubmitDonation(pending, "supporter"), false, "pending is already under review");
+  assert.equal(canResubmitDonation(confirmed, "supporter"), false, "confirmed is already counted");
+  assert.equal(canResubmitDonation(null, "supporter"), false);
+});
+
+test("resubmitDonation resets a rejected donation to pending in place", () => {
+  const r = rejected({ athleteId: 7, amount: 500, supporterId: "supporter", id: "keep-me", at: 1000 });
+  const again = resubmitDonation(
+    r,
+    "supporter",
+    { amount: 650, method: "Maya", reference: "NEWREF1", supporterName: "Nina", receiptName: "new.png", receiptPreview: "data:image/png;base64,AAA", note: "fixed" },
+    9000,
+  );
+  // Identity preserved exactly.
+  assert.equal(again.id, "keep-me", "id preserved");
+  assert.equal(again.athleteId, 7, "athlete preserved");
+  assert.equal(again.supporterId, "supporter", "supporter preserved");
+  // Back to pending with edited details.
+  assert.equal(again.status, DONATION_STATUS.PENDING);
+  assert.equal(again.amount, 650);
+  assert.equal(again.method, "Maya");
+  assert.equal(again.reference, "NEWREF1");
+  assert.equal(again.supporterName, "Nina");
+  assert.equal(again.receiptName, "new.png");
+  assert.equal(again.note, "fixed");
+  // Timing restarted.
+  assert.equal(again.createdAt, 9000, "auto-confirm window restarts from resubmission");
+  assert.equal(msUntilAutoConfirm(again, 9000), AUTO_CONFIRM_MS);
+});
+
+test("resubmitDonation clears all stale rejection and confirmation metadata", () => {
+  const r = rejected();
+  assert.equal(r.rejectionReason, "wrong_image");
+  const again = resubmitDonation(r, "supporter", {}, 9000);
+  assert.equal(again.rejectedAt, null);
+  assert.equal(again.rejectionReason, null);
+  assert.equal(again.rejectionNote, "");
+  assert.equal(again.confirmedAt, null);
+  assert.equal(again.confirmedBy, null);
+});
+
+test("resubmitDonation keeps prior field values when the patch omits them", () => {
+  const r = rejected({ amount: 400, id: "r2" });
+  const base = resubmitDonation(r, "supporter", {}, 9000); // reset only
+  assert.equal(base.amount, 400, "amount kept");
+  assert.equal(base.method, r.method, "method kept");
+  assert.equal(base.reference, r.reference, "reference kept");
+});
+
+test("resubmitDonation is a no-op for a non-owner or a confirmed donation", () => {
+  const r = rejected({ supporterId: "supporter" });
+  assert.equal(resubmitDonation(r, "intruder", { amount: 999 }), r, "non-owner cannot retry");
+
+  const confirmed = confirmDonation(createPendingDonation({ athleteId: 1, amount: 500, supporterId: "supporter" }), "athlete", 2000);
+  const after = resubmitDonation(confirmed, "supporter", { amount: 999 });
+  assert.equal(after, confirmed, "confirmed donation is returned unchanged");
+  assert.equal(after.status, DONATION_STATUS.CONFIRMED);
+});
+
+test("resubmitDonation rejects a non-positive resulting amount", () => {
+  const r = rejected();
+  assert.throws(() => resubmitDonation(r, "supporter", { amount: 0 }), /positive/i);
+  assert.throws(() => resubmitDonation(r, "supporter", { amount: -5 }), /positive/i);
+});
+
+test("a resubmitted donation is counted at most once in athlete totals", () => {
+  // Start: one rejected donation -> contributes 0 to totals.
+  const r = rejected({ athleteId: 1, amount: 1000, supporterId: "supporter", id: "x" });
+  assert.deepEqual(confirmedTotals([r], 1), { total: 0, count: 0 }, "rejected counts for nothing");
+
+  // Supporter resubmits in place (same id), athlete later confirms it.
+  const pendingAgain = resubmitDonation(r, "supporter", { amount: 1200 }, 9000);
+  const list = [confirmDonation(pendingAgain, "athlete", 9999)];
+  const totals = confirmedTotals(list, 1);
+  assert.equal(totals.total, 1200, "counted exactly once at its resubmitted amount");
+  assert.equal(totals.count, 1, "single supporter row, never doubled");
+});
+
+test("resubmitting then confirming cannot be retried again (no reopening a counted donation)", () => {
+  const r = rejected({ supporterId: "supporter", id: "y" });
+  const pendingAgain = resubmitDonation(r, "supporter", {}, 9000);
+  const confirmed = confirmDonation(pendingAgain, "athlete", 9999);
+  assert.equal(canResubmitDonation(confirmed, "supporter"), false, "confirmed is final");
+  assert.equal(resubmitDonation(confirmed, "supporter", { amount: 1 }), confirmed, "no-op once confirmed");
+});
+
+// --- Resubmit is in place: never duplicates the original (store behavior) ----
+// Mirrors the store's resubmitDonation action: list.map replacing the same id.
+// This proves a retry updates the SAME record and never appends a new one.
+
+function storeResubmit(list, donationId, supporterId, patch, at) {
+  return list.map((d) => (d.id === donationId ? resubmitDonation(d, supporterId, patch, at) : d));
+}
+
+test("resubmit updates the same record in place and does not add a new donation", () => {
+  const rejected = rejectDonation(
+    createPendingDonation({ athleteId: 1, amount: 500, supporterId: "supporter", id: "keep", createdAt: 100 }),
+    "wrong_image",
+    "",
+    200,
+  );
+  const list = [rejected];
+  const next = storeResubmit(list, "keep", "supporter", { amount: 600, method: "Maya", reference: "R2" }, 9000);
+  assert.equal(next.length, 1, "no duplicate record created");
+  assert.equal(next[0].id, "keep", "same id preserved");
+  assert.equal(next[0].status, DONATION_STATUS.PENDING, "back to pending");
+  assert.equal(next[0].amount, 600, "edited amount applied");
+  assert.equal(next[0].rejectionReason, null, "stale rejection metadata cleared");
+  assert.equal(next[0].createdAt, 9000, "auto-confirm timing restarted");
+});
+
+test("a donation cannot be resubmitted again once it has been confirmed", () => {
+  const rejected = rejectDonation(
+    createPendingDonation({ athleteId: 1, amount: 500, supporterId: "supporter", id: "x" }),
+    "wrong_image",
+  );
+  // First retry -> pending; athlete confirms it.
+  const afterRetry = storeResubmit([rejected], "x", "supporter", {}, 9000);
+  const confirmed = [confirmDonation(afterRetry[0], "athlete", 9999)];
+  // A second retry attempt is a no-op: confirmed donations are never reopened.
+  const afterSecond = storeResubmit(confirmed, "x", "supporter", { amount: 1 }, 10000);
+  assert.equal(afterSecond.length, 1);
+  assert.equal(afterSecond[0].status, DONATION_STATUS.CONFIRMED);
+  assert.equal(afterSecond[0].amount, confirmed[0].amount, "confirmed amount untouched");
+  const { total, count } = confirmedTotals(afterSecond, 1);
+  assert.equal(count, 1, "counted exactly once");
+  assert.equal(total, confirmed[0].amount);
+});
+
+// --- Deleting a donation from the supporter's history ------------------------
+
+test("canDeleteDonation allows owner's pending and rejected donations", () => {
+  const pending = createPendingDonation({ athleteId: 1, amount: 500, supporterId: "supporter" });
+  const rejected = rejectDonation(pending, "other");
+  assert.equal(canDeleteDonation(pending, "supporter"), true, "pending deletable");
+  assert.equal(canDeleteDonation(rejected, "supporter"), true, "rejected deletable");
+});
+
+test("canDeleteDonation never allows a confirmed donation (protects totals)", () => {
+  const confirmed = confirmDonation(createPendingDonation({ athleteId: 1, amount: 500, supporterId: "supporter" }), "athlete", 2000);
+  assert.equal(canDeleteDonation(confirmed, "supporter"), false);
+});
+
+test("canDeleteDonation is owner-scoped and null-safe", () => {
+  const notMine = createPendingDonation({ athleteId: 1, amount: 500, supporterId: "other-supporter" });
+  assert.equal(canDeleteDonation(notMine, "supporter"), false, "not the owner");
+  const noOwner = createPendingDonation({ athleteId: 1, amount: 500, supporterId: null });
+  assert.equal(canDeleteDonation(noOwner, "supporter"), false, "null owner never matches");
+  assert.equal(canDeleteDonation(null, "supporter"), false);
+});
+
+// Mirrors the store's removeDonation action: filter out an owned, deletable id.
+function storeRemove(list, donationId, supporterId) {
+  return list.filter((d) => !(d.id === donationId && canDeleteDonation(d, supporterId)));
+}
+
+test("removeDonation drops an owned pending/rejected donation and nothing else", () => {
+  const list = [
+    createPendingDonation({ athleteId: 1, amount: 100, supporterId: "supporter", id: "p" }),
+    rejectDonation(createPendingDonation({ athleteId: 1, amount: 200, supporterId: "supporter", id: "r" }), "other"),
+    confirmDonation(createPendingDonation({ athleteId: 1, amount: 300, supporterId: "supporter", id: "c" }), "athlete", 2000),
+  ];
+  assert.deepEqual(storeRemove(list, "p", "supporter").map((d) => d.id), ["r", "c"], "pending removed");
+  assert.deepEqual(storeRemove(list, "r", "supporter").map((d) => d.id), ["p", "c"], "rejected removed");
+});
+
+test("removeDonation is a no-op for a confirmed donation or a non-owner", () => {
+  const list = [
+    confirmDonation(createPendingDonation({ athleteId: 1, amount: 300, supporterId: "supporter", id: "c" }), "athlete", 2000),
+    rejectDonation(createPendingDonation({ athleteId: 1, amount: 200, supporterId: "other-supporter", id: "r" }), "other"),
+  ];
+  assert.equal(storeRemove(list, "c", "supporter").length, 2, "confirmed not deletable, totals safe");
+  assert.equal(storeRemove(list, "r", "supporter").length, 2, "another supporter's donation untouched");
 });

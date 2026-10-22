@@ -47,13 +47,20 @@ function validateReceipt(file: File): string | null {
  * accidental typos, and the filters never prove a payment is genuine.
  */
 export function DonationModal() {
-  const { donationTarget, closeDonation, submitDonation, getQrCodes } = useStarlete();
+  const { donationTarget, donationPrefill, closeDonation, submitDonation, resubmitDonation, getQrCodes } =
+    useStarlete();
+  // True when the modal is retrying a previously rejected donation in place.
+  const isResubmission = donationPrefill != null;
 
   const [step, setStep] = useState(1);
   // Single source of truth for the claimed amount. The supporter enters it
   // after paying (on the receipt step); there is no redundant up-front prompt.
   const [custom, setCustom] = useState("");
-  const [method, setMethod] = useState("");
+  // Which published QR account is selected, by its UNIQUE id. Selection is
+  // tracked by id (not provider name) so an athlete with two QRs for the same
+  // app — e.g. GCash, Maya, GCash — can select the correct one; the recorded
+  // donation method remains the provider name (see `method` below).
+  const [selectedQrId, setSelectedQrId] = useState("");
   const [reference, setReference] = useState("");
   const [supporterName, setSupporterName] = useState("");
   const [note, setNote] = useState("");
@@ -94,15 +101,58 @@ export function DonationModal() {
     () => (athlete ? getQrCodes(athlete.id) : []),
     [athlete, getQrCodes],
   );
+
+  // Prefill the flow from a rejected donation being retried. Seeding is keyed
+  // on the record id so it runs once per opened resubmission (and is cleared
+  // for a brand-new donation). The supporter can still edit every field and
+  // attach a replacement receipt before resubmitting.
+  const prefillId = donationPrefill?.id ?? null;
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!donationPrefill) return;
+    setCustom(donationPrefill.amount ? String(donationPrefill.amount) : "");
+    // Select a published QR matching the stored provider name (first match is
+    // fine — the recorded method is the provider name, not a specific account).
+    const prefillQr = donationPrefill.method
+      ? qrCodes.find((q) => q.method === donationPrefill.method)
+      : undefined;
+    setSelectedQrId(prefillQr?.id ?? "");
+    setReference(donationPrefill.reference ?? "");
+    // Don't surface the stored "Anonymous supporter" sentinel as an editable
+    // name; leave it blank so it stays anonymous unless the supporter types one.
+    setSupporterName(
+      donationPrefill.supporterName && donationPrefill.supporterName !== "Anonymous supporter"
+        ? donationPrefill.supporterName
+        : "",
+    );
+    setNote(donationPrefill.note ?? "");
+    setReceiptName(donationPrefill.receiptName ?? "");
+    setReceiptPreview(donationPrefill.receiptPreview ?? "");
+    // A previously stored receipt is treated as already-accepted; the supporter
+    // may still replace it, which re-runs validation/OCR via onUpload.
+    setFilterState(donationPrefill.receiptPreview ? "accepted" : "idle");
+    setFilterMessage("");
+    setOcrState("idle");
+    setSuggested(null);
+    // Start the supporter on the upload/details step with their details loaded.
+    setStep(2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prefillId]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
   const actual = parseClaimedAmount(custom);
-  const activeQr = qrCodes.find((q) => q.method === method) ?? qrCodes[0];
+  // Resolve the active QR by its unique id; fall back to the first published QR
+  // when nothing is selected yet. The provider name recorded on the donation is
+  // derived from the active QR (e.g. "GCash"), never from a bare name match.
+  const activeQr = qrCodes.find((q) => q.id === selectedQrId) ?? qrCodes[0];
+  const method = activeQr?.method ?? "";
 
   if (!athlete) return null;
 
   const reset = () => {
     setStep(1);
     setCustom("");
-    setMethod("");
+    setSelectedQrId("");
     setReference("");
     setSupporterName("");
     setNote("");
@@ -180,9 +230,10 @@ export function DonationModal() {
     if (result.amount != null && !custom) setCustom(String(result.amount));
     if (result.reference != null && !reference) setReference(result.reference);
     if (result.method != null) {
-      // Only adopt a suggested method the athlete actually publishes.
+      // Only adopt a suggested method the athlete actually publishes. Select by
+      // id; don't override an account the supporter already picked.
       const match = qrCodes.find((q) => q.method.toLowerCase() === result.method!.toLowerCase());
-      if (match && !method) setMethod(match.method);
+      if (match && !selectedQrId) setSelectedQrId(match.id);
     }
   };
 
@@ -192,7 +243,7 @@ export function DonationModal() {
     if (field === "reference" && suggested.reference != null) setReference(suggested.reference);
     if (field === "method" && suggested.method != null) {
       const match = qrCodes.find((q) => q.method.toLowerCase() === suggested.method!.toLowerCase());
-      if (match) setMethod(match.method);
+      if (match) setSelectedQrId(match.id);
     }
   };
 
@@ -209,8 +260,7 @@ export function DonationModal() {
     // image (metadata only) so it isn't shown until retried/reviewed. Rejected
     // images never reach here (receiptName is cleared).
     const keepPrivate = filterState === "uncertain";
-    const donation = submitDonation({
-      athleteId: athlete.id,
+    const patch = {
       amount: actual,
       method,
       reference: reference.trim(),
@@ -218,9 +268,22 @@ export function DonationModal() {
       receiptName: keepPrivate ? "" : receiptName,
       receiptPreview: keepPrivate ? "" : receiptPreview,
       note: note.trim(),
-    });
+    };
+    // Resolve the resubmission target up front from the prefill id. This is the
+    // single source of truth for "is this a retry": if a prefill id is present
+    // we ALWAYS update that record in place and NEVER create a new donation, so
+    // a retry can never duplicate the original.
+    const resubmitId = prefillId;
+    if (resubmitId) {
+      // Retry the SAME rejected record in place: preserve id/athlete/supporter,
+      // return it to pending, clear stale metadata, restart auto-confirm timing.
+      resubmitDonation(resubmitId, patch);
+      setSubmittedRef(patch.reference);
+    } else {
+      const donation = submitDonation({ athleteId: athlete.id, ...patch });
+      setSubmittedRef(donation.reference);
+    }
     setConfirmingAmount(false);
-    setSubmittedRef(donation.reference);
     setStep(4);
   };
 
@@ -238,7 +301,7 @@ export function DonationModal() {
 
         {step < 4 && (
           <div className="checkout-head">
-            <span className="eyebrow">QR donation · demo</span>
+            <span className="eyebrow">{isResubmission ? "Resubmit donation · demo" : "QR donation · demo"}</span>
             <h2>Back {athlete.name}</h2>
             <div className="stepper">
               <span className={step >= 1 ? "done" : ""}>1</span><i />
@@ -257,26 +320,47 @@ export function DonationModal() {
               <>
                 <p>Open your wallet app, scan this code, and send your support directly to the athlete. You&rsquo;ll enter the amount you paid on the next step.</p>
                 <div className="qr-method-tabs">
-                  {qrCodes.map((q) => (
-                    <button
-                      key={q.id}
-                      className={activeQr?.id === q.id ? "selected" : ""}
-                      onClick={() => setMethod(q.method)}
-                    >
-                      {q.method}
-                    </button>
-                  ))}
+                  {qrCodes.map((q) => {
+                    // Disambiguate duplicate providers (e.g. two GCash accounts)
+                    // by appending the account label to the tab.
+                    const dupe = qrCodes.filter((o) => o.method === q.method).length > 1;
+                    return (
+                      <button
+                        key={q.id}
+                        className={activeQr?.id === q.id ? "selected" : ""}
+                        onClick={() => setSelectedQrId(q.id)}
+                      >
+                        {dupe && q.label ? `${q.method} · ${q.label}` : q.method}
+                      </button>
+                    );
+                  })}
                 </div>
                 {activeQr && (
                   <div className="qr-display">
-                    <img src={activeQr.image} alt={`${activeQr.method} QR code`} width={160} height={160} />
-                    <div className="qr-meta">
-                      <strong>{activeQr.method}</strong>
-                      <small>{activeQr.label}</small>
-                    </div>
-                    <button className="text-button" onClick={() => setShowFullQr(true)}>
-                      View in full
-                    </button>
+                    {activeQr.image ? (
+                      <>
+                        <img src={activeQr.image} alt={`${activeQr.method} QR code`} width={160} height={160} />
+                        <div className="qr-meta">
+                          <strong>{activeQr.method}</strong>
+                          <small>{activeQr.label}</small>
+                          {activeQr.accountNumber && <small>{activeQr.accountNumber}</small>}
+                        </div>
+                        <button className="text-button" onClick={() => setShowFullQr(true)}>
+                          View in full
+                        </button>
+                      </>
+                    ) : (
+                      // No QR image: surface the account name and number large so
+                      // supporters can read and type them easily.
+                      <>
+                        <p className="qr-no-image-note muted-line">No QR image provided. Use the account details below to pay.</p>
+                        <div className="qr-no-image-details">
+                          <span className="qr-no-image-method">{activeQr.method}</span>
+                          <strong className="qr-no-image-name">{activeQr.label}</strong>
+                          {activeQr.accountNumber && <span className="qr-no-image-number">{activeQr.accountNumber}</span>}
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
                 <p className="safe-note">
@@ -285,8 +369,8 @@ export function DonationModal() {
                 <button
                   className="button full"
                   onClick={() => {
-                    // Default to the first published method if none picked yet.
-                    if (!method && qrCodes[0]) setMethod(qrCodes[0].method);
+                    // Default to the first published QR if none picked yet.
+                    if (!selectedQrId && qrCodes[0]) setSelectedQrId(qrCodes[0].id);
                     setStep(2);
                   }}
                 >
@@ -307,8 +391,14 @@ export function DonationModal() {
         {step === 2 && (
           <div className="donation-step">
             <button className="back-button" onClick={() => setStep(1)}><Icon name="back" /> QR code</button>
-            <h3>Upload your receipt</h3>
-            <p>We&rsquo;ll read it to suggest your details. You can edit everything below.</p>
+            <h3>{isResubmission ? "Edit & resubmit your donation" : "Upload your receipt"}</h3>
+            {isResubmission ? (
+              <p className="field-hint warn">
+                <Icon name="shield" size={14} /> This updates your rejected donation and sends it back for review — it stays the same submission, not a new one. Edit the details or attach a clearer receipt below.
+              </p>
+            ) : (
+              <p>We&rsquo;ll read it to suggest your details. You can edit everything below.</p>
+            )}
 
             <div className="receipt-upload">
               <input
@@ -372,11 +462,18 @@ export function DonationModal() {
 
             <label>
               Payment method
-              <select value={method} onChange={(e) => setMethod(e.target.value)}>
+              {/* Valued by unique QR id so duplicate providers (e.g. two GCash
+                  accounts) stay distinct; the donation still records q.method. */}
+              <select value={selectedQrId} onChange={(e) => setSelectedQrId(e.target.value)}>
                 <option value="" disabled>Select the method you used</option>
-                {qrCodes.map((q) => (
-                  <option key={q.id} value={q.method}>{q.method}</option>
-                ))}
+                {qrCodes.map((q) => {
+                  const dupe = qrCodes.filter((o) => o.method === q.method).length > 1;
+                  return (
+                    <option key={q.id} value={q.id}>
+                      {dupe && q.label ? `${q.method} · ${q.label}` : q.method}
+                    </option>
+                  );
+                })}
               </select>
               {suggested?.method && method !== suggested.method && (
                 <button type="button" className="suggestion-chip" onClick={() => applySuggestion("method")}>
@@ -521,7 +618,7 @@ export function DonationModal() {
         )}
       </div>
     </div>
-    {showFullQr && activeQr && createPortal(
+    {showFullQr && activeQr?.image && createPortal(
       <div className="qr-fullscreen-backdrop" onClick={() => setShowFullQr(false)}>
         <div
           className="qr-fullscreen-dialog"
@@ -540,6 +637,7 @@ export function DonationModal() {
           <span className="eyebrow">{activeQr.method}</span>
           <img src={activeQr.image} alt={`${activeQr.method} QR code`} />
           <strong>{activeQr.label}</strong>
+          {activeQr.accountNumber && <small>{activeQr.accountNumber}</small>}
         </div>
       </div>,
       document.body,

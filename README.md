@@ -109,6 +109,31 @@ supporter sees on their rejected payment. Rejected and pending donations never
 count toward an athlete's confirmed totals or supporter count, and a donation
 can never be both confirmed and rejected.
 
+When reviewing a pending receipt, the athlete can open the uploaded image at
+**full size** in a popup (modeled on the full-size QR viewer): large images fit
+the viewport and it dismisses via close button, outside click, or Escape. The
+confirm and reject controls stay available throughout the review, and a
+donation with no receipt image is handled gracefully (no viewer is offered).
+
+Each row in the supporter's **My payments** has a three-dot (⋮) actions menu,
+gated by status: a **rejected** donation offers **View**, **Edit & resubmit**,
+and **Delete**; a **pending** donation offers **View** and **Delete**; a
+**confirmed** donation offers **View** only. Confirmed donations are never
+editable or deletable, so an athlete's confirmed totals can't be changed from
+here. **View** opens a read-only detail (amount, athlete, method, reference,
+date, status, rejection reason/note, and the receipt image if present).
+**Delete** asks for confirmation and removes only the owning supporter's
+pending/rejected donation. The menu dismisses on outside click or Escape.
+
+**Edit & resubmit** reopens the donation flow prefilled with the rejected
+submission's details; the supporter can edit any field and attach a replacement
+receipt (which re-runs the same validation/OCR filtering). Resubmitting updates
+the **same** donation record in place — its id, athlete, and supporter are
+preserved — returning it to **pending**, clearing the stale rejection metadata,
+and restarting the auto-confirm timing. Only the owning supporter can retry, a
+donation can't be retried once confirmed, and because it stays one record it is
+counted at most once in an athlete's totals.
+
 Both dashboards show payment history: the athlete sees **Recent payments**
 (confirmed, pending, rejected, with the rejection reason) and the supporter sees
 **My payments** scoped to their own submissions.
@@ -117,13 +142,15 @@ Each athlete's **public profile** shows a GoFundMe-style donations section next
 to the fundraising progress: the five latest **confirmed** donations inline
 (donor name, amount, date), the confirmed-donation count, and a clear empty
 state. A **See all** popup lists every confirmed donation; a **See top** popup
-ranks donors by their total confirmed contribution. Pending and rejected
+ranks contributors by their total confirmed contribution. Pending and rejected
 donations — and receipts — are never shown here. Donor identities come from the
-name entered on each donation; the display ranking groups by that exact name and
-never merges different names or splits a shared one. Because the demo has no
-real accounts, anonymous donations all share the name "Anonymous supporter" and
-are grouped together — a known demo identity limitation, not a claim that they
-are the same person. All donations popups are mobile-friendly and dismissible via
+name entered on each donation; the display ranking groups **named** donors by
+that exact name and never merges different names or splits a shared one. Because
+the demo has no real accounts, it cannot tell one anonymous supporter from
+another, so anonymous donations are **not** grouped: each confirmed anonymous
+donation is ranked as its own "Anonymous supporter" row (its own amount, count
+of 1) rather than claiming they are the same person — a known demo identity
+limitation. All donations popups are mobile-friendly and dismissible via
 close button, outside click, or Escape.
 
 > **Identity limitation.** The demo has a single supporter identity

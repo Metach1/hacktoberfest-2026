@@ -30,8 +30,7 @@ const IMAGE_SELECTORS = [
   ".qr-display img", // supporter: QR shown to scan & pay
   ".qr-fullscreen-dialog img", // supporter: enlarged QR view
   ".qr-manage-row img", // athlete dashboard: managed QR thumbnails
-  ".qr-add-preview", // athlete dashboard: new-QR upload preview
-  ".receipt-preview img", // supporter: uploaded receipt thumbnail
+  ".receipt-preview img", // uploaded receipt + new/edited QR upload preview
   ".review-receipt img", // review + athlete receipt viewer
   ".pending-thumb", // athlete dashboard: pending receipt thumbnail
 ];

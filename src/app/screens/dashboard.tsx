@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { AthleteCard, Icon, MiniAthlete, Progress, peso } from "@/src/app/shared/ui";
 import { useStarlete, type Donation, type QrCode } from "@/src/app/store";
@@ -14,8 +15,149 @@ import { msUntilAutoConfirm } from "@/src/app/lib/donations.mjs";
 import {
   REJECTION_REASONS,
   rejectionReasonLabel,
+  isValidAccountNumber,
 } from "@/src/app/lib/donations.mjs";
 import { checkPaymentQr } from "@/src/app/lib/qr-decode";
+
+/**
+ * Read-only detail popup for one of the supporter's donations. Shows amount,
+ * athlete, method, reference, date, status, rejection reason/note (if any), and
+ * the receipt image when present. Dismissible via close, outside click, Escape.
+ */
+function PaymentDetail({
+  donation,
+  athleteName,
+  onClose,
+}: {
+  donation: Donation;
+  athleteName: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal small-modal" role="dialog" aria-modal="true" aria-label="Donation details" onClick={(e) => e.stopPropagation()}>
+        <button className="modal-close" onClick={onClose} aria-label="Close"><Icon name="close" /></button>
+        <span className="eyebrow">Donation details</span>
+        <h2>{peso(donation.amount)} to {athleteName}</h2>
+        <div className="review-rows">
+          <span><small>Status</small><b style={{ textTransform: "capitalize" }}>{donation.status}</b></span>
+          <span><small>Method</small><b>{donation.method || "—"}</b></span>
+          <span><small>Reference</small><b>{donation.reference || "—"}</b></span>
+          <span><small>Date</small><b>{shortDate(donation.createdAt)}</b></span>
+        </div>
+        {donation.note && <p className="donor-note">“{donation.note}”</p>}
+        {donation.status === "rejected" && (
+          <p className="payment-reject">
+            Rejected · {rejectionReasonLabel(donation.rejectionReason ?? "")}
+            {donation.rejectionNote ? ` — ${donation.rejectionNote}` : ""}
+          </p>
+        )}
+        {donation.receiptPreview ? (
+          <div className="review-receipt"><img src={donation.receiptPreview} alt={donation.receiptName || "Receipt"} /></div>
+        ) : (
+          <p className="muted-line">No receipt image attached.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Three-dot (⋮) actions menu for a supporter payment row. Rejected donations
+ * get View / Edit & resubmit / Delete; pending and confirmed donations get
+ * View only (confirmed donations are never editable or deletable, so confirmed
+ * totals are never disturbed). The dropdown dismisses on outside click and
+ * Escape; Delete asks for confirmation first.
+ */
+function PaymentRowMenu({ donation, athleteName }: { donation: Donation; athleteName: string }) {
+  const { openResubmission, removeDonation } = useStarlete();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [viewing, setViewing] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  const isRejected = donation.status === "rejected";
+  // Confirmed donations are View-only (not deletable); pending/rejected deletable.
+  const canDelete = donation.status !== "confirmed";
+
+  // Dismiss the dropdown on outside click and Escape.
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("mousedown", onClick);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onClick);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
+
+  return (
+    <div className="payment-menu" ref={wrapRef}>
+      <button
+        className="icon-button"
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        aria-label="Payment actions"
+        onClick={() => setMenuOpen((v) => !v)}
+      >
+        <Icon name="dots" size={18} />
+      </button>
+
+      {menuOpen && (
+        <div className="payment-menu-pop" role="menu">
+          <button role="menuitem" onClick={() => { setMenuOpen(false); setViewing(true); }}>View</button>
+          {isRejected && (
+            <button role="menuitem" onClick={() => { setMenuOpen(false); openResubmission(donation.id); }}>
+              Edit &amp; resubmit
+            </button>
+          )}
+          {canDelete && (
+            <button role="menuitem" className="danger" onClick={() => { setMenuOpen(false); setConfirmingDelete(true); }}>
+              Delete
+            </button>
+          )}
+        </div>
+      )}
+
+      {viewing && (
+        <PaymentDetail donation={donation} athleteName={athleteName} onClose={() => setViewing(false)} />
+      )}
+
+      {confirmingDelete && (
+        <div className="modal-backdrop" onClick={() => setConfirmingDelete(false)}>
+          <div className="modal small-modal" role="dialog" aria-modal="true" aria-label="Delete donation" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setConfirmingDelete(false)} aria-label="Close"><Icon name="close" /></button>
+            <span className="eyebrow">Delete donation</span>
+            <h2>Remove this {donation.status} donation?</h2>
+            <p className="muted-line">
+              This removes the {peso(donation.amount)} donation to {athleteName} from your payment history. This can&rsquo;t be undone.
+            </p>
+            <div className="form-actions">
+              <button className="button secondary" onClick={() => setConfirmingDelete(false)}>Cancel</button>
+              <button className="button danger" onClick={() => { removeDonation(donation.id); setConfirmingDelete(false); }}>
+                Delete donation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function SupporterDashboard({ athletes }: { athletes: Athlete[] }) {
   const { getDonationsForSupporter, getAthlete } = useStarlete();
@@ -37,11 +179,13 @@ function SupporterDashboard({ athletes }: { athletes: Athlete[] }) {
             <div className="payment-history">
               {myPayments.map((d) => {
                 const athlete = getAthlete(d.athleteId);
+                const athleteName = athlete?.name ?? `Athlete #${d.athleteId}`;
                 return (
                   <div className="payment-row" key={d.id}>
                     <div className="payment-main">
-                      <strong>{athlete?.name ?? `Athlete #${d.athleteId}`}</strong>
+                      <strong>{athleteName}</strong>
                       <StatusBadge status={d.status} />
+                      <PaymentRowMenu donation={d} athleteName={athleteName} />
                     </div>
                     <div className="payment-meta">
                       <span>{peso(d.amount)}</span>
@@ -110,15 +254,28 @@ function QrManager({ athleteId }: { athleteId: number }) {
   const [adding, setAdding] = useState(false);
   const [method, setMethod] = useState("GCash");
   const [label, setLabel] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
   const [image, setImage] = useState("");
   const [editing, setEditing] = useState<string | null>(null);
+  // Staged edits for the QR being edited; committed together on Save so the
+  // method, label, account number, and image change in one atomic update.
+  const [editMethod, setEditMethod] = useState("GCash");
   const [editLabel, setEditLabel] = useState("");
+  const [editAccountNumber, setEditAccountNumber] = useState("");
+  const [editImage, setEditImage] = useState("");
   // QR image validation feedback.
   const [qrChecking, setQrChecking] = useState(false);
   const [qrError, setQrError] = useState("");
   const [qrNotice, setQrNotice] = useState("");
+  // Hidden file inputs driving the styled dropzones (add + edit).
+  const addFileRef = useRef<HTMLInputElement | null>(null);
+  const editFileRef = useRef<HTMLInputElement | null>(null);
 
-  const methods = ["GCash", "Maya", "GrabPay", "BPI", "BDO", "LandBank", "UnionBank", "Bank transfer"];
+  const methods = ["GCash", "Maya", "MariBank", "GrabPay", "BPI", "BDO", "LandBank", "UnionBank", "Bank transfer"];
+
+  // Validity of the add/edit account-number fields (digits-only, 8–19 digits).
+  const addAccountValid = isValidAccountNumber(accountNumber.trim());
+  const editAccountValid = isValidAccountNumber(editAccountNumber.trim());
 
   /**
    * Validate an uploaded QR image before accepting it: decode it locally and
@@ -154,14 +311,49 @@ function QrManager({ athleteId }: { athleteId: number }) {
   };
 
   const submitAdd = () => {
-    if (!label.trim()) return;
-    addQrCode(athleteId, method, label.trim(), image || undefined);
+    // Account name is mandatory; account number must be a valid 8–19 digit number.
+    if (!label.trim() || !addAccountValid) return;
+    addQrCode(athleteId, method, label.trim(), accountNumber.trim(), image || undefined);
     setAdding(false);
     setMethod("GCash");
     setLabel("");
+    setAccountNumber("");
     setImage("");
     setQrError("");
     setQrNotice("");
+  };
+
+  const startEdit = (qr: QrCode) => {
+    setEditing(qr.id);
+    setEditMethod(qr.method);
+    setEditLabel(qr.label);
+    setEditAccountNumber(qr.accountNumber);
+    setEditImage("");
+    setQrError("");
+    setQrNotice("");
+  };
+
+  const cancelEdit = () => {
+    setEditing(null);
+    setEditAccountNumber("");
+    setEditImage("");
+    setQrError("");
+    setQrNotice("");
+  };
+
+  const saveEdit = (qrId: string) => {
+    // Account name is mandatory; account number must be a valid 8–19 digit number.
+    if (!editLabel.trim() || !editAccountValid) return;
+    // One atomic update: method, label, account number, and (if a new image was
+    // chosen) image. The QR id is preserved by replaceQrCode.
+    const patch: Partial<Omit<QrCode, "id">> = {
+      method: editMethod,
+      label: editLabel.trim(),
+      accountNumber: editAccountNumber.trim(),
+    };
+    if (editImage) patch.image = editImage;
+    replaceQrCode(athleteId, qrId, patch);
+    cancelEdit();
   };
 
   return (
@@ -180,40 +372,71 @@ function QrManager({ athleteId }: { athleteId: number }) {
       )}
 
       <div className="qr-manage-list">
-        {codes.map((qr: QrCode) => (
-          <div className="qr-manage-row" key={qr.id}>
-            <img src={qr.image} alt={`${qr.method} QR`} width={56} height={56} />
-            <div className="qr-manage-meta">
-              <strong>{qr.method}</strong>
-              {editing === qr.id ? (
-                <input
-                  value={editLabel}
-                  onChange={(e) => setEditLabel(e.target.value)}
-                  placeholder="Account name / handle"
-                  autoFocus
-                />
-              ) : (
+        {codes.map((qr: QrCode) =>
+          editing === qr.id ? (
+            <div className="qr-edit-form" key={qr.id}>
+              <label>
+                Payment method
+                <select value={editMethod} onChange={(e) => setEditMethod(e.target.value)}>
+                  {methods.map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </label>
+              <label>
+                Account name
+                <input value={editLabel} onChange={(e) => setEditLabel(e.target.value)} placeholder="e.g. J. Santos" autoFocus />
+              </label>
+              <label>
+                Account number
+                <input value={editAccountNumber} onChange={(e) => setEditAccountNumber(e.target.value)} inputMode="numeric" placeholder="e.g. 0917 123 4567" />
+                {editAccountNumber.trim() && !editAccountValid && (
+                  <small className="form-error">Account number must be 8–19 digits.</small>
+                )}
+              </label>
+              <div className="qr-upload-field">
+                <span className="qr-upload-label">QR image</span>
+                <input ref={editFileRef} type="file" accept="image/*" hidden onChange={(e) => validateAndSetImage(e.target.files?.[0], setEditImage)} />
+                {(editImage || qr.image) ? (
+                  <div className="receipt-preview">
+                    <img src={editImage || qr.image} alt={`${editMethod} QR preview`} />
+                    <div>
+                      <strong>{editImage ? "New image selected" : "Current image"}</strong>
+                      <button type="button" className="text-button" onClick={() => editFileRef.current?.click()}>Replace image</button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" className="receipt-dropzone" onClick={() => editFileRef.current?.click()}>
+                    <Icon name="plus" size={22} />
+                    <strong>Upload QR image</strong>
+                    <small>GCash, Maya, or bank (QR Ph) · PNG, JPG, or WebP</small>
+                  </button>
+                )}
+                <small className="field-hint">We check that it&rsquo;s a supported GCash, Maya, or bank (QR Ph) code. This isn&rsquo;t payment verification.</small>
+              </div>
+              {qrChecking && <p className="field-hint">Checking the QR code…</p>}
+              {qrError && <p className="form-error">{qrError}</p>}
+              {qrNotice && <p className="field-hint">{qrNotice}</p>}
+              <div className="form-actions">
+                <button className="button secondary" onClick={cancelEdit}>Cancel</button>
+                <button className="button" disabled={!editLabel.trim() || !editAccountValid || qrChecking} onClick={() => saveEdit(qr.id)}>Save changes</button>
+              </div>
+            </div>
+          ) : (
+            <div className="qr-manage-row" key={qr.id}>
+              {qr.image
+                ? <img src={qr.image} alt={`${qr.method} QR`} width={56} height={56} />
+                : <span className="qr-no-image" aria-label="No QR image"><Icon name="plus" size={18} /><small>No QR</small></span>}
+              <div className="qr-manage-meta">
+                <strong>{qr.method}</strong>
                 <small>{qr.label}</small>
-              )}
+                <small>{qr.accountNumber}</small>
+              </div>
+              <div className="qr-manage-actions">
+                <button className="text-button" onClick={() => startEdit(qr)}>Edit</button>
+                <button className="text-button danger" onClick={() => removeQrCode(athleteId, qr.id)}>Remove</button>
+              </div>
             </div>
-            <div className="qr-manage-actions">
-              {editing === qr.id ? (
-                <>
-                  <label className="link-file">
-                    Replace image
-                    <input type="file" accept="image/*" hidden onChange={(e) => validateAndSetImage(e.target.files?.[0], (v) => replaceQrCode(athleteId, qr.id, { image: v }))} />
-                  </label>
-                  <button className="text-button" onClick={() => { if (editLabel.trim()) replaceQrCode(athleteId, qr.id, { label: editLabel.trim() }); setEditing(null); }}>Save</button>
-                </>
-              ) : (
-                <>
-                  <button className="text-button" onClick={() => { setEditing(qr.id); setEditLabel(qr.label); }}>Edit</button>
-                  <button className="text-button danger" onClick={() => removeQrCode(athleteId, qr.id)}>Remove</button>
-                </>
-              )}
-            </div>
-          </div>
-        ))}
+          ),
+        )}
       </div>
 
       {adding && (
@@ -225,21 +448,42 @@ function QrManager({ athleteId }: { athleteId: number }) {
             </select>
           </label>
           <label>
-            Account name / handle
-            <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. J. Santos · 0917•••1234" />
+            Account name
+            <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. J. Santos" />
           </label>
-          <label className="qr-upload-field">
-            QR image (optional — a placeholder is generated if omitted)
-            <input type="file" accept="image/*" onChange={(e) => validateAndSetImage(e.target.files?.[0], setImage)} />
+          <label>
+            Account number
+            <input value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} inputMode="numeric" placeholder="e.g. 0917 123 4567" />
+            {accountNumber.trim() && !addAccountValid && (
+              <small className="form-error">Account number must be 8–19 digits.</small>
+            )}
+          </label>
+          <div className="qr-upload-field">
+            <span className="qr-upload-label">QR image <span className="qr-upload-optional">(optional)</span></span>
+            <input ref={addFileRef} type="file" accept="image/*" hidden onChange={(e) => validateAndSetImage(e.target.files?.[0], setImage)} />
+            {image ? (
+              <div className="receipt-preview">
+                <img src={image} alt="QR preview" />
+                <div>
+                  <strong>Image selected</strong>
+                  <button type="button" className="text-button" onClick={() => addFileRef.current?.click()}>Replace image</button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" className="receipt-dropzone" onClick={() => addFileRef.current?.click()}>
+                <Icon name="plus" size={22} />
+                <strong>Upload QR image</strong>
+                <small>GCash, Maya, or bank (QR Ph) · PNG, JPG, or WebP</small>
+              </button>
+            )}
             <small className="field-hint">We check that it&rsquo;s a supported GCash, Maya, or bank (QR Ph) code. This isn&rsquo;t payment verification.</small>
-          </label>
+          </div>
           {qrChecking && <p className="field-hint">Checking the QR code…</p>}
           {qrError && <p className="form-error">{qrError}</p>}
           {qrNotice && <p className="field-hint">{qrNotice}</p>}
-          {image && <img className="qr-add-preview" src={image} alt="QR preview" width={72} height={72} />}
           <div className="form-actions">
-            <button className="button secondary" onClick={() => { setAdding(false); setImage(""); setQrError(""); setQrNotice(""); }}>Cancel</button>
-            <button className="button" disabled={!label.trim() || qrChecking} onClick={submitAdd}>Save QR</button>
+            <button className="button secondary" onClick={() => { setAdding(false); setAccountNumber(""); setImage(""); setQrError(""); setQrNotice(""); }}>Cancel</button>
+            <button className="button" disabled={!label.trim() || !addAccountValid || qrChecking} onClick={submitAdd}>Save QR</button>
           </div>
         </div>
       )}
@@ -257,6 +501,18 @@ function PendingDonations({ athleteId }: { athleteId: number }) {
   const [reason, setReason] = useState("");
   const [rejectNote, setRejectNote] = useState("");
   const [confirmReject, setConfirmReject] = useState(false);
+  // The receipt image shown at full size in a zoomable viewer, if any.
+  const [fullReceipt, setFullReceipt] = useState<Donation | null>(null);
+
+  // Close the full-size receipt viewer on Escape (mirrors the QR viewer).
+  useEffect(() => {
+    if (!fullReceipt) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setFullReceipt(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [fullReceipt]);
 
   const startReject = (d: Donation) => {
     setOpen(null);
@@ -323,9 +579,21 @@ function PendingDonations({ athleteId }: { athleteId: number }) {
               <span><small>Auto-confirm in</small><b>{formatRemaining(msUntilAutoConfirm(open))}</b></span>
             </div>
             {open.note && <p className="donor-note">“{open.note}”</p>}
-            {open.receiptPreview
-              ? <div className="review-receipt"><img src={open.receiptPreview} alt={open.receiptName || "Receipt"} /></div>
-              : <p className="muted-line">No receipt image attached.</p>}
+            {open.receiptPreview ? (
+              <div className="review-receipt">
+                <button
+                  type="button"
+                  className="receipt-zoom"
+                  onClick={() => setFullReceipt(open)}
+                  aria-label="View receipt at full size"
+                >
+                  <img src={open.receiptPreview} alt={open.receiptName || "Receipt"} />
+                  <span className="receipt-zoom-hint"><Icon name="search" size={14} /> View full size</span>
+                </button>
+              </div>
+            ) : (
+              <p className="muted-line">No receipt image attached.</p>
+            )}
             <p className="safe-note"><Icon name="shield" /> Confirming records this demo donation toward your total. OCR and this flow do not verify real payments.</p>
             <div className="form-actions">
               <button className="button secondary danger" onClick={() => startReject(open)}>Reject…</button>
@@ -382,6 +650,33 @@ function PendingDonations({ athleteId }: { athleteId: number }) {
             )}
           </div>
         </div>
+      )}
+
+      {/* Full-size receipt viewer — modeled on the QR fullscreen viewer: a
+          portaled, dark-backdrop dialog that fits large images in the viewport
+          and dismisses via close button, outside click, and Escape. */}
+      {fullReceipt?.receiptPreview && createPortal(
+        <div className="receipt-fullscreen-backdrop" onClick={() => setFullReceipt(null)}>
+          <div
+            className="receipt-fullscreen-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Receipt at full size"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="modal-close"
+              aria-label="Close full-size receipt"
+              onClick={() => setFullReceipt(null)}
+            >
+              <Icon name="close" />
+            </button>
+            <span className="eyebrow">Receipt from {fullReceipt.supporterName}</span>
+            <img src={fullReceipt.receiptPreview} alt={fullReceipt.receiptName || "Receipt"} />
+            {fullReceipt.receiptName && <strong>{fullReceipt.receiptName}</strong>}
+          </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
