@@ -14,6 +14,7 @@ import {
   createClient,
   isSupabaseConfigured,
 } from "@/src/app/lib/supabase/client";
+import { resolveDisplayName } from "@/src/app/lib/profile-display.mjs";
 
 export type Role = "athlete" | "supporter";
 
@@ -22,6 +23,7 @@ interface SessionState {
   user: User | null;
   role: Role | null;
   displayName: string | null;
+  profilePicture: string | null;
   error: string | null;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -34,19 +36,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<Role | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const loadProfile = useCallback(async (currentUser: User | null) => {
     if (!currentUser) {
       setRole(null);
       setDisplayName(null);
+      setProfilePicture(null);
       setError(null);
       return;
     }
     const supabase = createClient();
     const { data, error: profileError } = await supabase
       .from("profiles")
-      .select("role, first_name")
+      .select("role, first_name, last_name, profile_picture")
       .eq("id", currentUser.id)
       .maybeSingle();
 
@@ -59,9 +63,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const metaRole = currentUser.user_metadata?.role as Role | undefined;
     const metaName = currentUser.user_metadata?.first_name as string | undefined;
     setRole((data?.role as Role | undefined) ?? metaRole ?? null);
-    setDisplayName(
-      data?.first_name ?? metaName ?? currentUser.email?.split("@")[0] ?? null,
-    );
+    setDisplayName(resolveDisplayName(
+      data?.first_name,
+      data?.last_name,
+      metaName || currentUser.email?.split("@")[0] || null,
+    ));
+    setProfilePicture((data?.profile_picture as string | null | undefined) ?? null);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -110,12 +117,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setRole(null);
     setDisplayName(null);
+    setProfilePicture(null);
     setError(null);
   }, []);
 
   const value = useMemo<SessionState>(
-    () => ({ loading, user, role, displayName, error, signOut, refresh }),
-    [loading, user, role, displayName, error, signOut, refresh],
+    () => ({ loading, user, role, displayName, profilePicture, error, signOut, refresh }),
+    [loading, user, role, displayName, profilePicture, error, signOut, refresh],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

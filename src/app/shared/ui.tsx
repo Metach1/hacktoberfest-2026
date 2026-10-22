@@ -47,14 +47,15 @@ export function Logo() {
 }
 
 export function Progress({ value }: { value: number }) {
-  return <div className="progress"><span style={{ width: `${Math.min(value, 100)}%` }} /></div>;
+  const safeValue = Number.isFinite(value) ? Math.max(0, value) : 0;
+  return <div className="progress"><span style={{ width: `${Math.min(safeValue, 100)}%` }} /></div>;
 }
 
 /** Athlete summary card that links to the athlete's profile route. */
 export function AthleteCard({ athlete }: { athlete: Athlete }) {
-  const percent = Math.round((athlete.raised / athlete.goal) * 100);
+  const percent = athlete.goal > 0 ? Math.round((athlete.raised / athlete.goal) * 100) : 0;
   return (
-    <Link className="athlete-card" href={`/athletes/${athlete.id}`}>
+    <Link className="athlete-card" href={`/athletes/${athlete.profileId ?? athlete.id}`}>
       <div className="card-image">
         <img src={athlete.image} alt={`${athlete.name}, ${athlete.sport} athlete`} />
         <span className="sport-pill">{athlete.sport}</span>
@@ -74,7 +75,7 @@ export function AthleteCard({ athlete }: { athlete: Athlete }) {
 /** Small reusable link styled as a button. */
 export function MiniAthlete({ athlete, rank }: { athlete: Athlete; rank: number }) {
   return (
-    <Link className="mini-athlete" href={`/athletes/${athlete.id}`}>
+    <Link className="mini-athlete" href={`/athletes/${athlete.profileId ?? athlete.id}`}>
       <b>0{rank}</b>
       <img src={athlete.image} alt="" />
       <span><strong>{athlete.name}</strong><small>{athlete.sport} · {athlete.location}</small></span>

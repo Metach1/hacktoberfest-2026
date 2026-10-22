@@ -9,6 +9,8 @@ import type { Athlete } from "@/src/app/data/athletes";
 import { type Post } from "@/src/app/data/posts";
 import { TimeAgo } from "@/src/app/shared/time-ago";
 import { msUntilAutoConfirm } from "@/src/app/lib/donations.mjs";
+import { getMyProfile } from "@/src/app/services/profile";
+import { useSession } from "@/src/app/shared/session-provider";
 import {
   REJECTION_REASONS,
   rejectionReasonLabel,
@@ -156,13 +158,13 @@ function PaymentRowMenu({ donation, athleteName }: { donation: Donation; athlete
   );
 }
 
-function SupporterDashboard({ athletes }: { athletes: Athlete[] }) {
+function SupporterDashboard({ athletes, displayName }: { athletes: Athlete[]; displayName: string | null }) {
   const { getDonationsForSupporter, getAthlete } = useStarlete();
   const top = [...athletes].sort((a, b) => b.raised - a.raised);
   const myPayments = getDonationsForSupporter();
   return (
     <main className="dashboard page-shell">
-      <div className="dash-welcome"><div><span className="eyebrow">Supporter dashboard</span><h1>Magandang araw, Jamie.</h1><p>There are new stories waiting for your support.</p></div><div className="impact-chip"><Icon name="heart" /><span><small>Your total impact</small><b>₱4,500 given</b></span></div></div>
+      <div className="dash-welcome"><div><span className="eyebrow">Supporter dashboard</span><h1>Magandang araw, {displayName || "supporter"}.</h1><p>There are new stories waiting for your support.</p></div><div className="impact-chip"><Icon name="heart" /><span><small>Your total impact</small><b>₱4,500 given</b></span></div></div>
       <section><div className="section-head"><div><span className="eyebrow">Picked for you</span><h2>Athletes making moves</h2></div></div><div className="card-grid">{athletes.slice(0, 3).map(a => <AthleteCard key={a.id} athlete={a} />)}</div></section>
       <section className="dashboard-grid">
         <div className="dash-card">
@@ -723,7 +725,23 @@ function PaymentHistory({ athleteId }: { athleteId: number }) {
   );
 }
 
-function AthleteDashboard({ athlete, posts, onCreate, onEdit, onDelete }: { athlete: Athlete; posts: Post[]; onCreate: (authorAthleteId: number, text: string) => void; onEdit: (postId: string, text: string) => void; onDelete: (postId: string) => void }) {
+function AthleteDashboard({
+  athlete,
+  posts,
+  postsLoading,
+  postError,
+  onCreate,
+  onEdit,
+  onDelete,
+}: {
+  athlete: Athlete;
+  posts: Post[];
+  postsLoading: boolean;
+  postError: string | null;
+  onCreate: (authorAthleteId: number, text: string) => void;
+  onEdit: (postId: string, text: string) => void;
+  onDelete: (postId: string) => void;
+}) {
   const { getDonationsForAthlete } = useStarlete();
   const [creating, setCreating] = useState(false);
   const [post, setPost] = useState("");
@@ -732,9 +750,11 @@ function AthleteDashboard({ athlete, posts, onCreate, onEdit, onDelete }: { athl
   const [editText, setEditText] = useState("");
   // Inline delete confirmation: the post awaiting a Yes/Cancel on its own card.
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const percent = Math.round((athlete.raised / athlete.goal) * 100);
+  const percent = athlete.goal > 0 ? Math.round((athlete.raised / athlete.goal) * 100) : 0;
   // Only the signed-in athlete's own posts are shown and editable here.
-  const myPosts = posts.filter(p => p.authorAthleteId === athlete.id);
+  const myPosts = posts.filter((post) =>
+    athlete.profileId ? post.ownerId === athlete.profileId : post.authorAthleteId === athlete.id,
+  );
 
   const startEdit = (p: Post) => { setEditingId(p.id); setEditText(p.text); };
   const cancelEdit = () => { setEditingId(null); setEditText(""); };
@@ -772,7 +792,7 @@ function AthleteDashboard({ athlete, posts, onCreate, onEdit, onDelete }: { athl
                 </div>
               ))}
         </div>
-        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Your story</span><h2>Recent posts</h2></div><button className="text-button" onClick={() => setCreating(true)}>New post</button></div>{myPosts.length ? myPosts.map(p => (
+        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Your story</span><h2>Recent posts</h2></div><button className="text-button" onClick={() => setCreating(true)}>New post</button></div>{postError && <p className="field-error" role="alert">{postError}</p>}{postsLoading ? <p className="profile-bio">Loading posts…</p> : myPosts.length ? myPosts.map(p => (
           <article className="dash-post" key={p.id}>
             <small><TimeAgo iso={p.createdAt} />{p.editedAt ? " · edited" : ""}</small>
             <strong>{p.text}</strong>
@@ -807,16 +827,69 @@ function AthleteDashboard({ athlete, posts, onCreate, onEdit, onDelete }: { athl
 }
 
 export function DashboardScreen() {
-  const { role, athletes, posts, addPost, editPost, deletePost, mounted } = useStarlete();
+  const { role, athletes, posts, postsLoading, postError, addPost, editPost, deletePost, mounted } = useStarlete();
+  const { user, displayName } = useSession();
   const router = useRouter();
+  const [profileValues, setProfileValues] = useState<{
+    name: string;
+    sport: string;
+    location: string;
+    image: string;
+    bio: string;
+    achievement: string;
+    fundingGoal: number | null;
+    verified: boolean;
+  } | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   useEffect(() => {
     if (mounted && !role) router.replace("/login");
   }, [mounted, role, router]);
 
+  useEffect(() => {
+    if (role !== "athlete" || !user) return;
+    let active = true;
+    getMyProfile()
+      .then((profile) => {
+        if (!active || !profile) return;
+        setProfileValues({
+          name: [profile.firstName, profile.lastName].filter(Boolean).join(" ") || athletes[0].name,
+          sport: profile.sport,
+          location: profile.location,
+          image: profile.profilePicture || athletes[0].image,
+          bio: profile.bio,
+          achievement: profile.achievement,
+          fundingGoal: profile.fundingGoal,
+          verified: profile.verified,
+        });
+      })
+      .catch((error: unknown) => {
+        if (active) setProfileError(error instanceof Error ? error.message : "Could not load your profile.");
+      });
+    return () => { active = false; };
+  }, [athletes, role, user]);
+
   if (!role) return null;
   if (role === "athlete") {
-    return <AthleteDashboard athlete={athletes[0]} posts={posts} onCreate={addPost} onEdit={editPost} onDelete={deletePost} />;
+    const demoAthlete = athletes[0];
+    const athlete: Athlete = profileValues ? {
+      ...demoAthlete,
+      profileId: user?.id,
+      name: profileValues.name,
+      sport: profileValues.sport || demoAthlete.sport,
+      location: profileValues.location || demoAthlete.location,
+      image: profileValues.image,
+      bio: profileValues.bio,
+      achievement: profileValues.achievement,
+      goal: profileValues.fundingGoal ?? 0,
+      verified: profileValues.verified,
+    } : { ...demoAthlete, profileId: user?.id };
+    return (
+      <>
+        {profileError && <p className="field-error page-shell" role="alert">{profileError}</p>}
+        <AthleteDashboard athlete={athlete} posts={posts} postsLoading={postsLoading} postError={postError} onCreate={addPost} onEdit={editPost} onDelete={deletePost} />
+      </>
+    );
   }
-  return <SupporterDashboard athletes={athletes} />;
+  return <SupporterDashboard athletes={athletes} displayName={displayName} />;
 }

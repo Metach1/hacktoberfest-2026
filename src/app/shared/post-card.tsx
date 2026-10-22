@@ -6,6 +6,7 @@ import { Icon } from "@/src/app/shared/ui";
 import { TimeAgo } from "@/src/app/shared/time-ago";
 import { useStarlete, actorIdForRole } from "@/src/app/store";
 import { postAuthor, type Post } from "@/src/app/data/posts";
+import { useSession } from "@/src/app/shared/session-provider";
 
 /**
  * A single feed post with author header, like toggle, and a comment thread.
@@ -17,14 +18,15 @@ import { postAuthor, type Post } from "@/src/app/data/posts";
  */
 export function PostCard({ post, showAuthor = true }: { post: Post; showAuthor?: boolean }) {
   const { role, athletes, toggleLike, addComment } = useStarlete();
+  const { displayName } = useSession();
   const actorId = actorIdForRole(role, athletes);
-  const author = postAuthor(post.authorAthleteId);
+  const author = postAuthor(post.authorAthleteId, post);
 
   const [showComments, setShowComments] = useState(false);
   const [comment, setComment] = useState("");
 
   const liked = post.likedBy.includes(actorId);
-  const actorName = role === "athlete" ? athletes[0]?.name ?? "Athlete" : "Jamie";
+  const actorName = displayName || (role === "athlete" ? athletes[0]?.name ?? "Athlete" : "A supporter");
 
   const submitComment = () => {
     const text = comment.trim();
@@ -38,7 +40,7 @@ export function PostCard({ post, showAuthor = true }: { post: Post; showAuthor?:
     <article className="feed-post">
       {showAuthor && (
         <header className="feed-post-head">
-          <Link className="feed-author" href={`/athletes/${post.authorAthleteId}`}>
+          <Link className="feed-author" href={`/athletes/${post.authorProfileId ?? post.authorAthleteId}`}>
             {author.image ? <img src={author.image} alt="" /> : <span className="feed-avatar-fallback" aria-hidden="true">{author.name.charAt(0)}</span>}
             <span className="feed-author-meta">
               <strong>{author.name}{author.verified && <span className="verified inline-verified"><Icon name="check" size={11} /></span>}</strong>
