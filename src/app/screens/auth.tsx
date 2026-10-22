@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Icon, Logo } from "@/src/app/shared/ui";
 import { signIn, signUp, type Role } from "@/src/app/services/auth";
 import { useSession } from "@/src/app/shared/session-provider";
+import { REGIONS, regionName } from "@/src/app/lib/regions";
 
 export function AuthScreen({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
@@ -16,6 +17,8 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [birth, setBirth] = useState("");
+  const [sport, setSport] = useState("Track & Field");
+  const [regionCode, setRegionCode] = useState("");
   const [consent, setConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +41,18 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
     setSubmitting(true);
     try {
       if (mode === "register") {
-        await signUp({ email, password, role, firstName: fullName.split(" ")[0] || undefined });
+        const firstName = fullName.trim().split(/\s+/)[0] || undefined;
+        if (role === "athlete") {
+          const location = regionName(regionCode);
+          if (!regionCode || !location) {
+            setError("Please select your location.");
+            setSubmitting(false);
+            return;
+          }
+          await signUp({ email, password, role, firstName, sport, regionCode });
+        } else {
+          await signUp({ email, password, role, firstName });
+        }
       } else {
         await signIn(email, password);
       }
@@ -62,7 +76,7 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
             {mode === "register" && <label>Full name<input required value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Juan dela Cruz" /></label>}
             <label>Email address<input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" /></label>
             <label>Password<input type="password" required minLength={8} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" /></label>
-            {mode === "register" && role === "athlete" && <><div className="field-row"><label>Birth date<input type="date" required value={birth} onChange={e => setBirth(e.target.value)} /></label><label>Sport<select required><option>Track &amp; Field</option><option>Boxing</option><option>Basketball</option><option>Swimming</option></select></label></div><label>City / Province<input required placeholder="Cebu City" /></label>{showConsent && <label className="consent"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} /><span><b>Parental consent confirmed</b><small>A parent or guardian has approved this athlete profile.</small></span></label>}</>}
+            {mode === "register" && role === "athlete" && <><div className="field-row"><label>Birth date<input type="date" required value={birth} onChange={e => setBirth(e.target.value)} /></label><label>Sport<select required value={sport} onChange={e => setSport(e.target.value)}><option>Track &amp; Field</option><option>Boxing</option><option>Basketball</option><option>Swimming</option></select></label></div><label>Location<select required value={regionCode} onChange={e => setRegionCode(e.target.value)}><option value="">Select your region…</option>{REGIONS.map(region => <option key={region.regionCode} value={region.regionCode}>{region.name}</option>)}</select></label>{showConsent && <label className="consent"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} /><span><b>Parental consent confirmed</b><small>A parent or guardian has approved this athlete profile.</small></span></label>}</>}
             {error && <p className="field-error" role="alert">{error}</p>}
             <button className="button full" type="submit" disabled={submitting}>{submitting ? "Please wait…" : mode === "login" ? `Log in` : "Create account"} <Icon name="arrow" /></button>
           </form>

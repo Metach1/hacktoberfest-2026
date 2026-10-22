@@ -8,28 +8,46 @@
  * and never touch the service-role key.
  */
 import { createClient } from "@/src/app/lib/supabase/client";
+import { regionName } from "@/src/app/lib/regions";
 
 export type Role = "athlete" | "supporter";
 
-export interface SignUpInput {
-  email: string;
-  password: string;
-  role: Role;
-  firstName?: string;
-}
+export type SignUpInput =
+  | { email: string; password: string; role: "supporter"; firstName?: string }
+  | {
+      email: string;
+      password: string;
+      role: "athlete";
+      firstName?: string;
+      sport: string;
+      regionCode: string;
+    };
 
 /**
  * Create an account. The `role` and `first_name` are stored in the auth user's
- * metadata; a database trigger (`handle_new_user`) copies them into the
- * `profiles` row on signup.
+ * metadata; a database trigger (`handle_new_user`) copies them into `profiles`
+ * and creates the athlete profile with its selected region and sport.
  */
-export async function signUp({ email, password, role, firstName }: SignUpInput) {
+export async function signUp(input: SignUpInput) {
   const supabase = createClient();
+  const { email, password, firstName } = input;
+  const athleteMetadata =
+    input.role === "athlete"
+      ? (() => {
+          const location = regionName(input.regionCode);
+          if (!location) throw new Error("Please select a valid location.");
+          return {
+            sport: input.sport,
+            region_code: input.regionCode,
+            location,
+          };
+        })()
+      : {};
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      data: { role, first_name: firstName ?? null },
+      data: { role: input.role, first_name: firstName ?? null, ...athleteMetadata },
     },
   });
   if (error) throw error;

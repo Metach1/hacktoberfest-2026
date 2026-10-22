@@ -55,13 +55,16 @@ CLI:
 | `0009_remove_seeded_showcase_data.sql` | Delete seeded fictional catalog and showcase records. |
 | `0010_direct_transfer_controls.sql` | Restrict direct-transfer reporting and review transitions. |
 | `0011_reconcile_athlete_profiles.sql` | Add athlete profile columns skipped when `0006` encountered the table created by `0001`. |
+| `0012_create_athlete_profile_on_signup.sql` | Save athlete region and sport from signup metadata into `athlete_profiles`. |
 
 Migration `0009` removes only rows marked as seeded (including seeded profiles)
 and associated showcase records; it preserves rows owned by registered
 accounts. Applying migrations is an explicit database operation; code changes
-do not run them against a hosted Supabase project. Apply through `0011` before
-using the current app; it adds the missing `bio`, `achievement`, `created_at`,
-and `updated_at` columns to `athlete_profiles` on existing databases.
+do not run them against a hosted Supabase project. Apply through `0012` before
+using the current app. Migration `0011` adds the missing `bio`, `achievement`,
+`created_at`, and `updated_at` columns to `athlete_profiles` on existing
+databases; `0012` updates the signup trigger to create an athlete profile with
+the selected region and sport.
 
 The signup trigger creates `profiles` rows. Athlete-specific profile fields
 are managed in `athlete_profiles`; payment QR details are managed in

@@ -35,7 +35,7 @@ Requirements: Node.js 20.19 or newer and npm.
 
 1. Create a Supabase project.
 2. Apply the migrations in `supabase/migrations/` in order through
-   `0011_reconcile_athlete_profiles.sql`.
+   `0012_create_athlete_profile_on_signup.sql`.
 3. Copy `.env.example` to `.env.local` and set the Supabase project URL and
    public anon key.
 4. Install and run:
@@ -53,6 +53,10 @@ Do not run or restore the old seeded showcase data. Migration
 preserving rows owned by registered accounts. It must be applied to the
 Supabase project to remove existing showcase records; changing application
 code does not execute remote database migrations.
+
+Athlete signup requires a location selected from the 18 Philippine regions.
+Apply migration `0012_create_athlete_profile_on_signup.sql` so the signup
+trigger saves the selected region and sport to the athlete's profile.
 
 ## Development checks
 
