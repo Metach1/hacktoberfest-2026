@@ -1,17 +1,23 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { AthleteProfileScreen } from "@/src/app/screens/athlete-profile";
-import { athletes } from "@/src/app/data/athletes";
 
-// Prerender a static page for each fictional athlete in the seed.
-export function generateStaticParams() {
-  return athletes.map((a) => ({ id: String(a.id) }));
+export default function AthletePage({ params }: PageProps<"/athletes/[id]">) {
+  return (
+    <Suspense fallback={<main aria-busy="true">Loading athlete profile...</main>}>
+      <AthletePageContent params={params} />
+    </Suspense>
+  );
 }
 
-export default async function AthletePage({ params }: PageProps<"/athletes/[id]">) {
+async function AthletePageContent({
+  params,
+}: {
+  params: PageProps<"/athletes/[id]">["params"];
+}) {
   const { id } = await params;
-  const numericId = Number.parseInt(id, 10);
-  if (!Number.isInteger(numericId) || numericId <= 0) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
     notFound();
   }
-  return <AthleteProfileScreen id={numericId} />;
+  return <AthleteProfileScreen id={id} />;
 }

@@ -6,7 +6,6 @@
 import phRegions from "@/data/ph-regions.json";
 import { countByRegion as rawCountByRegion } from "@/data/region-counts.mjs";
 import { filterAthletes as rawFilterAthletes } from "@/data/athlete-filter.mjs";
-import type { Athlete } from "@/src/app/data/athletes";
 
 export interface RegionPath {
   regionCode: string;
@@ -22,9 +21,18 @@ export interface RegionMap {
 
 export const REGION_MAP: RegionMap = phRegions as RegionMap;
 
+/** Minimal athlete shape required by region counts and filtering. */
+export interface RegionAthlete {
+  id: string | number;
+  name: string;
+  sport: string;
+  location: string;
+  regionCode: string;
+}
+
 /** Tally athletes per canonical region code. */
-export const countByRegion: (athletes: Pick<Athlete, "regionCode">[]) => Record<string, number> =
-  rawCountByRegion as (athletes: Pick<Athlete, "regionCode">[]) => Record<string, number>;
+export const countByRegion: (athletes: Pick<RegionAthlete, "regionCode">[]) => Record<string, number> =
+  rawCountByRegion as (athletes: Pick<RegionAthlete, "regionCode">[]) => Record<string, number>;
 
 export interface AthleteFilters {
   search?: string;
@@ -34,5 +42,5 @@ export interface AthleteFilters {
 }
 
 /** Apply Discover's combined search/sport/region filters to the athlete list. */
-export const filterAthletes: (athletes: Athlete[], filters?: AthleteFilters) => Athlete[] =
-  rawFilterAthletes as unknown as (athletes: Athlete[], filters?: AthleteFilters) => Athlete[];
+export const filterAthletes: <T extends RegionAthlete>(athletes: T[], filters?: AthleteFilters) => T[] =
+  rawFilterAthletes as <T extends RegionAthlete>(athletes: T[], filters?: AthleteFilters) => T[];

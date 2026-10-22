@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { Suspense, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon, Logo } from "@/src/app/shared/ui";
-import { DonationModal } from "@/src/app/shared/donation";
 import { useSession } from "@/src/app/shared/session-provider";
 
 function Header() {
@@ -62,17 +61,20 @@ function Footer() {
     <footer>
       <Logo />
       <p>Backing Filipino athletes, one story at a time.</p>
-      <span>© 2025 Startlete. Demo experience only.</span>
+      <span>Startlete.</span>
     </footer>
   );
 }
 
-/**
- * Shared app chrome rendered once in the root layout. Header and footer are
- * hidden on the standalone auth routes. The donation modal lives here so it can
- * be opened from any route and survives client-side navigation.
- */
 export function AppChrome({ children }: { children: ReactNode }) {
+  return (
+    <Suspense fallback={<div className="app">{children}</div>}>
+      <RouteAwareChrome>{children}</RouteAwareChrome>
+    </Suspense>
+  );
+}
+
+function RouteAwareChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const authPage = pathname === "/login" || pathname === "/register";
   // The landing page uses a deep-blue header/footer treatment; the marker class
@@ -83,7 +85,6 @@ export function AppChrome({ children }: { children: ReactNode }) {
       {!authPage && <Header />}
       {children}
       {!authPage && <Footer />}
-      <DonationModal />
     </div>
   );
 }

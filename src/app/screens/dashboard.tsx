@@ -3,14 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
-import { AthleteCard, Icon, MiniAthlete, Progress, peso } from "@/src/app/shared/ui";
-import { useStarlete, type Donation, type QrCode } from "@/src/app/store";
+import { Icon, RegisteredAthleteCard, peso } from "@/src/app/shared/ui";
+import { useStarlete, type Donation } from "@/src/app/store";
 import { useSession } from "@/src/app/shared/session-provider";
-import { useAsync } from "@/src/app/shared/async-state";
+import { ErrorState, useAsync } from "@/src/app/shared/async-state";
 import { getMyProfile, type MyProfile } from "@/src/app/services/profile";
 import { getFeed, createPost, editPost as editPostSvc, deletePost as deletePostSvc, type FeedPost } from "@/src/app/services/feed";
 import { getMyQrCodes, addMyQrCode, updateMyQrCode, removeMyQrCode, type QrCodeRow, type QrInput } from "@/src/app/services/qr";
-import type { Athlete } from "@/src/app/data/athletes";
 import { TimeAgo } from "@/src/app/shared/time-ago";
 import { msUntilAutoConfirm } from "@/src/app/lib/donations.mjs";
 import {
@@ -19,6 +18,16 @@ import {
   isValidAccountNumber,
 } from "@/src/app/lib/donations.mjs";
 import { checkPaymentQr } from "@/src/app/lib/qr-decode";
+import { getPublicAthletes } from "@/src/app/services/public-athletes";
+import {
+  confirmDirectDonation,
+  DIRECT_TRANSFER_REJECTION_REASONS,
+  directTransferRejectionLabel,
+  getMyIncomingDirectDonations,
+  getMyDirectDonations,
+  rejectDirectDonation,
+  type DirectDonation,
+} from "@/src/app/services/donations";
 
 /**
  * Read-only detail popup for one of the supporter's donations. Shows amount,
@@ -160,43 +169,56 @@ function PaymentRowMenu({ donation, athleteName }: { donation: Donation; athlete
   );
 }
 
-function SupporterDashboard({ athletes }: { athletes: Athlete[] }) {
-  const { getDonationsForSupporter, getAthlete } = useStarlete();
+function SupporterDashboard() {
   const { displayName } = useSession();
   const firstName = (displayName ?? "there").split(" ")[0];
-  const top = [...athletes].sort((a, b) => b.raised - a.raised);
-  const myPayments = getDonationsForSupporter();
+  const { data: athletes, loading: athletesLoading, error: athletesError, reload: reloadAthletes } =
+    useAsync(getPublicAthletes, []);
+  const { data: myPayments, loading: paymentsLoading, error: paymentsError, reload: reloadPayments } =
+    useAsync(getMyDirectDonations, []);
+  const athleteById = new Map((athletes ?? []).map((athlete) => [athlete.id, athlete]));
   return (
     <main className="dashboard page-shell">
-      <div className="dash-welcome"><div><span className="eyebrow">Supporter dashboard</span><h1>Magandang araw, {firstName}.</h1><p>There are new stories waiting for your support.</p></div></div>
-      <section><div className="section-head"><div><span className="eyebrow">Picked for you</span><h2>Athletes making moves</h2></div></div><div className="card-grid">{athletes.slice(0, 3).map(a => <AthleteCard key={a.id} athlete={a} />)}</div></section>
+      <div className="dash-welcome"><div><span className="eyebrow">Supporter dashboard</span><h1>Magandang araw, {firstName}.</h1><p>Find registered athletes and manage your transfer reports.</p></div></div>
+      <section>
+        <div className="section-head"><div><span className="eyebrow">Athlete community</span><h2>Athletes you can support</h2></div></div>
+        {athletesLoading && <p className="muted-line">Loading athlete profiles…</p>}
+        {athletesError && <ErrorState message={athletesError} onRetry={reloadAthletes} />}
+        {!athletesLoading && !athletesError && athletes?.length ? (
+          <div className="card-grid">{athletes.slice(0, 3).map((athlete) => <RegisteredAthleteCard key={athlete.id} athlete={athlete} />)}</div>
+        ) : null}
+        {!athletesLoading && !athletesError && !athletes?.length && <div className="empty-note small"><p>No athletes have published payment details yet.</p></div>}
+      </section>
       <section className="dashboard-grid">
         <div className="dash-card">
-          <div className="section-head"><div><span className="eyebrow">Your payments</span><h2>My payments</h2></div>{myPayments.length > 0 && <span className="count-pill">{myPayments.length}</span>}</div>
-          <p className="muted-line">Donations you submitted. A <strong>pending</strong> submission is awaiting athlete review — it is not yet accepted. A <strong>confirmed</strong> status reflects this demo workflow, not independently verified bank settlement.</p>
-          {myPayments.length === 0 ? (
-            <div className="empty-note small"><p>You haven&rsquo;t submitted any donations yet.</p></div>
+          <div className="section-head"><div><span className="eyebrow">Your transfers</span><h2>My reports</h2></div>{myPayments?.length ? <span className="count-pill">{myPayments.length}</span> : null}</div>
+          <p className="muted-line">Reports are supporter-entered and are not proof of payment. The receiving athlete confirms whether a transfer arrived.</p>
+          {paymentsLoading && <p className="muted-line">Loading your reports…</p>}
+          {paymentsError && <ErrorState message={paymentsError} onRetry={reloadPayments} />}
+          {!paymentsLoading && !paymentsError && !myPayments?.length ? (
+            <div className="empty-note small"><p>You haven&rsquo;t reported any transfers yet. Open an athlete profile to see their payment QR.</p></div>
           ) : (
             <div className="payment-history">
-              {myPayments.map((d) => {
-                const athlete = getAthlete(d.athleteId);
-                const athleteName = athlete?.name ?? `Athlete #${d.athleteId}`;
+              {(myPayments ?? []).map((d: DirectDonation) => {
+                const athlete = athleteById.get(d.athleteOwnerId);
+                const athleteName = athlete?.name ?? "Athlete";
                 return (
                   <div className="payment-row" key={d.id}>
                     <div className="payment-main">
                       <strong>{athleteName}</strong>
-                      <StatusBadge status={d.status} />
-                      <PaymentRowMenu donation={d} athleteName={athleteName} />
+                      <span className={`status-badge ${d.status}`}>{d.status}</span>
                     </div>
                     <div className="payment-meta">
                       <span>{peso(d.amount)}</span>
                       <span>{d.method || "—"}</span>
                       <span>{shortDate(d.createdAt)}</span>
                     </div>
-                    {d.status === "pending" && <p className="payment-note muted-line">Awaiting athlete review — not yet accepted.</p>}
+                    <p className="payment-note muted-line">
+                      {d.status === "pending" ? "Awaiting athlete confirmation; not independently verified." : ""}
+                    </p>
                     {d.status === "rejected" && (
                       <p className="payment-reject">
-                        Rejected · {rejectionReasonLabel(d.rejectionReason ?? "")}
+                        Rejected · {directTransferRejectionLabel(d.rejectionReason)}
                         {d.rejectionNote ? ` — ${d.rejectionNote}` : ""}
                       </p>
                     )}
@@ -206,10 +228,6 @@ function SupporterDashboard({ athletes }: { athletes: Athlete[] }) {
             </div>
           )}
         </div>
-      </section>
-      <section className="dashboard-grid">
-        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Rising now</span><h2>Trending athletes</h2></div></div>{athletes.slice(1, 4).map((a, i) => <MiniAthlete key={a.id} athlete={a} rank={i + 1} />)}</div>
-        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Community</span><h2>Funding leaderboard</h2></div></div>{top.slice(0, 4).map((a, i) => <div className="leader-row" key={a.id}><span className={i === 0 ? "rank first" : "rank"}>{i + 1}</span><div><strong>{a.name}</strong><small>{a.supporters} supporters</small></div><b>{peso(a.raised)}</b></div>)}</div>
       </section>
     </main>
   );
@@ -753,16 +771,114 @@ function PaymentHistory({ athleteId }: { athleteId: number }) {
   );
 }
 
+function DirectTransferReview() {
+  const { data: donations, loading, error, reload } =
+    useAsync(getMyIncomingDirectDonations, []);
+  const [actionError, setActionError] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const [note, setNote] = useState("");
+  const pending = (donations ?? []).filter((donation) => donation.status === "pending");
+  const confirmed = (donations ?? []).filter((donation) => donation.status === "confirmed");
+  const totalConfirmed = confirmed.reduce((total, donation) => total + donation.amount, 0);
+
+  const confirm = async (donationId: string) => {
+    setBusyId(donationId);
+    setActionError("");
+    try {
+      await confirmDirectDonation(donationId);
+      reload();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Couldn't confirm this transfer.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const reject = async (donationId: string) => {
+    if (!reason) return;
+    setBusyId(donationId);
+    setActionError("");
+    try {
+      await rejectDirectDonation(donationId, reason, note);
+      setRejectingId(null);
+      setReason("");
+      setNote("");
+      reload();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "Couldn't reject this report.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <div className="dash-card">
+      <div className="section-head">
+        <div><span className="eyebrow">Direct transfers</span><h2>Support reports</h2></div>
+        {pending.length > 0 && <span className="count-pill">{pending.length}</span>}
+      </div>
+      <p className="muted-line">Supporters report transfers they say they sent. Confirm only after checking your wallet; Startlete cannot verify payment.</p>
+      {loading && <p className="muted-line">Loading transfer reports…</p>}
+      {error && <ErrorState message={error} onRetry={reload} />}
+      {actionError && <p className="form-error" role="alert">{actionError}</p>}
+      {!loading && !error && pending.length === 0 && (
+        <div className="empty-note small"><p>No transfer reports need review.</p></div>
+      )}
+      {pending.map((donation) => (
+        <div className="pending-row" key={donation.id}>
+          <span className="donor-avatar"><Icon name="heart" /></span>
+          <div className="pending-meta">
+            <strong>{donation.supporterName}</strong>
+            <small>{donation.method} · {donation.reference} · {timeAgo(donation.createdAt)}</small>
+            {donation.note && <small>{donation.note}</small>}
+          </div>
+          <b>{peso(donation.amount)}</b>
+          <div className="pending-actions">
+            {rejectingId === donation.id ? (
+              <div className="direct-transfer-form">
+                <label>Reason
+                  <select value={reason} onChange={(event) => setReason(event.target.value)}>
+                    <option value="" disabled>Select a reason</option>
+                    {DIRECT_TRANSFER_REJECTION_REASONS.map((item) => (
+                      <option key={item.value} value={item.value}>{item.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>Note (optional)<textarea value={note} onChange={(event) => setNote(event.target.value)} /></label>
+                <button className="button small danger" disabled={!reason || busyId === donation.id} onClick={() => reject(donation.id)}>Reject report</button>
+                <button className="text-button" onClick={() => setRejectingId(null)}>Cancel</button>
+              </div>
+            ) : (
+              <>
+                <button className="text-button danger" disabled={busyId === donation.id} onClick={() => setRejectingId(donation.id)}>Reject</button>
+                <button className="button small" disabled={busyId === donation.id} onClick={() => confirm(donation.id)}>
+                  {busyId === donation.id ? "Saving…" : "Confirm received"}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      ))}
+      {confirmed.length > 0 && (
+        <div className="direct-transfer-confirmed">
+          <div className="section-head"><h3>Confirmed transfers</h3><strong>{peso(totalConfirmed)}</strong></div>
+          {confirmed.map((donation) => (
+            <div className="donation-row" key={donation.id}>
+              <span className="donor-avatar"><Icon name="heart" /></span>
+              <div><strong>{donation.supporterName}</strong><small>{donation.method} · {timeAgo(donation.confirmedAt ?? donation.createdAt)}</small></div>
+              <b>+{peso(donation.amount)}</b>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AthleteDashboard() {
   const { displayName } = useSession();
-  // QR codes + donations (from the store/catalog model) are keyed by a numeric
-  // athlete id. The real-user model has no numeric id, so for these sections we
-  // use the demo catalog athlete — this restores the working QR/donation
-  // features for submission. NOTE: a follow-up migrates QR/donations to the
-  // real signed-in athlete (Supabase); until then these sections operate on the
-  // demo catalog athlete, not the logged-in user's own payment data.
-  const { athletes, getDonationsForAthlete } = useStarlete();
-  const demoAthleteId = athletes[0]?.id ?? 1;
   // The signed-in athlete's real profile (name, funding goal, etc.).
   const { data: profile } = useAsync<MyProfile | null>(() => getMyProfile(), []);
   // The signed-in athlete's own posts, loaded from the database feed.
@@ -842,29 +958,10 @@ function AthleteDashboard() {
         )) : <p className="profile-bio">No posts yet. Share your first update!</p>}</div>
       </section>
 
-      {/* QR payment codes + incoming donations (demo catalog athlete). */}
+      {/* The athlete's own QR codes and direct transfer reports. */}
       <section className="dashboard-grid">
-        <PendingDonations athleteId={demoAthleteId} />
+        <DirectTransferReview />
         <QrManager />
-      </section>
-
-      <section className="dashboard-grid">
-        <div className="dash-card">
-          <div className="section-head"><div><span className="eyebrow">Community support</span><h2>Confirmed donations</h2></div></div>
-          {(() => {
-            const confirmed = getDonationsForAthlete(demoAthleteId).filter((d) => d.status === "confirmed");
-            return confirmed.length === 0
-              ? <div className="empty-note small"><p>No confirmed donations yet. Confirm a pending receipt to see it here.</p></div>
-              : confirmed.map((d) => (
-                  <div className="donation-row" key={d.id}>
-                    <span className="donor-avatar"><Icon name="heart" /></span>
-                    <div><strong>{d.supporterName}</strong><small>{timeAgo(d.confirmedAt ?? d.createdAt)}</small></div>
-                    <b>+{peso(d.amount)}</b>
-                  </div>
-                ));
-          })()}
-        </div>
-        <PaymentHistory athleteId={demoAthleteId} />
       </section>
 
       {creating && <div className="modal-backdrop"><div className="modal small-modal"><button className="modal-close" onClick={() => setCreating(false)}><Icon name="close" /></button><span className="eyebrow">Share an update</span><h2>Bring supporters along</h2><label>Post<textarea value={post} onChange={e => setPost(e.target.value)} placeholder="What happened in training today?" /></label>{postError && <p className="field-error" role="alert">{postError}</p>}<button className="button full" disabled={!post.trim() || posting} onClick={publish}>{posting ? "Publishing…" : "Publish update"}</button></div></div>}
@@ -875,7 +972,6 @@ function AthleteDashboard() {
 
 export function DashboardScreen() {
   const { role, user, loading: sessionLoading } = useSession();
-  const { athletes } = useStarlete();
   const router = useRouter();
 
   useEffect(() => {
@@ -887,5 +983,5 @@ export function DashboardScreen() {
   if (role === "athlete") {
     return <AthleteDashboard />;
   }
-  return <SupporterDashboard athletes={athletes} />;
+  return <SupporterDashboard />;
 }

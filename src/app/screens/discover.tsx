@@ -3,15 +3,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { AthleteCard, Icon, peso } from "@/src/app/shared/ui";
-import { useStarlete } from "@/src/app/store";
-import type { Athlete } from "@/src/app/data/athletes";
+import { RegisteredAthleteCard, Icon, peso } from "@/src/app/shared/ui";
+import { ErrorState, useAsync } from "@/src/app/shared/async-state";
+import { getPublicAthletes, type PublicAthlete } from "@/src/app/services/public-athletes";
 import { regionName } from "@/src/app/lib/regions";
 import {
   REGION_MAP,
   countByRegion,
   filterAthletes,
 } from "@/src/app/lib/region-map";
+
+const EMPTY_ATHLETES: PublicAthlete[] = [];
 
 /** Map an athlete count to a choropleth intensity bucket (0 = empty). */
 function intensity(count: number): 0 | 1 | 2 | 3 | 4 {
@@ -33,7 +35,7 @@ function PhilippinesMap({
   selectedRegion,
   onSelectRegion,
 }: {
-  athletes: Athlete[];
+  athletes: PublicAthlete[];
   selectedRegion: string | null;
   onSelectRegion: (regionCode: string | null) => void;
 }) {
@@ -136,8 +138,8 @@ function PhilippinesMap({
 }
 
 /** A single brief, text-only athlete row for the compact region/search list. */
-function AthleteRow({ athlete }: { athlete: Athlete }) {
-  const percent = Math.round((athlete.raised / athlete.goal) * 100);
+function AthleteRow({ athlete }: { athlete: PublicAthlete }) {
+  const percent = athlete.goal > 0 ? Math.round((athlete.raised / athlete.goal) * 100) : 0;
   return (
     <Link className="region-row" href={`/athletes/${athlete.id}`}>
       <div className="region-row-head">
@@ -145,14 +147,19 @@ function AthleteRow({ athlete }: { athlete: Athlete }) {
         {athlete.verified && <span className="verified" title="Verified athlete"><Icon name="check" size={11} /></span>}
       </div>
       <span className="region-row-meta"><Icon name="pin" size={13} /> {athlete.location} · {athlete.sport}</span>
-      <div className="region-row-progress"><span style={{ width: `${Math.min(percent, 100)}%` }} /></div>
-      <small className="region-row-fund">{peso(athlete.raised)} raised · {percent}%</small>
+      {athlete.goal > 0 && (
+        <>
+          <div className="region-row-progress"><span style={{ width: `${Math.min(percent, 100)}%` }} /></div>
+          <small className="region-row-fund">{peso(athlete.raised)} raised · {percent}%</small>
+        </>
+      )}
     </Link>
   );
 }
 
 export function DiscoverScreen() {
-  const { athletes } = useStarlete();
+  const { data: athletesData, loading, error, reload } = useAsync<PublicAthlete[]>(getPublicAthletes, []);
+  const athletes = athletesData ?? EMPTY_ATHLETES;
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -255,6 +262,15 @@ export function DiscoverScreen() {
             </div>
           </div>
 
+          {loading && <p className="muted-line">Loading registered athletes…</p>}
+          {!loading && error && <ErrorState message={error} onRetry={reload} />}
+          {!loading && !error && athletes.length === 0 && (
+            <div className="empty-note small">
+              <p>No athletes have published payment details yet. Check back later or create an athlete account.</p>
+              <Link className="text-button" href="/register">Join as an athlete</Link>
+            </div>
+          )}
+
           {listActive && (
             <div className="region-list">
               <div className="region-list-head">
@@ -282,6 +298,19 @@ export function DiscoverScreen() {
         </div>
       </section>
 
+      {!listActive && !loading && !error && athletes.length > 0 && (
+        <section className="discover-results">
+          <div className="section-head">
+            <div><span className="eyebrow">Athlete community</span><h2>Registered athletes</h2></div>
+          </div>
+          <div className="card-grid">
+            {athletes.map((athlete) => (
+              <RegisteredAthleteCard key={athlete.id} athlete={athlete} />
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Expanded detailed catalog: a solid sheet that slides up over the
           explorer so the catalog comes to the user, reusing the existing
           AthleteCard grid. */}
@@ -296,7 +325,7 @@ export function DiscoverScreen() {
               </div>
             </div>
             <div className="catalog-sheet-scroll">
-              <div className="card-grid">{filtered.map((a) => <AthleteCard key={a.id} athlete={a} />)}</div>
+              <div className="card-grid">{filtered.map((a) => <RegisteredAthleteCard key={a.id} athlete={a} />)}</div>
               {!filtered.length && <div className="empty"><h3>No athletes found</h3><p>Try broadening your search, choosing another region, or clearing a filter.</p></div>}
             </div>
           </div>

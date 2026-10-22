@@ -3,6 +3,7 @@
 import { ReactNode } from "react";
 import Link from "next/link";
 import type { Athlete } from "@/src/app/data/athletes";
+import type { PublicAthlete } from "@/src/app/services/public-athletes";
 
 /** Format a number as Philippine pesos. */
 export const peso = (value: number) => `₱${value.toLocaleString("en-PH")}`;
@@ -65,6 +66,33 @@ export function AthleteCard({ athlete }: { athlete: Athlete }) {
         <Progress value={percent} />
         <div className="funding-line"><span><strong>{peso(athlete.raised)}</strong> raised</span><span>{percent}%</span></div>
         <span className="card-link">View story <Icon name="arrow" size={16} /></span>
+      </div>
+    </Link>
+  );
+}
+
+/** Summary card for a registered athlete backed by the public Supabase directory. */
+export function RegisteredAthleteCard({ athlete }: { athlete: PublicAthlete }) {
+  const percent = athlete.goal > 0 ? Math.round((athlete.raised / athlete.goal) * 100) : 0;
+  return (
+    <Link className="athlete-card" href={`/athletes/${athlete.id}`}>
+      <div className="card-image">
+        <img src={athlete.image} alt={`${athlete.name}, ${athlete.sport || "athlete"}`} />
+        {athlete.sport && <span className="sport-pill">{athlete.sport}</span>}
+      </div>
+      <div className="card-content">
+        <div className="name-line">
+          <h3>{athlete.name}</h3>
+          {athlete.verified && <span className="verified" title="Verified athlete"><Icon name="check" size={12} /></span>}
+        </div>
+        <p className="location"><Icon name="pin" size={15} />{athlete.location || "Philippines"}</p>
+        {athlete.goal > 0 && (
+          <>
+            <Progress value={percent} />
+            <div className="funding-line"><span><strong>{peso(athlete.raised)}</strong> raised</span><span>{percent}%</span></div>
+          </>
+        )}
+        <span className="card-link">View profile <Icon name="arrow" size={16} /></span>
       </div>
     </Link>
   );
