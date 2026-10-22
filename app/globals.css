@@ -152,7 +152,10 @@ footer p { margin: 0; flex: 1; }
 .feed-post-text { margin-bottom: 18px; color: #34455b; font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
 .feed-actions { display: flex; flex-wrap: wrap; gap: 18px; padding-top: 14px; border-top: 1px solid #edf0f4; }
 .feed-action { display: inline-flex; align-items: center; gap: 7px; padding: 2px 0; border: 0; background: none; color: var(--muted); font-size: 12px; }
-.feed-action:hover, .feed-action.liked { color: var(--color-impact); }
+.feed-action.liked { color: var(--color-impact); }
+.feed-action:hover { color: var(--ink); }
+.feed-action.liked:hover { color: var(--color-impact); }
+.feed-action.liked svg { fill: currentColor; }
 .feed-comments { display: grid; gap: 14px; margin-top: 18px; padding-top: 16px; border-top: 1px solid #edf0f4; }
 .feed-comment { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; }
 .feed-comment-avatar { flex: 0 0 30px; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--cream); color: var(--navy); font-weight: 700; }
