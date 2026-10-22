@@ -3,13 +3,14 @@
 import { Suspense, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import Image from "next/image";
 import { Icon, Logo } from "@/src/app/shared/ui";
 import { useSession } from "@/src/app/shared/session-provider";
 
 function Header() {
   const pathname = usePathname();
   const router = useRouter();
-  const { role, displayName, signOut: endSession } = useSession();
+  const { role, displayName, profilePicture, signOut: endSession } = useSession();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 
@@ -40,7 +41,9 @@ function Header() {
           {role ? (
             <>
               <Link className={isActive("/dashboard") ? "active" : ""} href="/dashboard" onClick={close}>Dashboard</Link>
-              <Link className="nav-user" href="/dashboard/edit" onClick={close}>{initials}</Link>
+              <Link className="nav-user" href="/dashboard/edit" onClick={close} aria-label="Edit profile">
+                {profilePicture ? <Image src={profilePicture} alt="" width={37} height={37} unoptimized /> : initials}
+              </Link>
               <button className="icon-only" onClick={signOut} aria-label="Log out"><Icon name="logout" /></button>
             </>
           ) : (

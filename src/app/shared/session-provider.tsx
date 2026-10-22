@@ -31,6 +31,8 @@ interface SessionState {
   role: Role | null;
   /** The user's display name (first name or email local part). */
   displayName: string | null;
+  /** Public URL for the user's profile picture, if set. */
+  profilePicture: string | null;
   signOut: () => Promise<void>;
   /** Re-read the current session and profile (after sign in/up). */
   refresh: () => Promise<void>;
@@ -43,17 +45,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<Role | null>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [profilePicture, setProfilePicture] = useState<string | null>(null);
 
   const loadProfile = useCallback(async (currentUser: User | null) => {
     if (!currentUser) {
       setRole(null);
       setDisplayName(null);
+      setProfilePicture(null);
       return;
     }
     const supabase = createClient();
     let { data } = await supabase
       .from("profiles")
-      .select("role, first_name")
+      .select("role, first_name, profile_picture")
       .eq("id", currentUser.id)
       .maybeSingle();
 
@@ -68,12 +72,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       const { data: created } = await supabase
         .from("profiles")
         .insert({ id: currentUser.id, role: metaRole ?? "supporter", first_name: metaName })
-        .select("role, first_name")
+        .select("role, first_name, profile_picture")
         .maybeSingle();
       if (created) data = created;
     }
 
     setRole((data?.role as Role | undefined) ?? metaRole);
+    setProfilePicture(data?.profile_picture ?? null);
     setDisplayName(
       data?.first_name ??
         metaName ??
@@ -117,11 +122,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setRole(null);
     setDisplayName(null);
+    setProfilePicture(null);
   }, []);
 
   const value = useMemo<SessionState>(
-    () => ({ loading, user, role, displayName, signOut, refresh }),
-    [loading, user, role, displayName, signOut, refresh],
+    () => ({ loading, user, role, displayName, profilePicture, signOut, refresh }),
+    [loading, user, role, displayName, profilePicture, signOut, refresh],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

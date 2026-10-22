@@ -9,6 +9,21 @@ and this project aims to follow semantic versioning once it reaches a release.
 
 ### Added
 
+- Profile-picture uploads for athletes and supporters through Account settings.
+  JPEG, PNG, and WebP images up to 5 MB are stored in the public Supabase
+  `profile-images` bucket; authenticated users can only write to their own
+  storage folder. Athlete pictures appear on Discover cards and public
+  profiles, while signed-in users see their picture in the header. Apply
+  `0013_profile_picture_storage.sql` before enabling uploads. See
+  `docs/PROFILE_IMAGES.md` for setup, usage, and privacy details.
+- Athlete signup now requires a location selected from the canonical list of
+  18 Philippine regions and saves the region and sport into
+  `athlete_profiles`. Apply `0012_create_athlete_profile_on_signup.sql` for the
+  signup trigger update.
+- The profile editor presents picture selection and upload in a dedicated
+  panel, separate from saving profile details. Missing Storage setup is
+  reported with migration guidance and does not block saving other profile
+  information.
 - Database-backed authentication via Supabase: real sign up / log in / log out
   with hashed passwords, sessions, and a `profiles` table, replacing the demo
   role-picker. Sessions refresh via `proxy.ts` (Next.js 16 Proxy) and are

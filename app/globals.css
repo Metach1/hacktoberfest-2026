@@ -306,8 +306,18 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .settings { max-width: 900px; margin: auto; padding: 60px 28px 100px; }
 .settings-head { margin-bottom: 35px; }
 .settings-card { padding: 32px; border: 1px solid var(--line); border-radius: 18px; }
-.profile-avatar { width: 70px; height: 70px; border-radius: 50%; background: var(--navy); color: white; display: grid; place-items: center; font-weight: 800; margin-bottom: 28px; position: relative; }
-.profile-avatar button { position: absolute; right: -4px; bottom: -4px; border: 3px solid white; background: var(--blue); color: white; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; }
+.profile-picture-section { display: flex; align-items: center; gap: 20px; padding: 20px; margin-bottom: 30px; border: 1px solid var(--line); border-radius: 14px; background: #fafbfd; }
+.profile-avatar { flex: 0 0 76px; width: 76px; height: 76px; border-radius: 50%; background: var(--navy); color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; overflow: hidden; }
+.profile-avatar > img { width: 100%; height: 100%; object-fit: cover; }
+.profile-picture-controls { min-width: 0; display: grid; gap: 10px; }
+.profile-picture-controls > div:first-child > strong { color: var(--ink); font-size: 14px; }
+.profile-picture-input { display: none; }
+.profile-picture-help { color: var(--muted); font-size: 12px; margin: 4px 0 0; }
+.profile-picture-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.profile-picture-actions .button { min-height: 38px; padding: 0 14px; font-size: 12px; }
+.profile-picture-status { color: var(--muted); font-size: 12px; margin: 0; overflow-wrap: anywhere; }
+.profile-picture-controls .field-error { margin: 0; }
+.nav-user img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
 .form-actions { display: flex; justify-content: flex-end; gap: 10px; }
 
 .modal-backdrop { position: fixed; z-index: 100; inset: 0; background: rgba(3,17,31,.76); backdrop-filter: blur(5px); display: grid; place-items: center; padding: 20px; overflow-y: auto; }

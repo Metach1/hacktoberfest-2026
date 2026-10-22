@@ -62,7 +62,7 @@ catalog.
 
 1. Create a Supabase project.
 2. Apply the migrations in order through
-   `supabase/migrations/0012_create_athlete_profile_on_signup.sql`.
+   `supabase/migrations/0013_profile_picture_storage.sql`.
 3. Copy `.env.example` to `.env.local` and set the project URL and public anon
    key.
 4. Run `npm install` and `npm run dev`.
@@ -74,7 +74,8 @@ migrations. Migration `0011_reconcile_athlete_profiles.sql` adds athlete profile
 columns that were skipped when the table already existed during migration
 `0006_full_backend.sql`. Migration `0012_create_athlete_profile_on_signup.sql`
 updates the auth trigger so athlete signup saves the selected region and sport
-to `athlete_profiles`.
+to `athlete_profiles`. Migration `0013_profile_picture_storage.sql` configures
+the public profile photo bucket and owner-only upload policies.
 
 Never expose a Supabase service-role key. Public reads and owner-specific writes
 are enforced by database RLS policies.

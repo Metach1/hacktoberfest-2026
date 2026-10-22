@@ -9,6 +9,10 @@
  */
 import { createClient } from "@/src/app/lib/supabase/client";
 
+const PROFILE_IMAGE_BUCKET = "profile-images";
+const MAX_PROFILE_IMAGE_SIZE = 5 * 1024 * 1024;
+const PROFILE_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
 export interface MyProfile {
   id: string;
   role: "athlete" | "supporter";
@@ -68,6 +72,43 @@ export async function getMyProfile(): Promise<MyProfile | null> {
     location,
     fundingGoal,
   };
+}
+
+/** Upload and publish the signed-in user's profile picture. */
+export async function uploadMyProfilePicture(file: File): Promise<string> {
+  if (!PROFILE_IMAGE_TYPES.includes(file.type)) {
+    throw new Error("Choose a JPEG, PNG, or WebP image.");
+  }
+  if (file.size > MAX_PROFILE_IMAGE_SIZE) {
+    throw new Error("Profile pictures must be 5 MB or smaller.");
+  }
+
+  const supabase = createClient();
+  const { data: auth, error: authError } = await supabase.auth.getUser();
+  if (authError) throw new Error(authError.message);
+  const uid = auth.user?.id;
+  if (!uid) throw new Error("You must be signed in.");
+
+  const path = `${uid}/profile`;
+  const { error: uploadError } = await supabase.storage
+    .from(PROFILE_IMAGE_BUCKET)
+    .upload(path, file, {
+      cacheControl: "0",
+      contentType: file.type,
+      upsert: true,
+    });
+  if (uploadError) throw new Error(uploadError.message);
+
+  const { data } = supabase.storage.from(PROFILE_IMAGE_BUCKET).getPublicUrl(path);
+  const { data: updatedProfile, error: profileError } = await supabase
+    .from("profiles")
+    .update({ profile_picture: data.publicUrl })
+    .eq("id", uid)
+    .select("id")
+    .maybeSingle();
+  if (profileError) throw new Error(profileError.message);
+  if (!updatedProfile) throw new Error("The image uploaded, but your profile picture could not be saved.");
+  return data.publicUrl;
 }
 
 export interface UpdateMyProfileInput {

@@ -35,7 +35,7 @@ Requirements: Node.js 20.19 or newer and npm.
 
 1. Create a Supabase project.
 2. Apply the migrations in `supabase/migrations/` in order through
-   `0012_create_athlete_profile_on_signup.sql`.
+   `0013_profile_picture_storage.sql`.
 3. Copy `.env.example` to `.env.local` and set the Supabase project URL and
    public anon key.
 4. Install and run:
@@ -57,6 +57,12 @@ code does not execute remote database migrations.
 Athlete signup requires a location selected from the 18 Philippine regions.
 Apply migration `0012_create_athlete_profile_on_signup.sql` so the signup
 trigger saves the selected region and sport to the athlete's profile.
+
+Athletes and supporters can upload a public profile photo from Account
+settings. For setup, image limits, privacy, and where athlete photos appear, see
+the [profile pictures guide](./docs/PROFILE_IMAGES.md). Apply migration
+`0013_profile_picture_storage.sql` to configure the Supabase Storage bucket and
+ownership policies.
 
 ## Development checks
 
