@@ -34,12 +34,12 @@ export const LOCATIONS = {
     ],
   },
   CAR: {
-    Benguet: ["Baguio", "La Trinidad", "Itogon"],
-    Ifugao: ["Lagawe", "Kiangan"],
-    "Mountain Province": ["Bontoc", "Sagada"],
-    Abra: ["Bangued"],
-    Apayao: ["Kabugao", "Luna"],
-    Kalinga: ["Tabuk"],
+    Benguet: ["Baguio", "La Trinidad", "Itogon", "Tuba", "Mankayan"],
+    Ifugao: ["Lagawe", "Kiangan", "Banaue", "Mayoyao"],
+    "Mountain Province": ["Bontoc", "Sagada", "Besao", "Sabangan"],
+    Abra: ["Bangued", "Bucay", "Lagangilang"],
+    Apayao: ["Kabugao", "Luna", "Conner", "Flora"],
+    Kalinga: ["Tabuk", "Rizal", "Pinukpuk"],
   },
   "Region I": {
     "Ilocos Norte": ["Laoag", "Batac"],
@@ -71,11 +71,11 @@ export const LOCATIONS = {
     Quezon: ["Lucena", "Tayabas"],
   },
   "Region IV-B": {
-    "Oriental Mindoro": ["Calapan"],
-    "Occidental Mindoro": ["Mamburao"],
-    Palawan: ["Puerto Princesa"],
-    Marinduque: ["Boac"],
-    Romblon: ["Romblon"],
+    "Oriental Mindoro": ["Calapan", "Naujan", "Pinamalayan", "Bongabong"],
+    "Occidental Mindoro": ["Mamburao", "San Jose", "Sablayan"],
+    Palawan: ["Puerto Princesa", "Coron", "El Nido", "Narra", "Brooke's Point"],
+    Marinduque: ["Boac", "Mogpog", "Santa Cruz", "Gasan"],
+    Romblon: ["Romblon", "Odiongan", "San Agustin"],
   },
   "Region V": {
     "Camarines Sur": ["Naga", "Iriga", "Pili"],
@@ -93,17 +93,16 @@ export const LOCATIONS = {
     Guimaras: ["Jordan"],
   },
   "Region VII": {
-    Cebu: ["Cebu City", "Mandaue", "Lapu-Lapu", "Talisay", "Toledo", "Danao", "Carcar"],
-    Bohol: ["Tagbilaran"],
-    Siquijor: ["Siquijor"],
+    Cebu: ["Cebu City", "Mandaue", "Lapu-Lapu", "Talisay", "Toledo", "Danao", "Carcar", "Naga", "Bogo"],
+    Bohol: ["Tagbilaran", "Tubigon", "Jagna", "Ubay", "Carmen"],
   },
   "Region VIII": {
-    Leyte: ["Tacloban", "Ormoc", "Baybay"],
-    "Southern Leyte": ["Maasin"],
-    Samar: ["Catbalogan", "Calbayog"],
-    "Northern Samar": ["Catarman"],
-    "Eastern Samar": ["Borongan"],
-    Biliran: ["Naval"],
+    Leyte: ["Tacloban", "Ormoc", "Baybay", "Palo", "Carigara"],
+    "Southern Leyte": ["Maasin", "Sogod", "Liloan"],
+    Samar: ["Catbalogan", "Calbayog", "Basey"],
+    "Northern Samar": ["Catarman", "Laoang", "Allen"],
+    "Eastern Samar": ["Borongan", "Guiuan"],
+    Biliran: ["Naval", "Caibiran", "Kawayan"],
   },
   "Region IX": {
     "Zamboanga del Sur": ["Pagadian", "Zamboanga City"],
@@ -125,10 +124,10 @@ export const LOCATIONS = {
     "Davao Occidental": ["Malita"],
   },
   "Region XII": {
-    "South Cotabato": ["Koronadal", "General Santos"],
-    Cotabato: ["Kidapawan"],
-    "Sultan Kudarat": ["Tacurong", "Isulan"],
-    Sarangani: ["Alabel"],
+    "South Cotabato": ["Koronadal", "General Santos", "Polomolok", "Surallah"],
+    Cotabato: ["Kidapawan", "Midsayap", "Kabacan"],
+    "Sultan Kudarat": ["Tacurong", "Isulan", "Lambayong"],
+    Sarangani: ["Alabel", "Glan", "Malapatan"],
   },
   "Region XIII": {
     "Agusan del Norte": ["Butuan", "Cabadbaran"],
@@ -145,8 +144,9 @@ export const LOCATIONS = {
     "Tawi-Tawi": ["Bongao"],
   },
   NIR: {
-    "Negros Occidental": ["Bacolod", "Bago", "Cadiz", "Silay", "Talisay", "Victorias"],
-    "Negros Oriental": ["Dumaguete", "Bais", "Bayawan", "Canlaon", "Tanjay"],
+    "Negros Occidental": ["Bacolod", "Bago", "Cadiz", "Silay", "Talisay", "Victorias", "Kabankalan", "Sagay", "Himamaylan", "La Carlota"],
+    "Negros Oriental": ["Dumaguete", "Bais", "Bayawan", "Canlaon", "Tanjay", "Guihulngan", "Valencia", "Siaton"],
+    Siquijor: ["Siquijor", "Larena", "Lazi", "Maria", "Enrique Villanueva", "San Juan"],
   },
 };
 
