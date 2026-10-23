@@ -393,6 +393,37 @@ export function recentConfirmedDonations(donations, athleteId, limit = 5) {
   return confirmedDonationsForAthlete(donations, athleteId).slice(0, Math.max(0, limit));
 }
 
+/**
+ * All CONFIRMED donations for an athlete matched by their STABLE Supabase
+ * profile id (UUID), newest first. The profile-id counterpart of
+ * confirmedDonationsForAthlete: registered athletes share a non-unique synthetic
+ * numeric id, so the donor list must be scoped by athleteProfileId to stay
+ * exclusive per athlete. Pending/rejected donations are excluded.
+ *
+ * @param {Array<Object>} donations
+ * @param {string} profileId  Supabase athlete profile UUID.
+ * @returns {Array<Object>} new array, sorted by createdAt descending
+ */
+export function confirmedDonationsForProfile(donations, profileId) {
+  if (!profileId) return [];
+  return donations
+    .filter((d) => d.athleteProfileId === profileId && d.status === DONATION_STATUS.CONFIRMED)
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/**
+ * The N most recent CONFIRMED donations for an athlete by profile id (default
+ * 5), newest first. Profile-id counterpart of recentConfirmedDonations.
+ *
+ * @param {Array<Object>} donations
+ * @param {string} profileId  Supabase athlete profile UUID.
+ * @param {number} [limit=5]
+ * @returns {Array<Object>}
+ */
+export function recentConfirmedDonationsForProfile(donations, profileId, limit = 5) {
+  return confirmedDonationsForProfile(donations, profileId).slice(0, Math.max(0, limit));
+}
+
 /** The display name used for donations with no supplied donor name. */
 export const ANONYMOUS_DONOR_NAME = "Anonymous supporter";
 
@@ -454,10 +485,39 @@ export function isAnonymousDonation(donation) {
  * @returns {Array<{ id: string, donor: string, total: number, count: number, latestAt: number }>}
  */
 export function topDonorsForAthlete(donations, athleteId, limit) {
+  return rankDonors(donations, (d) => d.athleteId === athleteId, limit);
+}
+
+/**
+ * Profile-id counterpart of topDonorsForAthlete: rank confirmed contributors
+ * for an athlete matched by their STABLE Supabase profile id (UUID). Same
+ * ranking, aggregation, and anonymous-row rules; used so the donor list stays
+ * exclusive per registered athlete.
+ *
+ * @param {Array<Object>} donations
+ * @param {string} profileId  Supabase athlete profile UUID.
+ * @param {number} [limit] Optional cap on returned rows.
+ * @returns {Array<{ id: string, donor: string, total: number, count: number, latestAt: number }>}
+ */
+export function topDonorsForProfile(donations, profileId, limit) {
+  if (!profileId) return [];
+  return rankDonors(donations, (d) => d.athleteProfileId === profileId, limit);
+}
+
+/**
+ * Shared donor-ranking core. `matches` selects which donations belong to the
+ * target athlete (by numeric id or by profile id); confirmed-only, aggregation,
+ * anonymous-row, and tie-break rules are identical regardless of the matcher.
+ *
+ * @param {Array<Object>} donations
+ * @param {(d: Object) => boolean} matches
+ * @param {number} [limit]
+ */
+function rankDonors(donations, matches, limit) {
   const byDonor = new Map();
   const anonymousRows = [];
   for (const d of donations) {
-    if (d.athleteId !== athleteId || d.status !== DONATION_STATUS.CONFIRMED) continue;
+    if (!matches(d) || d.status !== DONATION_STATUS.CONFIRMED) continue;
     if (isAnonymousDonation(d)) {
       anonymousRows.push({
         id: d.id,

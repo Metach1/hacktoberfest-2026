@@ -8,6 +8,9 @@ import {
   confirmedDonationsForAthlete,
   recentConfirmedDonations,
   topDonorsForAthlete,
+  confirmedDonationsForProfile,
+  recentConfirmedDonationsForProfile,
+  topDonorsForProfile,
   donorKey,
 } from "../src/app/lib/donations.mjs";
 
@@ -20,6 +23,16 @@ function confirmed({ athleteId, amount, name, at, id }) {
   );
 }
 
+/**
+ * Build a confirmed donation scoped by Supabase profile id. Registered athletes
+ * share a non-unique synthetic numeric athleteId (e.g. -1), so these tests give
+ * every donation the SAME numeric id to prove the profile-id helpers isolate by
+ * athleteProfileId alone.
+ */
+function confirmedForProfile({ profileId, amount, name, at, id }) {
+  return { ...confirmed({ athleteId: -1, amount, name, at, id }), athleteProfileId: profileId };
+}
+
 test("confirmedDonationsForAthlete returns only that athlete's confirmed donations", () => {
   const donations = [
     confirmed({ athleteId: 1, amount: 500, name: "Ana", at: 100, id: "a" }),
@@ -29,6 +42,59 @@ test("confirmedDonationsForAthlete returns only that athlete's confirmed donatio
   ];
   const result = confirmedDonationsForAthlete(donations, 1);
   assert.deepEqual(result.map((d) => d.id), ["a"], "excludes other athletes, pending, and rejected");
+});
+
+test("confirmedDonationsForProfile is exclusive per athlete despite a shared numeric id", () => {
+  // All donations carry the SAME numeric athleteId (-1); only athleteProfileId
+  // differs. This reproduces the registered-athlete bug where donations leaked
+  // across profiles.
+  const donations = [
+    confirmedForProfile({ profileId: "carlos", amount: 500, name: "Ana", at: 100, id: "c1" }),
+    confirmedForProfile({ profileId: "carlos", amount: 300, name: "Ben", at: 200, id: "c2" }),
+    confirmedForProfile({ profileId: "rene", amount: 999, name: "Cy", at: 150, id: "r1" }),
+    { ...createPendingDonation({ athleteId: -1, amount: 777, createdAt: 160, id: "cp" }), athleteProfileId: "carlos" }, // pending
+  ];
+  assert.deepEqual(
+    confirmedDonationsForProfile(donations, "carlos").map((d) => d.id),
+    ["c2", "c1"],
+    "only Carlos's confirmed donations, newest first — Rene's excluded",
+  );
+  assert.deepEqual(confirmedDonationsForProfile(donations, "rene").map((d) => d.id), ["r1"]);
+  assert.deepEqual(confirmedDonationsForProfile(donations, "adili"), [], "an athlete with none gets an empty list");
+  assert.deepEqual(confirmedDonationsForProfile(donations, ""), [], "blank profile id yields nothing");
+});
+
+test("recentConfirmedDonationsForProfile caps and scopes by profile id", () => {
+  const donations = Array.from({ length: 7 }, (_, i) =>
+    confirmedForProfile({ profileId: "carlos", amount: 100 + i, name: `D${i}`, at: i * 100, id: `c${i}` }),
+  ).concat(confirmedForProfile({ profileId: "rene", amount: 9999, name: "X", at: 9999, id: "r" }));
+  const recent = recentConfirmedDonationsForProfile(donations, "carlos", 5);
+  assert.equal(recent.length, 5);
+  assert.deepEqual(recent.map((d) => d.id), ["c6", "c5", "c4", "c3", "c2"], "newest five for Carlos only");
+});
+
+test("topDonorsForProfile ranks per athlete and excludes other profiles", () => {
+  const donations = [
+    confirmedForProfile({ profileId: "carlos", amount: 500, name: "Ana", at: 100, id: "c1" }),
+    confirmedForProfile({ profileId: "carlos", amount: 700, name: "Ana", at: 300, id: "c2" }), // Ana 1200
+    confirmedForProfile({ profileId: "carlos", amount: 1000, name: "Ben", at: 200, id: "c3" }), // Ben 1000
+    confirmedForProfile({ profileId: "rene", amount: 5000, name: "Ana", at: 400, id: "r1" }), // other profile
+  ];
+  const top = topDonorsForProfile(donations, "carlos");
+  assert.deepEqual(top.map((t) => t.donor), ["Ana", "Ben"]);
+  assert.equal(top[0].total, 1200, "Ana's total is Carlos-only, not merged with Rene's");
+  assert.equal(top[0].count, 2);
+  assert.deepEqual(topDonorsForProfile(donations, ""), [], "blank profile id yields no rows");
+});
+
+test("topDonorsForProfile keeps anonymous donations as separate rows", () => {
+  const donations = [
+    confirmedForProfile({ profileId: "carlos", amount: 300, name: "", at: 100, id: "a1" }),
+    confirmedForProfile({ profileId: "carlos", amount: 700, name: "   ", at: 300, id: "a2" }),
+  ];
+  const top = topDonorsForProfile(donations, "carlos");
+  assert.equal(top.length, 2, "two anonymous donations stay separate");
+  assert.deepEqual(top.map((t) => t.id), ["a2", "a1"], "ranked by amount, keyed by donation id");
 });
 
 test("confirmedDonationsForAthlete orders newest first", () => {

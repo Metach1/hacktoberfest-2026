@@ -7,6 +7,9 @@ import {
   confirmedDonationsForAthlete,
   recentConfirmedDonations,
   topDonorsForAthlete,
+  confirmedDonationsForProfile,
+  recentConfirmedDonationsForProfile,
+  topDonorsForProfile,
 } from "@/src/app/lib/donations.mjs";
 
 /** A ranked row as returned by topDonorsForAthlete. For named donors `id` is
@@ -75,16 +78,24 @@ function Popup({ title, onClose, children }: { title: string; onClose: () => voi
  * receipts — are never shown here. Donor identities come from the donation's
  * entered display name; see `donorKey` for the demo identity limitation.
  */
-export function DonationsPanel({ athleteId }: { athleteId: number }) {
-  const { getDonationsForAthlete, donationError } = useStarlete();
+export function DonationsPanel({ athleteId, profileId }: { athleteId: number; profileId?: string }) {
+  const { getDonationsForAthlete, donations, donationError } = useStarlete();
   const [popup, setPopup] = useState<null | "all" | "top">(null);
 
-  // getDonationsForAthlete returns every status; the helpers below keep only
-  // confirmed donations, so pending/rejected never surface here.
-  const all = getDonationsForAthlete(athleteId);
-  const confirmed = confirmedDonationsForAthlete(all, athleteId) as Donation[];
-  const recent = recentConfirmedDonations(all, athleteId, 5) as Donation[];
-  const topDonors = topDonorsForAthlete(all, athleteId) as DonorRank[];
+  // Registered athletes share a non-unique synthetic numeric id, so their donor
+  // list must be scoped by the stable Supabase profile id to stay exclusive per
+  // athlete. Seed/demo athletes have no profileId and keep the numeric-id path.
+  // All helpers keep only confirmed donations; pending/rejected never surface.
+  const scoped = getDonationsForAthlete(athleteId);
+  const confirmed = (profileId
+    ? confirmedDonationsForProfile(donations, profileId)
+    : confirmedDonationsForAthlete(scoped, athleteId)) as Donation[];
+  const recent = (profileId
+    ? recentConfirmedDonationsForProfile(donations, profileId, 5)
+    : recentConfirmedDonations(scoped, athleteId, 5)) as Donation[];
+  const topDonors = (profileId
+    ? topDonorsForProfile(donations, profileId)
+    : topDonorsForAthlete(scoped, athleteId)) as DonorRank[];
   const count = confirmed.length;
 
   return (
