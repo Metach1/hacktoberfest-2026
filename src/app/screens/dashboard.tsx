@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AthleteCard, Icon, MiniAthlete, Progress, peso } from "@/src/app/shared/ui";
-import { useStarlete, type Donation, type QrCode } from "@/src/app/store";
+import { useStarlete, DONATION_STATUS, type Donation, type QrCode } from "@/src/app/store";
 import type { Athlete } from "@/src/app/data/athletes";
 import { type Post } from "@/src/app/data/posts";
 import { TimeAgo } from "@/src/app/shared/time-ago";
@@ -160,16 +160,24 @@ function PaymentRowMenu({ donation, athleteName }: { donation: Donation; athlete
 }
 
 function SupporterDashboard({ athletes, displayName }: { athletes: Athlete[]; displayName: string | null }) {
-  const { getDonationsForSupporter, getAthlete } = useStarlete();
+  const { getDonationsForSupporter, getAthlete, donationError } = useStarlete();
   const top = [...athletes].sort((a, b) => b.raised - a.raised);
   const myPayments = getDonationsForSupporter();
+  // Real "total impact": the current supporter's CONFIRMED donations summed
+  // across every athlete. Mirrors how confirmedTotals sums confirmed amounts
+  // for an athlete, but scoped to this supporter's own payments. Empty -> ₱0.
+  const totalImpact = myPayments.reduce(
+    (sum, d) => (d.status === DONATION_STATUS.CONFIRMED ? sum + d.amount : sum),
+    0,
+  );
   return (
     <main className="dashboard page-shell">
-      <div className="dash-welcome"><div><span className="eyebrow">Supporter dashboard</span><h1>Magandang araw, {displayName || "supporter"}.</h1><p>There are new stories waiting for your support.</p></div><div className="dash-welcome-actions"><Link className="button secondary" href="/discover?view=all"><Icon name="users" size={16} /> View all athletes</Link><div className="impact-chip"><Icon name="heart" /><span><small>Your total impact</small><b>₱4,500 given</b></span></div></div></div>
+      <div className="dash-welcome"><div><span className="eyebrow">Supporter dashboard</span><h1>Magandang araw, {displayName || "supporter"}.</h1><p>There are new stories waiting for your support.</p></div><div className="dash-welcome-actions"><Link className="button secondary" href="/discover?view=all"><Icon name="users" size={16} /> View all athletes</Link><div className="impact-chip"><Icon name="heart" /><span><small>Your total impact</small><b>{peso(totalImpact)} given</b></span></div></div></div>
       <section><div className="section-head"><div><span className="eyebrow">Picked for you</span><h2>Athletes making moves</h2></div></div><div className="card-grid">{athletes.slice(0, 3).map(a => <AthleteCard key={a.id} athlete={a} />)}</div></section>
       <section className="dashboard-grid">
         <div className="dash-card">
           <div className="section-head"><div><span className="eyebrow">Your payments</span><h2>My payments</h2></div>{myPayments.length > 0 && <span className="count-pill">{myPayments.length}</span>}</div>
+          {donationError && <p className="field-error" role="alert">{donationError}</p>}
           <p className="muted-line">Donations you submitted. A <strong>pending</strong> submission is awaiting athlete review — it is not yet accepted. A <strong>confirmed</strong> status reflects this demo workflow, not independently verified bank settlement.</p>
           {myPayments.length === 0 ? (
             <div className="empty-note small"><p>You haven&rsquo;t submitted any donations yet.</p></div>
@@ -490,7 +498,7 @@ function QrManager({ athleteId }: { athleteId: number }) {
 }
 
 function PendingDonations({ athleteId }: { athleteId: number }) {
-  const { getDonationsForAthlete, confirmDonation, rejectDonation } = useStarlete();
+  const { getDonationsForAthlete, confirmDonation, rejectDonation, donationError } = useStarlete();
   const all = getDonationsForAthlete(athleteId);
   const pending = all.filter((d) => d.status === "pending");
   const [open, setOpen] = useState<Donation | null>(null);
@@ -540,6 +548,7 @@ function PendingDonations({ athleteId }: { athleteId: number }) {
         {pending.length > 0 && <span className="count-pill">{pending.length}</span>}
       </div>
       <p className="muted-line">Review each receipt and confirm you received the funds, or reject it with a reason. Pending donations auto-confirm after 3 days — a demo timeout, not bank verification.</p>
+      {donationError && <p className="field-error" role="alert">{donationError}</p>}
 
       {pending.length === 0 ? (
         <div className="empty-note small"><p>No pending donations right now.</p></div>

@@ -76,7 +76,7 @@ function Popup({ title, onClose, children }: { title: string; onClose: () => voi
  * entered display name; see `donorKey` for the demo identity limitation.
  */
 export function DonationsPanel({ athleteId }: { athleteId: number }) {
-  const { getDonationsForAthlete } = useStarlete();
+  const { getDonationsForAthlete, donationError } = useStarlete();
   const [popup, setPopup] = useState<null | "all" | "top">(null);
 
   // getDonationsForAthlete returns every status; the helpers below keep only
@@ -89,6 +89,7 @@ export function DonationsPanel({ athleteId }: { athleteId: number }) {
 
   return (
     <div className="donations-panel">
+      {donationError && <p className="field-error" role="alert">{donationError}</p>}
       <div className="donations-head">
         <strong>{count} {count === 1 ? "donation" : "donations"}</strong>
         {count > 0 && (

@@ -39,6 +39,23 @@ import {
   setPostReaction,
   updatePost as updateDatabasePost,
 } from "@/src/app/services/posts";
+import {
+  autoConfirmDueDonations,
+  confirmDonation as confirmDatabaseDonation,
+  createDonation as createDatabaseDonation,
+  deleteDonation as deleteDatabaseDonation,
+  listDonations as listDatabaseDonations,
+  rejectDonation as rejectDatabaseDonation,
+  resubmitDonation as resubmitDatabaseDonation,
+  type DonationRecord,
+} from "@/src/app/services/donations";
+import {
+  createQrCode,
+  deleteQrCode,
+  listMyQrCodes,
+  listQrCodes,
+  updateQrCode,
+} from "@/src/app/services/qr";
 import { isSupabaseConfigured } from "@/src/app/lib/supabase/client";
 import { useSession } from "@/src/app/shared/session-provider";
 import { rejectionReasonLabel } from "@/src/app/lib/donations.mjs";
@@ -102,8 +119,10 @@ export type DonationStatus = "pending" | "confirmed" | "rejected";
 export interface Donation {
   id: string;
   athleteId: number;
+  athleteProfileId?: string | null;
+  athleteName?: string;
   /** Stable supporter identity this submission belongs to (demo sentinel). */
-  supporterId: ActorId | null;
+  supporterId: string | number | null;
   amount: number;
   method: string;
   reference: string;
@@ -177,6 +196,12 @@ interface StarleteState {
   posts: Post[];
   postsLoading: boolean;
   postError: string | null;
+  /**
+   * Last error from a donation or QR operation. Kept separate from postError
+   * so donation/QR failures surface near the donation UI and never leak into
+   * the posts / "Latest updates" section.
+   */
+  donationError: string | null;
   /** The athlete currently targeted by the donation modal, if open. */
   donationTarget: Athlete | null;
   /**
@@ -291,6 +316,7 @@ function normalizeDonation(d: Partial<Donation>): Donation {
     id: String(d.id ?? `don-${d.createdAt ?? Date.now()}`),
     athleteId: Number(d.athleteId),
     supporterId: d.supporterId ?? null,
+    athleteProfileId: d.athleteProfileId ?? null,
     amount: Number(d.amount ?? 0),
     method: d.method ?? "",
     reference: d.reference ?? "",
@@ -306,6 +332,18 @@ function normalizeDonation(d: Partial<Donation>): Donation {
     rejectionReason: d.rejectionReason ?? null,
     rejectionNote: d.rejectionNote ?? "",
   };
+}
+
+function mapDonationsForUi(
+  records: DonationRecord[],
+  role: Role | null,
+  userId: string | undefined,
+): Donation[] {
+  return records.map((record) =>
+    role === "athlete" && record.athleteProfileId === userId
+      ? { ...record, athleteId: seedAthletes[0]?.id ?? record.athleteId }
+      : record,
+  );
 }
 
 const StarleteContext = createContext<StarleteState | null>(null);
@@ -325,6 +363,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [postsLoading, setPostsLoading] = useState(false);
   const [postError, setPostError] = useState<string | null>(null);
+  const [donationError, setDonationError] = useState<string | null>(null);
   const [donationTarget, setDonationTarget] = useState<Athlete | null>(null);
   // When set, the donation modal is retrying this rejected record in place.
   const [donationPrefill, setDonationPrefill] = useState<Donation | null>(null);
@@ -347,7 +386,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       window.localStorage.removeItem("starlete-posts");
       if (savedVersion === DATA_VERSION || savedVersion === "v4" || savedVersion === "v3") {
         if (savedAthletes) setAthletes(JSON.parse(savedAthletes) as Athlete[]);
-        if (savedQr) {
+        if (savedQr && !isSupabaseConfigured()) {
           // Normalize older QR records to the current shape: default a missing
           // accountNumber to "" and a missing image to "" (no placeholder).
           const loadedQr = JSON.parse(savedQr) as Record<number, Partial<QrCode>[]>;
@@ -363,7 +402,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
           }
           setQrCodes(normalizedQr);
         }
-        if (savedDonations) {
+        if (savedDonations && !isSupabaseConfigured()) {
           // Normalize older records to the current shape (adds supporterId and
           // rejection fields when missing), apply the demo auto-confirm rule to
           // anything that aged past the window while the app was closed, then
@@ -406,8 +445,13 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
     try {
       window.localStorage.setItem("starlete-data-version", DATA_VERSION);
       window.localStorage.setItem("starlete-athletes", JSON.stringify(athletes));
-      window.localStorage.setItem("starlete-qr", JSON.stringify(qrCodes));
-      window.localStorage.setItem("starlete-donations", JSON.stringify(donations));
+      if (isSupabaseConfigured()) {
+        window.localStorage.removeItem("starlete-qr");
+        window.localStorage.removeItem("starlete-donations");
+      } else {
+        window.localStorage.setItem("starlete-qr", JSON.stringify(qrCodes));
+        window.localStorage.setItem("starlete-donations", JSON.stringify(donations));
+      }
       window.localStorage.setItem("starlete-notifications", JSON.stringify(notifications));
     } catch {
       // ignore
@@ -444,14 +488,91 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   }, [mounted, sessionLoading, user?.id, role]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
+  useEffect(() => {
+    if (!mounted || sessionLoading || !isSupabaseConfigured()) return;
+
+    let active = true;
+    // The account change must clear data from the previous session before the
+    // next database request resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setDonations([]);
+    const initialQrCodes = seedQrCodes(seedAthletes);
+    if (role === "athlete" && seedAthletes[0]) initialQrCodes[seedAthletes[0].id] = [];
+    setQrCodes(initialQrCodes);
+
+    setDonationError(null);
+    void (async () => {
+      // Run the demo auto-confirm sweep first, but never let its failure block
+      // the donation load below: a missing/failed RPC must not keep "Pending
+      // receipts" and "My payments" empty. Its error goes to donationError.
+      if (user?.id) {
+        try {
+          await autoConfirmDueDonations();
+        } catch (error: unknown) {
+          if (active) {
+            setDonationError(error instanceof Error ? error.message : "Could not auto-confirm due donations.");
+          }
+        }
+      }
+
+      try {
+        const loaded = await listDatabaseDonations();
+        if (active) {
+          setDonations(mapDonationsForUi(loaded, role, user?.id));
+        }
+      } catch (error: unknown) {
+        if (active) {
+          setDonationError(error instanceof Error ? error.message : "Could not load donations.");
+        }
+      }
+
+      if (role === "athlete" && user?.id) {
+        try {
+          const loadedQrCodes = await listMyQrCodes();
+          if (active) {
+            setQrCodes((current) => ({
+              ...current,
+              [seedAthletes[0]?.id ?? -1]: loadedQrCodes,
+            }));
+          }
+        } catch (error: unknown) {
+          if (active) {
+            setDonationError(error instanceof Error ? error.message : "Could not load payment QR codes.");
+          }
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [mounted, sessionLoading, user?.id, role]);
+
   // Periodically sweep for demo auto-confirm so a long-lived session confirms
   // donations that cross the 3-day window without a reload.
   useEffect(() => {
     if (!mounted) return;
-    const sweep = () => setDonations((list) => applyAutoConfirm(list) as Donation[]);
+    const sweep = () => {
+      if (!isSupabaseConfigured()) {
+        setDonations((list) => applyAutoConfirm(list) as Donation[]);
+        return;
+      }
+      if (!user?.id) return;
+
+      void autoConfirmDueDonations()
+        .then(async (updated) => {
+          if (updated > 0) {
+            const loaded = await listDatabaseDonations();
+            setDonations(mapDonationsForUi(loaded, role, user?.id));
+          }
+        })
+        .catch((error: unknown) => {
+          setDonationError(error instanceof Error ? error.message : "Could not auto-confirm due donations.");
+        });
+    };
     const timer = window.setInterval(sweep, 60 * 1000);
     return () => window.clearInterval(timer);
-  }, [mounted]);
+  }, [mounted, role, user?.id]);
 
   const login = useCallback((nextRole: Role) => {
     setRole(nextRole);
@@ -481,8 +602,20 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   );
 
   const getAthlete = useCallback(
-    (id: number) => reconciledAthletes.find((a) => a.id === id),
-    [reconciledAthletes],
+    (id: number) => {
+      const athlete = reconciledAthletes.find((item) => item.id === id);
+      if (athlete) return athlete;
+      const donation = donations.find((item) => item.athleteId === id && item.athleteName);
+      return donation?.athleteName
+        ? {
+            ...seedAthletes[0],
+            id,
+            profileId: donation.athleteProfileId ?? undefined,
+            name: donation.athleteName,
+          }
+        : undefined;
+    },
+    [reconciledAthletes, donations],
   );
 
   // Resolve an actor id to a display name for notification copy. The demo
@@ -496,6 +629,16 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   const openDonation = useCallback((athlete: Athlete) => {
     setDonationPrefill(null);
     setDonationTarget(athlete);
+    if (isSupabaseConfigured() && athlete.profileId) {
+      setDonationError(null);
+      void listQrCodes(athlete.profileId)
+        .then((loaded) => {
+          setQrCodes((current) => ({ ...current, [athlete.id]: loaded }));
+        })
+        .catch((error: unknown) => {
+          setDonationError(error instanceof Error ? error.message : "Could not load payment QR codes.");
+        });
+    }
   }, []);
   const closeDonation = useCallback(() => {
     setDonationTarget(null);
@@ -506,14 +649,33 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
     (donationId: string): boolean => {
       const donation = donations.find((d) => d.id === donationId);
       // Owner-only, rejected-only. A confirmed/pending donation is never retried.
-      if (!donation || !canResubmitDonation(donation, SUPPORTER_ID)) return false;
+      const currentSupporterId = isSupabaseConfigured() ? user?.id ?? null : SUPPORTER_ID;
+      if (!donation || !canResubmitDonation(donation, currentSupporterId)) return false;
       const athlete = reconciledAthletes.find((a) => a.id === donation.athleteId);
-      if (!athlete) return false;
+      const target = athlete ?? (donation.athleteProfileId
+        ? {
+            ...seedAthletes[0],
+            id: donation.athleteId,
+            profileId: donation.athleteProfileId,
+            name: donation.athleteName ?? seedAthletes[0].name,
+          }
+        : undefined);
+      if (!target) return false;
       setDonationPrefill(donation);
-      setDonationTarget(athlete);
+      setDonationTarget(target);
+      if (isSupabaseConfigured() && target.profileId) {
+        setDonationError(null);
+        void listQrCodes(target.profileId)
+          .then((loaded) => {
+            setQrCodes((current) => ({ ...current, [target.id]: loaded }));
+          })
+          .catch((error: unknown) => {
+            setDonationError(error instanceof Error ? error.message : "Could not load payment QR codes.");
+          });
+      }
       return true;
     },
-    [donations, reconciledAthletes],
+    [donations, reconciledAthletes, user?.id],
   );
 
   // --- QR management -------------------------------------------------------
@@ -524,6 +686,16 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
 
   const addQrCode = useCallback(
     (athleteId: number, method: string, label: string, accountNumber: string, image?: string) => {
+      if (isSupabaseConfigured()) {
+        void createQrCode({ method, label, accountNumber, image: image ?? "" })
+          .then((qr) => {
+            setQrCodes((map) => ({ ...map, [athleteId]: [...(map[athleteId] ?? []), qr] }));
+          })
+          .catch((error: unknown) => {
+            setDonationError(error instanceof Error ? error.message : "Could not publish this QR code.");
+          });
+        return;
+      }
       setQrCodes((map) => {
         const existing = map[athleteId] ?? [];
         const qr: QrCode = {
@@ -542,6 +714,21 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
 
   const replaceQrCode = useCallback(
     (athleteId: number, qrId: string, patch: Partial<Omit<QrCode, "id">>) => {
+      if (isSupabaseConfigured()) {
+        void updateQrCode(qrId, patch)
+          .then(() => {
+            setQrCodes((map) => ({
+              ...map,
+              [athleteId]: (map[athleteId] ?? []).map((qr) =>
+                qr.id === qrId ? { ...qr, ...patch } : qr,
+              ),
+            }));
+          })
+          .catch((error: unknown) => {
+            setDonationError(error instanceof Error ? error.message : "Could not update this QR code.");
+          });
+        return;
+      }
       setQrCodes((map) => {
         const existing = map[athleteId] ?? [];
         return {
@@ -554,6 +741,19 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   );
 
   const removeQrCode = useCallback((athleteId: number, qrId: string) => {
+    if (isSupabaseConfigured()) {
+      void deleteQrCode(qrId)
+        .then(() => {
+          setQrCodes((map) => ({
+            ...map,
+            [athleteId]: (map[athleteId] ?? []).filter((qr) => qr.id !== qrId),
+          }));
+        })
+        .catch((error: unknown) => {
+          setDonationError(error instanceof Error ? error.message : "Could not remove this QR code.");
+        });
+      return;
+    }
     setQrCodes((map) => {
       const existing = map[athleteId] ?? [];
       return { ...map, [athleteId]: existing.filter((q) => q.id !== qrId) };
@@ -582,25 +782,73 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const submitDonation = useCallback<StarleteState["submitDonation"]>((input) => {
-    const donation = createPendingDonation({ ...input, supporterId: SUPPORTER_ID }) as Donation;
+    const supporterIdentity = isSupabaseConfigured() ? user?.id ?? SUPPORTER_ID : SUPPORTER_ID;
+    const donation = {
+      ...createPendingDonation({ ...input, supporterId: supporterIdentity }),
+      athleteProfileId: donationTarget?.profileId ?? null,
+      athleteName: donationTarget?.name,
+    } as Donation;
+
+    if (!isSupabaseConfigured()) {
+      setDonations((list) => [donation, ...list]);
+      pushNotification({
+        type: "donation_pending",
+        data: { amount: donation.amount, supporterName: donation.supporterName },
+      });
+      return donation;
+    }
+
+    setDonationError(null);
     setDonations((list) => [donation, ...list]);
-    // Notify the athlete audience: a new pending donation needs review. Copy is
-    // athlete-facing, so it names the supporter the donation came FROM.
-    pushNotification({
-      type: "donation_pending",
-      data: { amount: donation.amount, supporterName: donation.supporterName },
-    });
+    void createDatabaseDonation({
+      ...input,
+      athleteProfileId: donationTarget?.profileId ?? null,
+    })
+      .then((saved) => {
+        const persisted = {
+          ...saved,
+          athleteId: input.athleteId,
+          athleteName: donation.athleteName,
+        } as Donation;
+        setDonations((list) => list.map((item) => item.id === donation.id ? persisted : item));
+        pushNotification({
+          type: "donation_pending",
+          data: { amount: persisted.amount, supporterName: persisted.supporterName },
+        });
+      })
+      .catch((error: unknown) => {
+        setDonations((list) => list.filter((item) => item.id !== donation.id));
+        setDonationError(error instanceof Error ? error.message : "Could not submit this donation.");
+      });
     return donation;
-  }, [pushNotification]);
+  }, [donationTarget, pushNotification, user?.id]);
 
   const confirmDonation = useCallback((donationId: string) => {
     const donation = donations.find((item) => item.id === donationId);
     if (!donation) return;
+
+    if (isSupabaseConfigured()) {
+      void confirmDatabaseDonation(donationId)
+        .then((saved) => {
+          const next = { ...saved, athleteId: donation.athleteId } as Donation;
+          setDonations((list) => list.map((item) => item.id === donationId ? next : item));
+          const event = donationStatusNotification(donation, "confirmed", {
+            amount: donation.amount,
+            athleteName: getAthlete(donation.athleteId)?.name ?? donation.athleteName,
+          });
+          if (event) pushNotification(event);
+        })
+        .catch((error: unknown) => {
+          setDonationError(error instanceof Error ? error.message : "Could not confirm this donation.");
+        });
+      return;
+    }
+
     const next = confirmDonationRecord(donation, "athlete") as Donation;
     setDonations((list) => list.map((item) => (item.id === donationId ? next : item)));
     const event = donationStatusNotification(donation, "confirmed", {
       amount: donation.amount,
-      athleteName: getAthlete(donation.athleteId)?.name,
+      athleteName: getAthlete(donation.athleteId)?.name ?? donation.athleteName,
     });
     if (event) pushNotification(event);
   }, [donations, pushNotification, getAthlete]);
@@ -608,11 +856,30 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   const rejectDonation = useCallback((donationId: string, reason: string, note?: string) => {
     const donation = donations.find((item) => item.id === donationId);
     if (!donation) return;
+
+    if (isSupabaseConfigured()) {
+      void rejectDatabaseDonation(donationId, reason, note ?? "")
+        .then((saved) => {
+          const next = { ...saved, athleteId: donation.athleteId } as Donation;
+          setDonations((list) => list.map((item) => item.id === donationId ? next : item));
+          const event = donationStatusNotification(donation, "rejected", {
+            amount: donation.amount,
+            athleteName: getAthlete(donation.athleteId)?.name ?? donation.athleteName,
+            reasonLabel: rejectionReasonLabel(next.rejectionReason ?? reason),
+          });
+          if (event) pushNotification(event);
+        })
+        .catch((error: unknown) => {
+          setDonationError(error instanceof Error ? error.message : "Could not reject this donation.");
+        });
+      return;
+    }
+
     const next = rejectDonationRecord(donation, reason, note ?? "") as Donation;
     setDonations((list) => list.map((item) => (item.id === donationId ? next : item)));
     const event = donationStatusNotification(donation, "rejected", {
       amount: donation.amount,
-      athleteName: getAthlete(donation.athleteId)?.name,
+      athleteName: getAthlete(donation.athleteId)?.name ?? donation.athleteName,
       reasonLabel: rejectionReasonLabel(next.rejectionReason ?? reason),
     });
     if (event) pushNotification(event);
@@ -622,37 +889,72 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
     (donationId, patch) => {
       const donation = donations.find((item) => item.id === donationId);
       if (!donation) return;
-      const next = resubmitDonationRecord(donation, SUPPORTER_ID, patch) as Donation;
+      const currentSupporterId = isSupabaseConfigured() ? user?.id ?? null : SUPPORTER_ID;
+      const next = resubmitDonationRecord(donation, currentSupporterId, patch) as Donation;
+
+      if (isSupabaseConfigured()) {
+        void resubmitDatabaseDonation(donationId, patch)
+          .then((saved) => {
+            const persisted = { ...saved, athleteId: donation.athleteId } as Donation;
+            setDonations((list) => list.map((item) => item.id === donationId ? persisted : item));
+            const event = donationResubmissionNotification(donation, persisted);
+            if (event) pushNotification(event);
+          })
+          .catch((error: unknown) => {
+            setDonations((list) => list.map((item) => item.id === donationId ? donation : item));
+            setDonationError(error instanceof Error ? error.message : "Could not resubmit this donation.");
+          });
+        setDonations((list) => list.map((item) => item.id === donationId ? next : item));
+        return;
+      }
+
       setDonations((list) => list.map((item) => (item.id === donationId ? next : item)));
       const event = donationResubmissionNotification(donation, next);
       if (event) pushNotification(event);
     },
-    [donations, pushNotification],
+    [donations, pushNotification, user?.id],
   );
 
   const removeDonation = useCallback((donationId: string) => {
     // Owner- and status-guarded: only the current supporter's pending/rejected
     // donations are removable. A confirmed donation is left intact so derived
     // totals never change behind the athlete's back.
-    setDonations((list) =>
-      list.filter((d) => !(d.id === donationId && canDeleteDonation(d, SUPPORTER_ID))),
-    );
-  }, []);
+    const currentSupporterId = isSupabaseConfigured() ? user?.id ?? null : SUPPORTER_ID;
+    const donation = donations.find((item) => item.id === donationId);
+    if (!donation || !canDeleteDonation(donation, currentSupporterId)) return;
+    if (isSupabaseConfigured()) {
+      void deleteDatabaseDonation(donationId)
+        .then(() => setDonations((list) => list.filter((item) => item.id !== donationId)))
+        .catch((error: unknown) => {
+          setDonationError(error instanceof Error ? error.message : "Could not remove this donation.");
+        });
+      return;
+    }
+    setDonations((list) => list.filter((item) => item.id !== donationId));
+  }, [donations, user?.id]);
 
+  const currentUserId = user?.id;
   const getDonationsForAthlete = useCallback(
-    (athleteId: number) =>
-      donations
-        .filter((d) => d.athleteId === athleteId)
-        .sort((a, b) => b.createdAt - a.createdAt),
-    [donations],
+    (athleteId: number) => {
+      const ownedByCurrentAthlete = isSupabaseConfigured()
+        && role === "athlete"
+        && currentUserId
+        && (athleteId === seedAthletes[0]?.id || athleteId === -1);
+      return donations
+        .filter((d) => ownedByCurrentAthlete
+          ? d.athleteProfileId === currentUserId
+          : d.athleteId === athleteId)
+        .sort((a, b) => b.createdAt - a.createdAt);
+    },
+    [donations, role, currentUserId],
   );
 
   const getDonationsForSupporter = useCallback(
     () =>
       donations
-        .filter((d) => d.supporterId === SUPPORTER_ID)
+        .filter((d) => d.supporterId === (isSupabaseConfigured() ? user?.id : SUPPORTER_ID))
         .sort((a, b) => b.createdAt - a.createdAt),
-    [donations],
+    [donations, user?.id],
   );
 
   const addPost = useCallback((authorAthleteId: number, text: string) => {
@@ -828,6 +1130,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       posts,
       postsLoading,
       postError,
+      donationError,
       donationTarget,
       donationPrefill,
       qrCodes,
@@ -862,7 +1165,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       markAllNotificationsRead,
     }),
     [
-      mounted, role, reconciledAthletes, posts, postsLoading, postError, donationTarget, donationPrefill, qrCodes, donations, notifications,
+      mounted, role, reconciledAthletes, posts, postsLoading, postError, donationError, donationTarget, donationPrefill, qrCodes, donations, notifications,
       login, logout, getAthlete, openDonation, openResubmission, closeDonation,
       getQrCodes, addQrCode, replaceQrCode, removeQrCode,
       submitDonation, confirmDonation, rejectDonation, resubmitDonation, removeDonation, getDonationsForAthlete,
