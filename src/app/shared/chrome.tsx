@@ -7,6 +7,13 @@ import { Icon, Logo } from "@/src/app/shared/ui";
 import { DonationModal } from "@/src/app/shared/donation";
 import { useStarlete } from "@/src/app/store";
 import { REGION_MAP } from "@/src/app/lib/region-map";
+import {
+  EDIT_PROFILE_HREF,
+  LOGOUT_HREF,
+  avatarInitials,
+  isDismissKey,
+  profileMenuItems,
+} from "@/src/app/lib/profile-menu.mjs";
 
 /** Relative "time ago" label for a notification's epoch-ms timestamp. */
 function timeAgo(ts: number): string {
@@ -109,10 +116,96 @@ function NotificationsBell() {
   );
 }
 
+/**
+ * Profile avatar button + dropdown menu (header, signed-in only). The circle
+ * toggles a menu with "Edit profile" and "Log out". The menu dismisses on
+ * outside click, Escape, and after an option is picked — mirroring the
+ * notifications panel. Both demo roles (athlete, supporter) have an editable
+ * account at /dashboard/edit, so the Edit profile option is always shown.
+ */
+function ProfileMenu({ onNavigate }: { onNavigate: () => void }) {
+  const { role, logout, athletes } = useStarlete();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  const athleteName = athletes[0]?.name;
+  const initials = avatarInitials(role, athleteName);
+  const label = role === "athlete" ? athleteName ?? "Your profile" : "Your account";
+  const roleLabel = role === "athlete" ? "Athlete" : "Supporter";
+  const items = profileMenuItems(role);
+  const iconFor: Record<string, string> = { "edit-profile": "users", logout: "logout" };
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (isDismissKey(e.key)) setOpen(false);
+    };
+    window.addEventListener("mousedown", onClick);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onClick);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  // Run an option: close the menu and the mobile nav, then act. "logout" ends
+  // the session first so protected routes redirect afterward, then lands home.
+  const runItem = (id: string, href?: string) => {
+    setOpen(false);
+    onNavigate();
+    if (id === "logout") {
+      logout();
+      router.push(LOGOUT_HREF);
+      return;
+    }
+    router.push(href ?? EDIT_PROFILE_HREF);
+  };
+
+  return (
+    <div className="profile-menu" ref={wrapRef}>
+      <button
+        type="button"
+        className="nav-user"
+        aria-label={`Account menu for ${label}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        {initials}
+      </button>
+
+      {open && (
+        <div className="profile-panel" role="menu" aria-label="Account menu">
+          <div className="profile-panel-head">
+            <strong>{label}</strong>
+            <small>{roleLabel}</small>
+          </div>
+          {items.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className="profile-menu-item"
+              role="menuitem"
+              onClick={() => runItem(item.id, item.href)}
+            >
+              <Icon name={iconFor[item.id] ?? "dots"} size={18} />
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Header() {
   const pathname = usePathname();
   const router = useRouter();
-  const { role, logout, athletes } = useStarlete();
+  const { role } = useStarlete();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 
@@ -142,16 +235,6 @@ function Header() {
     router.push(dest);
   };
 
-  const initials = role === "athlete"
-    ? athletes[0]?.name.split(" ").map(p => p[0]).slice(0, 2).join("").toUpperCase()
-    : "JD";
-
-  const signOut = () => {
-    logout();
-    close();
-    router.push("/");
-  };
-
   return (
     <header className="header">
       <div className="header-inner">
@@ -164,8 +247,7 @@ function Header() {
             <>
               <Link className={isActive("/dashboard") ? "active" : ""} href="/dashboard" onClick={close}>Dashboard</Link>
               <NotificationsBell />
-              <Link className="nav-user" href="/dashboard/edit" onClick={close}>{initials}</Link>
-              <button className="icon-only" onClick={signOut} aria-label="Log out"><Icon name="logout" /></button>
+              <ProfileMenu onNavigate={close} />
             </>
           ) : (
             <>

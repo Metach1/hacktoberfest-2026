@@ -54,7 +54,7 @@ h1, h2, h3 { letter-spacing: -.035em; }
 .nav { display: flex; align-items: center; gap: 28px; }
 .nav > a:not(.button):not(.nav-user), .nav > button { background: none; border: 0; color: #34455b; font-size: 17px; font-weight: 600; padding: 12px 0; text-decoration: none; }
 .nav > button.active { color: var(--blue); }
-.nav-user { width: 37px; height: 37px; border-radius: 50% !important; padding: 0 !important; color: white !important; background: var(--navy) !important; }
+.nav-user { width: 37px; height: 37px; border: 0; border-radius: 50% !important; padding: 0 !important; color: white !important; background: var(--navy) !important; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; cursor: pointer; }
 .nav .icon-only { color: var(--muted); }
 .menu-button { display: none; background: none; border: 0; color: var(--navy); }
 .button { border: 0; border-radius: 12px; background: var(--blue); color: white; min-height: 48px; padding: 0 22px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; font-weight: 700; font-size: 14px; transition: transform .2s, box-shadow .2s; }
@@ -647,6 +647,17 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .notif-item-main small { color: var(--muted); font-size: 11px; white-space: nowrap; }
 .notif-item p { margin: 3px 0 0; font-size: 12px; color: var(--muted); line-height: 1.4; }
 
+/* Profile avatar button + account dropdown menu (header). Sits above the map
+   and other panels (z-index above .notif-panel's 40). */
+.profile-menu { position: relative; display: inline-flex; }
+.profile-panel { position: absolute; z-index: 50; top: calc(100% + 8px); right: 0; width: 220px; max-width: calc(100vw - 32px); background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 16px 40px rgba(0,0,0,.16); padding: 6px; overflow: hidden; }
+.profile-panel-head { padding: 10px 12px 8px; border-bottom: 1px solid var(--line); margin-bottom: 6px; display: flex; flex-direction: column; gap: 2px; }
+.profile-panel-head strong { font-size: 14px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-panel-head small { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+.profile-menu-item { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 0; border-radius: 9px; background: none; color: var(--ink); font-size: 14px; font-weight: 600; text-align: left; cursor: pointer; }
+.profile-menu-item:hover { background: #fafbfc; }
+.profile-menu-item svg { color: var(--muted); flex: none; }
+.nav-user:focus-visible, .profile-menu-item:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 
 @media (max-width: 560px) {
   .pending-row { flex-wrap: wrap; }
