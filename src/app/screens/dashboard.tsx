@@ -689,52 +689,6 @@ function PendingDonations({ athleteId }: { athleteId: number }) {
   );
 }
 
-/**
- * Athlete-facing payment history: all donations (confirmed, pending, rejected)
- * with amount, supporter, method, reference, date, status, and the rejection
- * reason/note where applicable. Mobile-friendly stacked rows.
- */
-function PaymentHistory({ athleteId }: { athleteId: number }) {
-  const { getDonationsForAthlete } = useStarlete();
-  const all = getDonationsForAthlete(athleteId);
-
-  return (
-    <div className="dash-card">
-      <div className="section-head">
-        <div><span className="eyebrow">History</span><h2>Recent payments</h2></div>
-        {all.length > 0 && <span className="count-pill">{all.length}</span>}
-      </div>
-      <p className="muted-line">Every donation you&rsquo;ve received, including pending and rejected ones. Confirmed status reflects this demo workflow, not independently verified bank settlement.</p>
-      {all.length === 0 ? (
-        <div className="empty-note small"><p>No payments yet.</p></div>
-      ) : (
-        <div className="payment-history">
-          {all.map((d) => (
-            <div className="payment-row" key={d.id}>
-              <div className="payment-main">
-                <strong>{d.supporterName}</strong>
-                <StatusBadge status={d.status} />
-              </div>
-              <div className="payment-meta">
-                <span>{peso(d.amount)}</span>
-                <span>{d.method || "—"}</span>
-                <span>Ref {d.reference || "—"}</span>
-                <span>{shortDate(d.createdAt)}</span>
-              </div>
-              {d.status === "rejected" && (
-                <p className="payment-reject">
-                  Rejected · {rejectionReasonLabel(d.rejectionReason ?? "")}
-                  {d.rejectionNote ? ` — ${d.rejectionNote}` : ""}
-                </p>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function AthleteDashboard({
   athlete,
   posts,
@@ -823,13 +777,6 @@ function AthleteDashboard({
         )) : <p className="profile-bio">No posts yet. Share your first update!</p>}</div>
       </section>
 
-      <section className="dashboard-grid">
-        <PaymentHistory athleteId={athlete.id} />
-      </section>
-
-      <section className="dashboard-grid">
-        <PaymentHistory athleteId={athlete.id} />
-      </section>
       {creating && <div className="modal-backdrop"><div className="modal small-modal"><button className="modal-close" onClick={() => setCreating(false)}><Icon name="close" /></button><span className="eyebrow">Share an update</span><h2>Bring supporters along</h2><label>Post<textarea value={post} onChange={e => setPost(e.target.value)} placeholder="What happened in training today?" /></label><button className="button full" disabled={!post.trim()} onClick={() => { onCreate(athlete.id, post); setCreating(false); setPost(""); }}>Publish update</button></div></div>}
       {editingId && <div className="modal-backdrop"><div className="modal small-modal"><button className="modal-close" onClick={cancelEdit}><Icon name="close" /></button><span className="eyebrow">Edit update</span><h2>Update your post</h2><label>Post<textarea value={editText} onChange={e => setEditText(e.target.value)} placeholder="What happened in training today?" /></label><button className="button full" disabled={!editText.trim()} onClick={saveEdit}>Save changes</button></div></div>}
     </main>
