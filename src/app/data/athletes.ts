@@ -17,9 +17,33 @@
 import seed from "@/data/athletes.json";
 import { adaptAthletes } from "@/data/athlete-adapter.mjs";
 
+/** One photo in an athlete's gallery (up to 8). In the demo/pre-migration the
+ * `src` is a data URL; once the JSON column lands it's a stored object URL. */
+export interface AthletePhoto {
+  id: string;
+  /** Safe, generated file name (never the client-supplied name). */
+  name: string;
+  /** Data URL (demo) or stored object URL (backend). */
+  src: string;
+  alt: string;
+}
+
+/** One self-reported achievement; at most one may be `isProudest`. */
+export interface Achievement {
+  id: string;
+  title: string;
+  event?: string;
+  /** "YYYY" or "YYYY-MM-DD"; blank when undated. */
+  date?: string;
+  description?: string;
+  isProudest?: boolean;
+}
+
 /** UI view shape used by the Startlete screens. */
 export interface Athlete {
   id: number;
+  /** Supabase user ID for registered athletes; demo athletes use their numeric ID. */
+  profileId?: string;
   name: string;
   sport: string;
   location: string;
@@ -27,6 +51,10 @@ export interface Athlete {
   regionCode: string;
   /** Full administrative region name, for labels. */
   region: string;
+  /** Province within the region (registered athletes; blank for seed demo). */
+  province?: string;
+  /** City/municipality within the province (registered athletes; blank for seed demo). */
+  city?: string;
   image: string;
   raised: number;
   goal: number;
@@ -35,6 +63,12 @@ export interface Athlete {
   featured?: boolean;
   bio: string;
   achievement: string;
+  /** Photo gallery (up to 8). Optional: seed/demo athletes may have none. */
+  photos?: AthletePhoto[];
+  /** Self-reported achievements list (richer than the single `achievement`). */
+  achievements?: Achievement[];
+  /** School / university / club / team the athlete represents. */
+  institution?: string;
 }
 
 const seedAthletes = (seed as { athletes: Record<string, unknown>[] }).athletes;

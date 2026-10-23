@@ -1,30 +1,258 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon, Logo } from "@/src/app/shared/ui";
 import { DonationModal } from "@/src/app/shared/donation";
+import { useSession } from "@/src/app/shared/session-provider";
 import { useStarlete } from "@/src/app/store";
+import { getInitials } from "@/src/app/lib/profile-display.mjs";
+import {
+  EDIT_PROFILE_HREF,
+  LOGOUT_HREF,
+  isDismissKey,
+  profileMenuItems,
+} from "@/src/app/lib/profile-menu.mjs";
+import { REGION_MAP } from "@/src/app/lib/region-map";
+
+/** Relative "time ago" label for a notification's epoch-ms timestamp. */
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+/**
+ * Notifications bell + dropdown panel. The unread badge and list are scoped to
+ * the current role's audience by the store. The panel dismisses on outside
+ * click and Escape; opening it marks everything read.
+ */
+function NotificationsBell() {
+  const { getNotifications, unreadCount, markNotificationRead, markAllNotificationsRead } = useStarlete();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const items = getNotifications();
+
+  // Clicking a notification marks it read, navigates to its tab, and closes.
+  const openNotification = (n: { id: string; href?: string }) => {
+    markNotificationRead(n.id);
+    setOpen(false);
+    if (n.href) router.push(n.href);
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("mousedown", onClick);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onClick);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="notif" ref={wrapRef}>
+      <button
+        className="icon-only notif-bell"
+        aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        <Icon name="bell" />
+        {unreadCount > 0 && <span className="notif-badge" aria-hidden="true">{unreadCount > 9 ? "9+" : unreadCount}</span>}
+      </button>
+
+      {open && (
+        <div className="notif-panel" role="menu">
+          <div className="notif-head">
+            <strong>Notifications</strong>
+            {items.some((n) => !n.read) && (
+              <button className="text-button" onClick={() => markAllNotificationsRead()}>Mark all read</button>
+            )}
+          </div>
+          {items.length === 0 ? (
+            <p className="notif-empty muted-line">You&rsquo;re all caught up.</p>
+          ) : (
+            <ul className="notif-list">
+              {items.map((n) => (
+                <li
+                  key={n.id}
+                  className={n.read ? "notif-item" : "notif-item unread"}
+                  role="menuitem"
+                  tabIndex={0}
+                  onClick={() => openNotification(n)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openNotification(n);
+                    }
+                  }}
+                >
+                  <div className="notif-item-main">
+                    <strong>{n.title}</strong>
+                    <small>{timeAgo(n.createdAt)}</small>
+                  </div>
+                  <p>{n.body}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Profile avatar button + dropdown menu (header, signed-in only). The circle
+ * toggles a menu with "Edit profile", "Log out", and — for athletes — "View
+ * profile". Dismisses on outside click, Escape, and after an option is picked,
+ * mirroring the notifications panel. Data comes from the backend session
+ * (useSession) and the real sign-out path (endSession + store logout).
+ */
+function ProfileMenu({ onNavigate }: { onNavigate: () => void }) {
+  const { role, logout, requestLeaveConfirm } = useStarlete();
+  const { signOut: endSession, user, displayName, profilePicture } = useSession();
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  const initials = getInitials(displayName);
+  const label = displayName ?? (role === "athlete" ? "Your profile" : "Your account");
+  const roleLabel = role === "athlete" ? "Athlete" : "Supporter";
+  const items = profileMenuItems(role);
+  const iconFor: Record<string, string> = {
+    "view-profile": "users",
+    "edit-profile": "plus",
+    logout: "logout",
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (isDismissKey(e.key)) setOpen(false);
+    };
+    window.addEventListener("mousedown", onClick);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("mousedown", onClick);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  // Run an option: close the menu and mobile nav, then act. "logout" ends the
+  // Supabase session AND clears the store, then lands home — so protected
+  // routes redirect afterward. "view-profile" goes to the athlete's own public
+  // profile (/athletes/<their Supabase user id>, which the route resolves).
+  const runItem = (id: string, href?: string) => {
+    setOpen(false);
+    onNavigate();
+    // Each action routes through the unsaved-changes guard: when an editor has
+    // unsaved edits it prompts and only runs the action on "Discard". When
+    // there's no guard (or the form is clean) the action runs immediately.
+    if (id === "logout") {
+      requestLeaveConfirm(() => {
+        void (async () => {
+          await endSession();
+          logout();
+          router.push(LOGOUT_HREF);
+        })();
+      });
+      return;
+    }
+    if (id === "view-profile") {
+      if (user?.id) requestLeaveConfirm(() => router.push(`/athletes/${user.id}`));
+      return;
+    }
+    requestLeaveConfirm(() => router.push(href ?? EDIT_PROFILE_HREF));
+  };
+
+  return (
+    <div className="profile-menu" ref={wrapRef}>
+      <button
+        type="button"
+        className="nav-user"
+        aria-label={`Account menu for ${label}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        {profilePicture ? <img src={profilePicture} alt="" /> : initials}
+      </button>
+
+      {open && (
+        <div className="profile-panel" role="menu" aria-label="Account menu">
+          <div className="profile-panel-head">
+            <strong>{label}</strong>
+            <small>{roleLabel}</small>
+          </div>
+          {items.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className="profile-menu-item"
+              role="menuitem"
+              onClick={() => runItem(item.id, item.href)}
+            >
+              <Icon name={iconFor[item.id] ?? "dots"} size={18} />
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Header() {
   const pathname = usePathname();
   const router = useRouter();
-  const { role, logout, athletes } = useStarlete();
+  const { role, requestLeaveConfirm } = useStarlete();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
-  const initials = role === "athlete"
-    ? athletes[0]?.name.split(" ").map(p => p[0]).slice(0, 2).join("").toUpperCase()
-    : "JD";
-
-  const signOut = () => {
-    logout();
+  // The Discover link is region-aware: when the user is on an athlete profile
+  // that was opened from a region (/athletes/<id>?from=<regionCode>), Discover
+  // returns to that region — matching the profile's "Back to athletes". In
+  // every other context it resets to the plain /discover full map.
+  //
+  // The destination is computed FRESH at click time from the live URL
+  // (window.location), not from a render-time snapshot. A render-time
+  // useSearchParams value could go stale after a soft navigation and leak the
+  // region context onto an unrelated page; reading at click time guarantees it
+  // reflects the current page.
+  const goToDiscover = () => {
     close();
-    router.push("/");
+    let dest = "/discover";
+    const match = /^\/athletes\/[^/]+$/.test(window.location.pathname);
+    if (match) {
+      const from = new URLSearchParams(window.location.search).get("from");
+      if (from && REGION_MAP.regions.some((r) => r.regionCode === from)) {
+        dest = `/discover?region=${encodeURIComponent(from)}`;
+      }
+    }
+    // Route through the unsaved-changes guard so an active editor can prompt.
+    requestLeaveConfirm(() => router.push(dest));
   };
 
   return (
@@ -32,14 +260,14 @@ function Header() {
       <div className="header-inner">
         <Logo />
         <nav className={open ? "nav open" : "nav"}>
-          <Link className={isActive("/discover") ? "active" : ""} href="/discover" onClick={close}>Discover</Link>
+          <button type="button" className={isActive("/discover") ? "nav-link active" : "nav-link"} onClick={goToDiscover}>Discover</button>
           <Link className={isActive("/feed") ? "active" : ""} href="/feed" onClick={close}>Feed</Link>
           <Link href="/#how" onClick={close}>How it works</Link>
           {role ? (
             <>
               <Link className={isActive("/dashboard") ? "active" : ""} href="/dashboard" onClick={close}>Dashboard</Link>
-              <Link className="nav-user" href="/dashboard/edit" onClick={close}>{initials}</Link>
-              <button className="icon-only" onClick={signOut} aria-label="Log out"><Icon name="logout" /></button>
+              <NotificationsBell />
+              <ProfileMenu onNavigate={close} />
             </>
           ) : (
             <>

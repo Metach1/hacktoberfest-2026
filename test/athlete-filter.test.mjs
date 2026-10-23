@@ -37,6 +37,16 @@ test("search matches across name, sport and location", () => {
   assert.equal(filterAthletes(sample, { search: "cruz" }).length, 1);
 });
 
+test("search matches province and city", () => {
+  const withLoc = [
+    { name: "Dina", sport: "Judo", location: "Central Visayas", regionCode: "Region VII", province: "Cebu", city: "Cebu City" },
+    { name: "Elmo", sport: "Judo", location: "Davao Region", regionCode: "Region XI", province: "Davao del Sur", city: "Davao City" },
+  ];
+  assert.equal(filterAthletes(withLoc, { search: "cebu" }).length, 1, "matches province/city name");
+  assert.equal(filterAthletes(withLoc, { search: "davao del sur" }).length, 1, "matches full province name");
+  assert.equal(filterAthletes(withLoc, { search: "manila" }).length, 0, "no false positives");
+});
+
 test("region intersects with sport and search (AND semantics)", () => {
   // Region V has one boxer (Ben); combining with sport Boxing keeps him.
   const out = filterAthletes(sample, { region: "Region V", sport: "Boxing" });

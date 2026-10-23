@@ -32,7 +32,13 @@ design intentionally uses `<img>` with remote photography.
 | Minor consent | Athlete registrants under 18 must confirm simulated parental consent before submit. | Pass |
 | Role rule: supporter donates | Support button opens the simulated checkout for supporters. | Pass |
 | Role rule: athlete cannot donate | Support button is disabled for athletes and the flow blocks the athlete role. | Pass |
-| Donation flow | Amount (preset/custom, min ₱50) → method → review → processing → success with reference. | Pass |
+| Donation flow | Scan QR → upload receipt + enter amount (min ₱50) + method + reference → review → amount confirmation (typo safeguard) → pending with reference. | Pass |
+| Payment-QR validation | Athlete QR uploads are decoded locally (jsQR) and validated against EMVCo / QR Ph format (TLV + CRC-16); unsupported or unreadable images are rejected with an actionable error and never stored. | Pass |
+| Reject pending donation | Athlete rejects a pending donation with a required reason + optional note and a confirm step; confirmed donations cannot be rejected; rejected donations never count toward totals or supporter count. | Pass (unit-tested) |
+| Athlete Recent payments | History lists confirmed, pending, and rejected donations with amount, supporter, method, reference, date, status, and rejection reason/note. | Pass |
+| Supporter My payments | Supporter sees only their own submissions (pending/confirmed/rejected), scoped to the single demo identity; pending is marked not-yet-accepted and confirmed is marked demo-workflow (not bank settlement). | Pass |
+| Receipt upload filtering | Local layered checks: optional on-device explicit-image moderation rejects confidently explicit images; OCR receipt-signal decides accept vs. uncertain; uncertain uploads are kept private from the athlete; rejected bytes are not retained. | Pass (unit-tested) |
+| Public-profile donations | Profile shows the five latest confirmed donations, the confirmed count, and an empty state; "See all" lists all confirmed donations and "See top" ranks contributors by total confirmed contribution — named donors are aggregated by exact name while each anonymous donation is its own row; pending/rejected and receipts are excluded; popups dismiss via close, outside click, and Escape. | Pass (unit-tested helpers) |
 | Funding update | On success, the athlete's raised total and supporter count increase across the app. | Pass |
 | Persistence | Selected role and athlete funding totals survive a page reload via `localStorage`. | Pass |
 | Logout | Clears role and returns to the landing page. | Pass |

@@ -31,6 +31,8 @@ export function Icon({ name, size = 20 }: { name: string; size?: number }) {
     plus: <><path d="M12 5v14M5 12h14" /></>,
     logout: <><path d="M10 17l5-5-5-5M15 12H3" /><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /></>,
     menu: <><path d="M4 7h16M4 12h16M4 17h16" /></>,
+    dots: <><circle cx="12" cy="5" r="1.4" /><circle cx="12" cy="12" r="1.4" /><circle cx="12" cy="19" r="1.4" /></>,
+    bell: <><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></>,
     close: <><path d="m6 6 12 12M18 6 6 18" /></>,
     spark: <><path d="m12 3-1.3 4.7L6 9l4.7 1.3L12 15l1.3-4.7L18 9l-4.7-1.3L12 3Z" /><path d="m5 14-.7 2.3L2 17l2.3.7L5 20l.7-2.3L8 17l-2.3-.7L5 14Z" /></>,
     comment: <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" />,
@@ -45,14 +47,17 @@ export function Logo() {
 }
 
 export function Progress({ value }: { value: number }) {
-  return <div className="progress"><span style={{ width: `${Math.min(value, 100)}%` }} /></div>;
+  const safeValue = Number.isFinite(value) ? Math.max(0, value) : 0;
+  return <div className="progress"><span style={{ width: `${Math.min(safeValue, 100)}%` }} /></div>;
 }
 
-/** Athlete summary card that links to the athlete's profile route. */
-export function AthleteCard({ athlete }: { athlete: Athlete }) {
-  const percent = Math.round((athlete.raised / athlete.goal) * 100);
+/** Athlete summary card; `from` preserves discovery-region navigation. */
+export function AthleteCard({ athlete, from }: { athlete: Athlete; from?: string | null }) {
+  const percent = athlete.goal > 0 ? Math.round((athlete.raised / athlete.goal) * 100) : 0;
+  const profilePath = `/athletes/${athlete.profileId ?? athlete.id}`;
+  const href = from ? `${profilePath}?from=${encodeURIComponent(from)}` : profilePath;
   return (
-    <Link className="athlete-card" href={`/athletes/${athlete.id}`}>
+    <Link className="athlete-card" href={href}>
       <div className="card-image">
         <img src={athlete.image} alt={`${athlete.name}, ${athlete.sport} athlete`} />
         <span className="sport-pill">{athlete.sport}</span>
@@ -72,7 +77,7 @@ export function AthleteCard({ athlete }: { athlete: Athlete }) {
 /** Small reusable link styled as a button. */
 export function MiniAthlete({ athlete, rank }: { athlete: Athlete; rank: number }) {
   return (
-    <Link className="mini-athlete" href={`/athletes/${athlete.id}`}>
+    <Link className="mini-athlete" href={`/athletes/${athlete.profileId ?? athlete.id}`}>
       <b>0{rank}</b>
       <img src={athlete.image} alt="" />
       <span><strong>{athlete.name}</strong><small>{athlete.sport} · {athlete.location}</small></span>

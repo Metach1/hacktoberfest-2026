@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { AthleteProfileScreen } from "@/src/app/screens/athlete-profile";
 import { athletes } from "@/src/app/data/athletes";
 
@@ -9,9 +9,9 @@ export function generateStaticParams() {
 
 export default async function AthletePage({ params }: PageProps<"/athletes/[id]">) {
   const { id } = await params;
-  const numericId = Number.parseInt(id, 10);
-  if (!Number.isInteger(numericId) || numericId <= 0) {
-    notFound();
-  }
-  return <AthleteProfileScreen id={numericId} />;
+  return (
+    <Suspense>
+      <AthleteProfileScreen id={id} />
+    </Suspense>
+  );
 }

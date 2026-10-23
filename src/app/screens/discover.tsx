@@ -7,11 +7,16 @@ import { AthleteCard, Icon, peso } from "@/src/app/shared/ui";
 import { useStarlete } from "@/src/app/store";
 import type { Athlete } from "@/src/app/data/athletes";
 import { regionName } from "@/src/app/lib/regions";
+import { isSupabaseConfigured } from "@/src/app/lib/supabase/client";
+import { toAthlete } from "@/src/app/lib/profile-adapter";
+import { confirmedTotalsByProfile } from "@/src/app/lib/donations.mjs";
+import { getPublicAthleteProfiles } from "@/src/app/services/profile";
 import {
   REGION_MAP,
   countByRegion,
   filterAthletes,
 } from "@/src/app/lib/region-map";
+import { Combobox } from "@/src/app/shared/combobox";
 
 /** Map an athlete count to a choropleth intensity bucket (0 = empty). */
 function intensity(count: number): 0 | 1 | 2 | 3 | 4 {
@@ -135,11 +140,13 @@ function PhilippinesMap({
   );
 }
 
-/** A single brief, text-only athlete row for the compact region/search list. */
-function AthleteRow({ athlete }: { athlete: Athlete }) {
-  const percent = Math.round((athlete.raised / athlete.goal) * 100);
+/** A brief athlete result that preserves the current discovery region. */
+function AthleteRow({ athlete, from }: { athlete: Athlete; from?: string | null }) {
+  const percent = athlete.goal > 0 ? Math.round((athlete.raised / athlete.goal) * 100) : 0;
+  const profilePath = `/athletes/${athlete.profileId ?? athlete.id}`;
+  const href = from ? `${profilePath}?from=${encodeURIComponent(from)}` : profilePath;
   return (
-    <Link className="region-row" href={`/athletes/${athlete.id}`}>
+    <Link className="region-row" href={href}>
       <div className="region-row-head">
         <strong>{athlete.name}</strong>
         {athlete.verified && <span className="verified" title="Verified athlete"><Icon name="check" size={11} /></span>}
@@ -152,16 +159,62 @@ function AthleteRow({ athlete }: { athlete: Athlete }) {
 }
 
 export function DiscoverScreen() {
-  const { athletes } = useStarlete();
+  const { athletes: demoAthletes, donations } = useStarlete();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [registeredAthletes, setRegisteredAthletes] = useState<Athlete[]>([]);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
   const [sport, setSport] = useState("All sports");
   // Whether the full catalog grid is expanded. Reset whenever the active
   // selection/search changes so "Expand" always reflects the current results.
   const [expanded, setExpanded] = useState(false);
+  // Independent "browse every athlete" modal, unaffected by region/search/sport.
+  // Initialized from ?view=all so it can be opened from another page (e.g. the
+  // supporter dashboard) by navigating to /discover?view=all. The initializer
+  // reads the param once at mount — no setState-in-effect.
+  const [viewAll, setViewAll] = useState(() => searchParams.get("view") === "all");
+
+  // Close the all-athletes sheet and strip ?view=all so a refresh (or the
+  // browser back button) does not reopen it. Leaves any ?region= untouched.
+  const closeViewAll = useCallback(() => {
+    setViewAll(false);
+    if (searchParams.get("view") === "all") {
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete("view");
+      const query = params.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    }
+  }, [pathname, router, searchParams]);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    let active = true;
+    getPublicAthleteProfiles()
+      .then((profiles) => {
+        if (active) setRegisteredAthletes(profiles.map((profile, index) => toAthlete(profile, -(index + 1))));
+      })
+      .catch((error: unknown) => {
+        if (active) setProfileError(error instanceof Error ? error.message : "Could not load athlete profiles.");
+      });
+    return () => { active = false; };
+  }, []);
+
+  const athletes = useMemo(
+    () => [
+      ...demoAthletes,
+      // Registered athletes come from toAthlete() with raised/supporters at 0
+      // and aren't reconciled by the store. Fold in confirmed donations by the
+      // stable Supabase profile id so cards/rows show real raised totals.
+      ...registeredAthletes.map((a) => {
+        const { total, count } = confirmedTotalsByProfile(donations, a.profileId ?? "");
+        return { ...a, raised: total, supporters: count };
+      }),
+    ],
+    [demoAthletes, registeredAthletes, donations],
+  );
 
   // The selected region is held in the URL so it is shareable and works with
   // the browser back button. A valid region code is one that exists on the map.
@@ -206,7 +259,7 @@ export function DiscoverScreen() {
   // elements the user is meant to interact with. The expanded catalog modal has
   // its own dismissal, so pause this while it is open.
   useEffect(() => {
-    if (!listActive || expanded) return;
+    if (!listActive || expanded || viewAll) return;
     const INTERACTIVE = "[data-region], .region-list, .search-box, select, input, button, a";
     const onPointerDown = (e: PointerEvent) => {
       const target = e.target as Element | null;
@@ -222,12 +275,23 @@ export function DiscoverScreen() {
       document.removeEventListener("pointerdown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
     };
-  }, [listActive, expanded, clearSelection]);
+  }, [listActive, expanded, viewAll, clearSelection]);
+
+  // Close either catalog modal on Escape.
+  useEffect(() => {
+    if (!expanded && !viewAll) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") { setExpanded(false); closeViewAll(); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [expanded, viewAll, closeViewAll]);
 
   const headingName = selectedRegionName ?? "the Philippines";
 
   return (
     <main className="page-shell">
+      {profileError && <p className="field-error" role="alert">{profileError}</p>}
       <div className="discover-hero">
         <span className="eyebrow light">Discover Filipino talent</span>
         <h1>Find a story to believe in.</h1>
@@ -241,17 +305,27 @@ export function DiscoverScreen() {
           <h2>Athletes across<br />{headingName}</h2>
           <p className="explorer-sub">Select a region on the map, or search, to meet the athletes training there.</p>
 
+          <button type="button" className="text-button view-all-button" onClick={() => setViewAll(true)}>
+            <Icon name="users" size={16} /> View all athletes ({athletes.length})
+          </button>
+
           <div className="explorer-controls">
             <label className="search-box"><Icon name="search" /><input value={search} onChange={(e) => onSearchChange(e.target.value)} placeholder="Search athletes, sports, or cities" /></label>
             <div className="explorer-filters">
-              <select value={sport} onChange={(e) => onSportChange(e.target.value)} aria-label="Filter by sport">
-                <option>All sports</option>
-                {[...new Set(athletes.map((a) => a.sport))].map((s) => <option key={s}>{s}</option>)}
-              </select>
-              <select value={selectedRegion ?? ""} onChange={(e) => setSelectedRegion(e.target.value || null)} aria-label="Filter by region">
-                <option value="">All regions</option>
-                {REGION_MAP.regions.map((r) => <option key={r.regionCode} value={r.regionCode}>{r.name}</option>)}
-              </select>
+              <Combobox
+                options={["All sports", ...new Set(athletes.map((a) => a.sport))]}
+                value={sport}
+                onChange={onSportChange}
+                ariaLabel="Filter by sport"
+                placeholder="Type to filter sports…"
+              />
+              <Combobox
+                options={[{ value: "", label: "All regions" }, ...REGION_MAP.regions.map((r) => ({ value: r.regionCode, label: r.name }))]}
+                value={selectedRegion ?? ""}
+                onChange={(v) => setSelectedRegion(v || null)}
+                ariaLabel="Filter by region"
+                placeholder="Type to filter regions…"
+              />
             </div>
           </div>
 
@@ -267,7 +341,7 @@ export function DiscoverScreen() {
               </div>
               <div className="region-list-scroll">
                 {filtered.length ? (
-                  filtered.map((a) => <AthleteRow key={a.id} athlete={a} />)
+                  filtered.map((a) => <AthleteRow key={a.id} athlete={a} from={selectedRegion} />)
                 ) : (
                   <p className="region-empty">{selectedRegionName ? `No athletes in ${selectedRegionName} yet.` : "No athletes match your search."}</p>
                 )}
@@ -296,8 +370,27 @@ export function DiscoverScreen() {
               </div>
             </div>
             <div className="catalog-sheet-scroll">
-              <div className="card-grid">{filtered.map((a) => <AthleteCard key={a.id} athlete={a} />)}</div>
+              <div className="card-grid">{filtered.map((a) => <AthleteCard key={a.id} athlete={a} from={selectedRegion} />)}</div>
               {!filtered.length && <div className="empty"><h3>No athletes found</h3><p>Try broadening your search, choosing another region, or clearing a filter.</p></div>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Browse every registered athlete, unfiltered. Same sheet pattern as the
+          region catalog, but it never sets a region. */}
+      {viewAll && (
+        <div className="modal-backdrop catalog-backdrop" onClick={closeViewAll}>
+          <div className="catalog-sheet" role="dialog" aria-modal="true" aria-label="All athletes" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="modal-close" onClick={closeViewAll} aria-label="Close catalog"><Icon name="close" /></button>
+            <div className="results-head">
+              <div>
+                <span className="eyebrow">Athlete community</span>
+                <h2>All athletes <span className="results-count">({athletes.length})</span></h2>
+              </div>
+            </div>
+            <div className="catalog-sheet-scroll">
+              <div className="card-grid">{athletes.map((a) => <AthleteCard key={a.id} athlete={a} />)}</div>
             </div>
           </div>
         </div>

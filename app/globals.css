@@ -54,7 +54,8 @@ h1, h2, h3 { letter-spacing: -.035em; }
 .nav { display: flex; align-items: center; gap: 28px; }
 .nav > a:not(.button):not(.nav-user), .nav > button { background: none; border: 0; color: #34455b; font-size: 17px; font-weight: 600; padding: 12px 0; text-decoration: none; }
 .nav > button.active { color: var(--blue); }
-.nav-user { width: 37px; height: 37px; border-radius: 50% !important; padding: 0 !important; color: white !important; background: var(--navy) !important; }
+.nav-user { width: 37px; height: 37px; border-radius: 50% !important; padding: 0 !important; color: white !important; background: var(--navy) !important; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; }
+.nav-user img { width: 100%; height: 100%; object-fit: cover; }
 .nav .icon-only { color: var(--muted); }
 .menu-button { display: none; background: none; border: 0; color: var(--navy); }
 .button { border: 0; border-radius: 12px; background: var(--blue); color: white; min-height: 48px; padding: 0 22px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; font-weight: 700; font-size: 14px; transition: transform .2s, box-shadow .2s; }
@@ -152,12 +153,25 @@ footer p { margin: 0; flex: 1; }
 .feed-post-text { margin-bottom: 18px; color: #34455b; font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
 .feed-actions { display: flex; flex-wrap: wrap; gap: 18px; padding-top: 14px; border-top: 1px solid #edf0f4; }
 .feed-action { display: inline-flex; align-items: center; gap: 7px; padding: 2px 0; border: 0; background: none; color: var(--muted); font-size: 12px; }
-.feed-action:hover, .feed-action.liked { color: var(--color-impact); }
+.feed-action.liked { color: var(--color-impact); }
+.feed-action:hover { color: var(--ink); }
+.feed-action.liked:hover { color: var(--color-impact); }
+.feed-action.liked svg { fill: currentColor; }
 .feed-comments { display: grid; gap: 14px; margin-top: 18px; padding-top: 16px; border-top: 1px solid #edf0f4; }
 .feed-comment { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; }
 .feed-comment-avatar { flex: 0 0 30px; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--cream); color: var(--navy); font-weight: 700; }
 .feed-comment p { margin: 4px 0 0; color: #34455b; line-height: 1.5; overflow-wrap: anywhere; }
 .feed-comment small { color: var(--muted); }
+.feed-comment-body { flex: 1; min-width: 0; }
+.feed-comment-menu { flex: 0 0 auto; }
+.feed-comment-menu .icon-button { width: 26px; height: 26px; }
+.feed-comment-edit { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+.feed-comment-edit input { width: 100%; }
+.feed-comment-edit-actions { display: flex; gap: 12px; }
+.feed-comment-edit-actions .text-button { font-size: 12px; padding: 2px 0; }
+.feed-comment-confirm { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 8px; font-size: 12px; color: var(--muted); }
+.feed-comment-confirm .text-button { font-size: 12px; padding: 2px 0; }
+.feed-comment-confirm .text-button.danger { color: #c0392b; }
 .feed-comment-form { display: flex; align-items: center; gap: 8px; }
 .feed-comment-form input { flex: 1; min-width: 0; }
 .feed-comment-signin { margin: 0; color: var(--muted); font-size: 12px; }
@@ -194,6 +208,25 @@ footer p { margin: 0; flex: 1; }
 .support-stats { display: flex; justify-content: space-between; margin: 11px 0 24px; font-size: 10px; color: var(--muted); }
 .support-stats b { color: var(--ink); }
 .safe-note { color: var(--muted); font-size: 10px; line-height: 1.4; display: flex; align-items: center; justify-content: center; gap: 6px; margin: 13px 0 0; }
+
+/* GoFundMe-style confirmed donations on the public profile */
+.donations-panel { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 16px; }
+.donations-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.donations-head strong { font-size: 14px; }
+.donations-tabs { display: flex; gap: 14px; }
+.donations-tabs .text-button { font-size: 12px; }
+.donations-empty { font-size: 12px; margin: 4px 0 0; }
+.donation-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.donation-list.scroll { max-height: 60vh; overflow-y: auto; margin-top: 6px; }
+.donation-item { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); font-size: 13px; }
+.donation-item:first-child { border-top: none; }
+.donation-item-meta { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.donation-item-meta strong { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.donation-item-meta small { color: var(--muted); font-size: 10px; }
+.donation-item > b { color: var(--ink); white-space: nowrap; }
+.donor-initials { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--cream); color: var(--navy); font-size: 11px; font-weight: 800; flex-shrink: 0; }
+.donations-popup { max-width: 420px; }
+
 .profile-content { display: grid; grid-template-columns: 1.3fr .7fr; gap: 80px; border-top: 1px solid var(--line); margin-top: 70px; padding-top: 65px; }
 .profile-content h2 { font-size: 32px; }
 .profile-content p { color: var(--muted); line-height: 1.75; }
@@ -202,16 +235,21 @@ footer p { margin: 0; flex: 1; }
 .post small, .dash-post small { color: var(--blue); text-transform: uppercase; font-size: 9px; letter-spacing: .1em; }
 .post h3 { margin: 10px 0; }
 
-.auth-page { min-height: 100vh; display: grid; grid-template-columns: .8fr 1.2fr; }
-.auth-art { background: linear-gradient(180deg, rgba(7,28,52,.15), rgba(7,28,52,.97)), url("https://images.unsplash.com/photo-1728532483490-708f6562b738?auto=format&fit=crop&w=1200&q=85") center/cover; color: white; padding: 42px 7vw; display: flex; flex-direction: column; justify-content: space-between; }
+.auth-page { min-height: 100vh; }
+/* Left art is FIXED to the viewport (≈40% = the old .8fr of a 2.0fr grid), so
+   it never moves when the form grows (toggle) or the page scrolls. The form
+   column is pushed right by the same width and scrolls on its own. */
+.auth-art { position: fixed; top: 0; left: 0; width: 40vw; height: 100vh; background: linear-gradient(180deg, rgba(7,28,52,.15), rgba(7,28,52,.97)), url("https://images.unsplash.com/photo-1728532483490-708f6562b738?auto=format&fit=crop&w=1200&q=85") center/cover; color: white; padding: 42px 7vw; display: flex; flex-direction: column; justify-content: space-between; }
 .auth-art .logo { color: white; align-self: flex-start; }
 .auth-art h1 { font-size: 45px; line-height: 1.1; max-width: 500px; }
 .auth-art p { color: #b8c6d5; line-height: 1.7; }
 .auth-art > small { color: #899caf; }
-.auth-panel { padding: 55px 9vw; display: flex; align-items: center; }
-.auth-form { width: 100%; max-width: 540px; margin: auto; }
+.auth-panel { margin-left: 40vw; min-height: 100vh; padding: 55px 9vw; display: flex; align-items: flex-start; }
+.auth-form { width: 100%; max-width: 540px; margin: 0 auto; }
 .auth-form h2 { font-size: 34px; margin: 0 0 9px; }
 .auth-form > p { color: var(--muted); font-size: 14px; }
+.auth-error { display: flex; align-items: flex-start; gap: 10px; margin: 4px 0 16px; padding: 12px 14px; border: 1px solid #f2c6c6; border-radius: 10px; background: #fff5f5; color: #9f2525; font-size: 13px; font-weight: 500; line-height: 1.45; }
+.auth-error-icon { width: 18px; height: 18px; flex: 0 0 18px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: #f8dddd; color: #9f2525; font-size: 12px; font-weight: 800; line-height: 1; }
 .role-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 25px 0; }
 .role-switch button { border: 1px solid var(--line); border-radius: 12px; padding: 15px; background: white; display: flex; text-align: left; gap: 10px; color: var(--muted); }
 .role-switch button.selected { border-color: var(--blue); background: var(--blue-light); color: var(--blue); }
@@ -235,6 +273,7 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .dash-welcome { display: flex; align-items: center; justify-content: space-between; margin-bottom: 40px; }
 .dash-welcome h1, .settings-head h1 { font-size: 42px; margin: 0 0 8px; }
 .dash-welcome p, .settings-head p { color: var(--muted); margin: 0; }
+.dash-welcome-actions { display: flex; align-items: center; gap: 14px; }
 .impact-chip { background: var(--navy); color: var(--gold); border-radius: 15px; padding: 15px 20px; display: flex; gap: 12px; align-items: center; }
 .impact-chip span { display: flex; flex-direction: column; }
 .impact-chip small { color: #9baec2; font-size: 9px; }
@@ -250,6 +289,8 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .mini-athlete span { display: flex; flex-direction: column; flex: 1; gap: 3px; }
 .mini-athlete small, .leader-row small, .donation-row small { color: var(--muted); font-size: 10px; }
 .leader-row, .donation-row { display: flex; align-items: center; gap: 13px; padding: 13px 0; border-top: 1px solid var(--line); font-size: 12px; }
+a.leader-row { color: inherit; text-decoration: none; }
+a.leader-row:hover strong { color: var(--blue); }
 .leader-row div, .donation-row div { display: flex; flex-direction: column; gap: 3px; flex: 1; }
 .rank { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; background: #f1f3f5; font-size: 11px; }
 .rank.first { color: #956600; background: #fff0bd; }
@@ -280,6 +321,25 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .modal { width: 100%; max-width: 520px; background: white; border-radius: 20px; padding: 31px; position: relative; box-shadow: 0 25px 70px rgba(0,0,0,.3); }
 .small-modal { max-width: 480px; }
 .modal-close { position: absolute; right: 19px; top: 19px; background: #f0f2f4; border: 0; border-radius: 50%; width: 34px; height: 34px; display: grid; place-items: center; z-index: 2; }
+.qr-fullscreen-backdrop { position: fixed; z-index: 110; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(3,17,31,.9); }
+.qr-fullscreen-dialog { position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 100%; max-height: calc(100vh - 40px); overflow: auto; padding: 28px; border-radius: 16px; background: white; text-align: center; }
+.qr-fullscreen-dialog img { display: block; width: min(80vw, 560px); height: min(65vh, 560px); max-height: calc(100vh - 180px); object-fit: contain; background: white; }
+.qr-fullscreen-dialog strong { color: var(--ink); }
+/* Full-size receipt viewer — mirrors the QR fullscreen viewer so a large
+   receipt image fits the viewport (object-fit: contain) and is scrollable if
+   it still overflows. */
+/* z-index 200 so the receipt viewer always sits above the athlete review
+   modal (.modal-backdrop is z-index 100) when opened from inside it. */
+.receipt-fullscreen-backdrop { position: fixed; z-index: 200; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(3,17,31,.9); }
+.receipt-fullscreen-dialog { position: relative; display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 100%; max-height: calc(100vh - 40px); overflow: auto; padding: 28px; border-radius: 16px; background: white; text-align: center; }
+.receipt-fullscreen-dialog img { display: block; width: min(86vw, 680px); height: auto; max-height: calc(100vh - 180px); object-fit: contain; background: white; }
+.receipt-fullscreen-dialog strong { color: var(--ink); word-break: break-word; }
+/* Clickable receipt thumbnail in the athlete review modal. */
+.receipt-zoom { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; position: relative; }
+.receipt-zoom img { display: block; width: 100%; border-radius: 10px; }
+.receipt-zoom-hint { position: absolute; right: 10px; bottom: 10px; display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border-radius: 999px; background: rgba(3,17,31,.78); color: #fff; font-size: 12px; }
+/* Action row under a rejected supporter payment (edit & resubmit). */
+.payment-actions { display: flex; gap: 8px; margin-top: 8px; }
 .checkout-head { text-align: center; border-bottom: 1px solid var(--line); padding-bottom: 22px; }
 .checkout-head h2 { margin: 0 0 20px; font-size: 27px; }
 .stepper { display: flex; justify-content: center; align-items: center; }
@@ -330,8 +390,8 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
   .how-section { grid-template-columns: 1fr; gap: 50px; }
   .profile-hero { grid-template-columns: 1fr 1fr; }
   .support-card { grid-column: 1/-1; }
-  .auth-page { grid-template-columns: 1fr; }
-  .auth-art { min-height: 330px; }
+  .auth-art { position: static; width: auto; height: auto; min-height: 330px; }
+  .auth-panel { margin-left: 0; }
   .auth-art > small { display: none; }
 }
 
@@ -384,6 +444,7 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
   .role-switch, .field-row { grid-template-columns: 1fr; }
   .dash-welcome { align-items: flex-start; flex-direction: column; gap: 20px; }
   .dash-welcome h1, .settings-head h1 { font-size: 34px; }
+  .dash-welcome-actions { flex-direction: column; align-items: stretch; gap: 12px; width: 100%; }
   .impact-chip { width: 100%; }
   .dashboard { padding: 45px 18px 70px; }
   .stat-grid, .dashboard-grid { grid-template-columns: 1fr; }
@@ -403,7 +464,9 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .explorer-panel { position: relative; z-index: 2; }
 .explorer-panel > .eyebrow { margin-bottom: 10px; }
 .explorer-panel h2 { font-size: 34px; line-height: 1.08; margin: 0 0 12px; color: var(--navy); }
-.explorer-sub { margin: 0 0 20px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.explorer-sub { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.view-all-button { margin: 0 0 18px; font-size: 13px; }
+.results-count { color: var(--muted); font-weight: 600; }
 .explorer-controls { display: flex; flex-direction: column; gap: 10px; }
 .explorer-controls .search-box { background: white; border: 1px solid var(--line); border-radius: 12px; padding: 0 14px; }
 .explorer-controls .search-box input { background: transparent; }
@@ -473,6 +536,163 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
   .ph-map-svg { max-width: 420px; }
 }
 
+/* ---- QR-based donation flow (supporter + athlete) ---------------------- */
+
+/* Step 2: QR display */
+.qr-method-tabs { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 18px 0 14px; }
+.qr-method-tabs button { border: 1px solid var(--line); background: white; border-radius: 999px; padding: 7px 16px; font-weight: 700; font-size: 12px; }
+.qr-method-tabs button.selected { border-color: var(--blue); background: var(--blue-light); color: var(--blue); }
+.qr-display { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 20px; background: var(--cream); border-radius: 16px; margin-bottom: 8px; }
+.qr-display img { width: 160px; height: 160px; object-fit: contain; border-radius: 12px; background: white; padding: 8px; border: 1px solid var(--line); }
+.qr-display .text-button { min-height: 40px; }
+.qr-meta { text-align: center; display: flex; flex-direction: column; gap: 2px; }
+.qr-meta small { color: var(--muted); font-size: 11px; }
+
+/* Step 3: receipt upload + OCR */
+.receipt-upload { margin: 18px 0 10px; }
+.receipt-dropzone { width: 100%; border: 2px dashed var(--line); border-radius: 14px; background: #fafbfc; padding: 26px; display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--muted); }
+.receipt-dropzone strong { color: var(--ink); font-size: 14px; }
+.receipt-dropzone small { font-size: 11px; }
+.receipt-preview { display: flex; align-items: center; gap: 14px; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.receipt-preview img { width: 72px; height: 72px; object-fit: contain; background: #fff; border-radius: 8px; }
+.receipt-preview div { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.form-error { color: #c0392b; font-size: 11px; margin: 8px 0 0; }
+.field-hint { color: var(--muted); font-size: 11px; text-align: center; margin: 10px 0 0; }
+.checkbox-row { flex-direction: row !important; align-items: center !important; gap: 0 !important; margin: 8px 0 0 !important; font-size: 11px; font-weight: 400; color: var(--muted); cursor: pointer; line-height: 1; }
+.checkbox-row input[type="checkbox"] { appearance: auto; -webkit-appearance: checkbox; flex: 0 0 auto; width: 14px; height: 14px; min-height: 0; margin: 0 8px 0 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; cursor: pointer; }
+.checkbox-row .checkbox-label { position: relative; top: -3.5px; }
+.field-hint.warn { color: #9a6314; display: flex; align-items: center; gap: 6px; justify-content: center; }
+
+.ocr-status { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 10px 12px; border-radius: 10px; margin-bottom: 14px; background: var(--blue-light); color: var(--blue); }
+.ocr-status.ok { background: #e4f7ee; color: #16815a; }
+.ocr-status.warn { background: #fdf1e3; color: #9a6314; }
+.loader.small { width: 18px; height: 18px; border-width: 3px; margin: 0; }
+
+.suggestion-chip { align-self: flex-start; margin-top: 7px; border: 1px solid var(--blue); background: var(--blue-light); color: var(--blue); border-radius: 999px; padding: 4px 12px; font-size: 11px; font-weight: 700; }
+.donation-step select, .qr-add-form select { border: 1px solid var(--line); border-radius: 10px; min-height: 46px; padding: 0 12px; background: white; }
+.readonly-field { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; min-height: 46px; padding: 0 13px; background: var(--blue-light, #f1f5fb); color: var(--ink); font-weight: 700; }
+
+.review-receipt { margin: 14px 0; text-align: center; }
+.review-receipt img { max-width: 100%; max-height: 220px; width: auto; height: auto; object-fit: contain; border-radius: 12px; border: 1px solid var(--line); margin: 0 auto; }
+.success-icon.pending { background: #fdf1e3; color: #b9791a; }
+
+.empty-note { text-align: center; color: var(--muted); font-size: 13px; line-height: 1.6; padding: 10px 0 4px; }
+.empty-note.small { padding: 14px; background: var(--cream); border-radius: 12px; }
+.empty-note strong { color: var(--ink); }
+
+/* Athlete: QR management */
+.muted-line { color: var(--muted); font-size: 12px; line-height: 1.5; margin: 0 0 14px; }
+.qr-manage-list { display: flex; flex-direction: column; gap: 10px; }
+.qr-manage-row { display: flex; align-items: center; gap: 12px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.qr-manage-row img { width: 56px; height: 56px; object-fit: contain; border-radius: 8px; border: 1px solid var(--line); background: white; }
+.qr-no-image { width: 56px; height: 56px; flex: none; display: grid; place-items: center; gap: 2px; border-radius: 8px; border: 1px dashed var(--line); background: #fafbfc; color: var(--muted); }
+.qr-no-image small { font-size: 9px; }
+.qr-no-image-note { margin: 0 0 4px; max-width: 220px; text-align: center; }
+/* When a QR has no image, show the account name/number prominently so
+   supporters can read and type them easily. */
+.qr-no-image-details { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; background: #fafbfc; text-align: center; }
+.qr-no-image-method { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.qr-no-image-name { font-size: 20px; color: var(--ink); }
+.qr-no-image-number { font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; font-size: 22px; font-weight: 700; letter-spacing: .04em; color: var(--ink); user-select: all; }
+.qr-manage-meta { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.qr-manage-meta small { color: var(--muted); font-size: 11px; }
+.qr-manage-meta input { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; font-size: 12px; }
+.qr-manage-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.qr-manage-actions .danger { color: #c0392b; }
+.link-file { color: var(--blue); font-weight: 700; font-size: 12px; cursor: pointer; }
+.qr-add-form, .qr-edit-form { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 16px; }
+.qr-edit-form { border: 1px solid var(--line); border-radius: 12px; border-top: 1px solid var(--line); padding: 14px; background: #fafbfc; }
+.qr-add-form label, .qr-edit-form label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 700; margin-bottom: 12px; }
+.qr-edit-form select { border: 1px solid var(--line); border-radius: 10px; min-height: 46px; padding: 0 12px; background: white; }
+/* QR image upload field: a styled dropzone / preview (shared with the donation
+   flow's .receipt-dropzone / .receipt-preview) rather than a raw file input. */
+.qr-upload-field { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.qr-upload-label { font-size: 12px; font-weight: 700; }
+.qr-upload-optional { font-weight: 400; color: var(--muted); }
+.qr-upload-field .receipt-dropzone { cursor: pointer; }
+.qr-upload-field .field-hint { text-align: left; margin: 0; }
+
+/* Athlete: pending donations */
+.count-pill { background: var(--gold); color: var(--navy); border-radius: 999px; min-width: 24px; height: 24px; padding: 0 8px; display: inline-grid; place-items: center; font-weight: 800; font-size: 12px; }
+.pending-row { display: flex; align-items: center; gap: 12px; padding: 13px 0; border-top: 1px solid var(--line); font-size: 12px; }
+.pending-thumb { width: 44px; height: 44px; object-fit: contain; background: #fff; border-radius: 8px; border: 1px solid var(--line); }
+.pending-meta { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.pending-meta small { color: var(--muted); font-size: 10px; }
+.pending-meta .auto-hint { color: #9a6314; font-size: 10px; font-weight: 700; }
+.pending-row > b { color: var(--ink); }
+.pending-actions { display: flex; align-items: center; gap: 8px; }
+.donor-note { background: var(--cream); border-radius: 10px; padding: 10px 12px; font-size: 12px; font-style: italic; color: var(--ink); margin: 12px 0; }
+.donor-avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: #ffe9ec; color: #e24a5f; }
+.pending-actions .text-button.danger { color: #c0392b; }
+.button.danger { background: #c0392b; color: #fff; }
+.button.secondary.danger { background: #fdecea; color: #c0392b; }
+
+/* Donation status badges + payment history (athlete + supporter) */
+.status-badge { border-radius: 999px; padding: 2px 10px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; }
+.status-badge.pending { background: #fff3dc; color: #9a6314; }
+.status-badge.confirmed { background: #e4f6ec; color: #1f7a46; }
+.status-badge.rejected { background: #fdecea; color: #c0392b; }
+.payment-history { display: flex; flex-direction: column; }
+.payment-row { padding: 12px 0; border-top: 1px solid var(--line); font-size: 12px; }
+.payment-main { display: flex; align-items: center; gap: 10px; }
+.payment-main strong { font-size: 13px; margin-right: auto; }
+/* "My payments" status filter tabs + pagination */
+.payment-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.payment-filter { background: none; border: 1px solid var(--line); border-radius: 999px; padding: 5px 13px; font-size: 11px; font-weight: 700; color: var(--muted); cursor: pointer; }
+.payment-filter:hover { border-color: var(--blue); color: var(--blue); }
+.payment-filter.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
+.pager-info { font-size: 12px; color: var(--muted); font-weight: 700; }
+.pager .button:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
+/* Three-dot actions menu on a supporter payment row. */
+.payment-menu { position: relative; display: inline-flex; }
+.icon-button { background: none; border: 0; border-radius: 8px; width: 30px; height: 30px; display: grid; place-items: center; color: var(--muted); cursor: pointer; }
+.icon-button:hover { background: #f0f2f4; color: var(--ink); }
+.payment-menu-pop { position: absolute; z-index: 20; top: calc(100% + 4px); right: 0; min-width: 160px; background: #fff; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 30px rgba(0,0,0,.14); padding: 6px; display: flex; flex-direction: column; }
+.payment-menu-pop button { text-align: left; background: none; border: 0; border-radius: 8px; padding: 9px 11px; font-size: 13px; color: var(--ink); cursor: pointer; }
+.payment-menu-pop button:hover { background: #f0f2f4; }
+.payment-menu-pop button.danger { color: #c0392b; }
+.payment-menu-pop button.danger:hover { background: #fdecea; }
+.payment-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--muted); margin-top: 4px; }
+.payment-meta span:first-child { color: var(--ink); font-weight: 700; }
+.payment-reject { margin: 6px 0 0; color: #c0392b; font-size: 11px; }
+.payment-note { margin: 6px 0 0; font-size: 11px; }
+
+/* Notifications bell + dropdown panel (header). */
+.notif { position: relative; display: inline-flex; }
+.notif-bell { position: relative; }
+.notif-badge { position: absolute; top: -4px; right: -4px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: #c0392b; color: #fff; font-size: 10px; font-weight: 800; display: grid; place-items: center; line-height: 1; }
+.notif-panel { position: absolute; z-index: 40; top: calc(100% + 8px); right: 0; width: 320px; max-width: calc(100vw - 32px); max-height: 70vh; overflow-y: auto; background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 16px 40px rgba(0,0,0,.16); }
+.notif-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: #fff; }
+.notif-head strong { font-size: 14px; color: var(--ink); }
+.notif-head .text-button { font-size: 12px; font-weight: 700; }
+.notif-empty { padding: 20px 14px; margin: 0; text-align: center; }
+.notif-list { list-style: none; margin: 0; padding: 0; }
+.notif-item { padding: 11px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.notif-item:last-child { border-bottom: 0; }
+.notif-item:hover { background: #fafbfc; }
+.notif-item.unread { background: var(--blue-light); }
+.notif-item-main { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.notif-item-main strong { font-size: 13px; color: var(--ink); }
+.notif-item-main small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.notif-item p { margin: 3px 0 0; font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+/* Profile avatar + account dropdown (header). */
+.profile-menu { position: relative; display: inline-flex; }
+.profile-panel { position: absolute; z-index: 40; top: calc(100% + 8px); right: 0; width: 220px; max-width: calc(100vw - 32px); background: #fff; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 16px 40px rgba(0,0,0,.16); padding: 6px; }
+.profile-panel-head { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px 12px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
+.profile-panel-head strong { font-size: 14px; color: var(--ink); }
+.profile-panel-head small { color: var(--muted); font-size: 11px; }
+.profile-menu-item { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; background: none; border: 0; border-radius: 9px; padding: 10px 12px; font-size: 13px; font-weight: 600; color: var(--ink); cursor: pointer; }
+.profile-menu-item:hover { background: #f0f2f4; }
+
+
+@media (max-width: 560px) {
+  .pending-row { flex-wrap: wrap; }
+  .pending-actions { width: 100%; justify-content: flex-end; }
+  .qr-manage-actions { flex-direction: row; }
+  .qr-display img { width: 140px; height: 140px; }
+}
 /* Accepted incoming landing-page styles: Starlete white-first athlete funding landing page. */
 .home-app { background: var(--color-pure); }
 /* Deep-blue header + white text on the landing page only. The shared header
@@ -705,3 +925,96 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .dash-post .post-actions .text-button { padding: 2px 0; font-size: 13px; }
 .dash-post .post-actions .text-button.danger { color: #c0392b; }
 .dash-post .post-actions .confirm-text { font-size: 13px; color: var(--muted); margin-right: 2px; }
+
+/* Type-to-filter combobox (shared). Mirrors the native input/select look and
+   renders its filtered listbox as an absolutely positioned dropdown. */
+.combobox { position: relative; width: 100%; }
+.combobox-input { width: 100%; }
+.combobox-list { position: absolute; z-index: 40; top: calc(100% + 4px); left: 0; right: 0; margin: 0; padding: 4px; list-style: none; max-height: 240px; overflow-y: auto; background: white; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 35px rgba(7,28,52,.14); }
+.combobox-list--up { top: auto; bottom: calc(100% + 4px); box-shadow: 0 -12px 35px rgba(7,28,52,.14); }
+.combobox-option { padding: 9px 11px; border-radius: 7px; font-size: 14px; font-weight: 500; color: var(--ink); cursor: pointer; }
+.combobox-option.active, .combobox-option:hover { background: var(--blue-light); color: var(--blue); }
+.combobox-empty { padding: 9px 11px; font-size: 13px; color: var(--muted); }
+.explorer-filters .combobox-input { border: 1px solid var(--line); border-radius: 12px; padding: 0 12px; height: 46px; background: white; color: var(--ink); outline: 0; width: 100%; }
+
+/* ---- Photo slideshow (athlete profile hero) ---- */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.profile-photo.slideshow { outline: none; }
+.profile-photo.slideshow:focus-visible { box-shadow: 0 0 0 3px var(--blue-light); }
+.slide-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(255,255,255,.9); color: var(--ink); display: grid; place-items: center; box-shadow: 0 4px 14px rgba(0,0,0,.18); cursor: pointer; z-index: 2; }
+.slide-nav:hover { background: #fff; }
+.slide-nav.prev { left: 12px; }
+.slide-nav.next { right: 12px; }
+.slide-dots { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 7px; z-index: 2; }
+.slide-dot { width: 9px; height: 9px; border-radius: 50%; border: 0; padding: 0; background: rgba(255,255,255,.55); cursor: pointer; }
+.slide-dot.active { background: #fff; width: 22px; border-radius: 99px; }
+.slide-nav:focus-visible, .slide-dot:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
+.photo-zoom-btn { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.photo-zoom-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.slide-img { animation: slide-fade .6s ease; }
+@keyframes slide-fade { from { opacity: 0; } to { opacity: 1; } }
+.photo-lightbox-backdrop { position: fixed; z-index: 200; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(3,17,31,.92); }
+.photo-lightbox { position: relative; display: flex; align-items: center; justify-content: center; max-width: 100%; max-height: 100%; }
+.photo-lightbox img { display: block; width: auto; height: auto; max-width: min(92vw, 1100px); max-height: calc(100vh - 48px); object-fit: contain; border-radius: 12px; box-shadow: 0 24px 70px rgba(0,0,0,.5); background: #0b1c33; }
+.photo-lightbox .modal-close { position: absolute; top: -14px; right: -14px; z-index: 3; }
+.photo-lightbox .slide-nav { position: absolute; top: 50%; }
+.photo-lightbox .slide-nav.prev { left: 14px; }
+.photo-lightbox .slide-nav.next { right: 14px; }
+@media (prefers-reduced-motion: reduce) { .slide-img { animation: none; } }
+
+/* ---- Edit profile: photo gallery + achievements manager + preview ---- */
+/* Editor sections (photos + achievements managers) — matches frontend-main. */
+.editor-section { border: 1px solid var(--line); border-radius: 16px; padding: 20px; margin: 0 0 24px; }
+.editor-section legend { font-size: 13px; font-weight: 800; padding: 0 8px; }
+.editor-section legend small { font-weight: 600; color: var(--muted); }
+.photo-manage-list { list-style: none; margin: 4px 0 16px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 14px; }
+.photo-manage-row { position: relative; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.photo-manage-row img { width: 100%; height: 110px; object-fit: cover; display: block; }
+.profile-pic-tag { position: absolute; top: 6px; left: 6px; background: var(--gold); color: var(--navy); font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; padding: 3px 7px; border-radius: 99px; }
+.photo-manage-actions { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 6px; background: #fafbfc; }
+.photo-manage-actions .icon-only { display: inline-flex; align-items: center; justify-content: center; color: var(--muted); border: 0; background: none; cursor: pointer; padding: 4px; border-radius: 8px; line-height: 0; }
+.photo-manage-actions .icon-only > span { display: inline-flex; }
+.photo-manage-actions .icon-only:hover:not(:disabled) { background: #eef1f4; }
+.photo-manage-actions .icon-only:disabled { opacity: .35; cursor: not-allowed; }
+.photo-manage-actions .icon-only.danger { color: #c0392b; }
+.achievement-manage-list { list-style: none; margin: 4px 0 18px; padding: 0; display: grid; gap: 12px; }
+.achievement-manage-row { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; justify-content: space-between; gap: 16px; }
+.achievement-manage-row.proudest { border-color: var(--gold); background: #fffdf5; }
+.achievement-manage-main strong { font-size: 14px; display: flex; align-items: center; gap: 8px; }
+.achievement-manage-main small { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+.achievement-manage-main p { margin: 8px 0 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
+.proudest-tag { display: inline-flex; align-items: center; gap: 3px; color: var(--gold-dark); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }
+.achievement-manage-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; white-space: nowrap; }
+.achievement-manage-actions .text-button { font-size: 12px; padding: 2px 0; }
+.achievement-manage-actions .text-button.danger { color: #c0392b; }
+.achievement-form { border-top: 1px dashed var(--line); margin-top: 4px; padding-top: 20px; }
+.achievement-form .form-actions { margin-top: 4px; }
+/* Athlete profile view: institution line, proudest meta, achievements list,
+   owner edit button — shared by the live profile and the edit preview. */
+.location.institution { margin: -12px 0 18px; }
+.location.institution svg { flex: none; }
+.institution-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.achievement-meta { display: block; margin-top: 2px; color: var(--muted); font-size: 11px; }
+.edit-profile-link { margin-top: 24px; align-self: flex-start; }
+.profile-achievements { border-top: 1px solid var(--line); margin-top: 70px; padding-top: 65px; }
+.profile-achievements .eyebrow { display: block; margin-bottom: 18px; }
+.achievement-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.achievement-item { border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; }
+.achievement-item-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.achievement-item-head strong { font-size: 15px; color: var(--ink); }
+.achievement-item-head small { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.achievement-event { margin: 6px 0 0; color: var(--blue); font-size: 13px; font-weight: 600; }
+.achievement-desc { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.achievement-note { margin-top: 16px; font-size: 12px; }
+
+/* Edit-profile preview mode: the live profile under a sticky action bar. */
+.preview-page { padding-top: 16px; }
+.preview-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; background: #fffdf5; border: 1px solid var(--gold); border-radius: 14px; padding: 12px 16px; margin-bottom: 26px; position: sticky; top: 90px; z-index: 20; }
+.preview-flag { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; color: var(--gold-dark); font-size: 13px; }
+.preview-actions { display: flex; gap: 10px; }
+
+@media (max-width: 640px) {
+  .achievement-manage-row { flex-direction: column; }
+  .achievement-manage-actions { flex-direction: row; align-self: flex-end; }
+  .preview-bar { top: 70px; }
+}
