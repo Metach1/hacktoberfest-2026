@@ -890,3 +890,14 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .dash-post .post-actions .text-button { padding: 2px 0; font-size: 13px; }
 .dash-post .post-actions .text-button.danger { color: #c0392b; }
 .dash-post .post-actions .confirm-text { font-size: 13px; color: var(--muted); margin-right: 2px; }
+
+/* Type-to-filter combobox (shared). Mirrors the native input/select look and
+   renders its filtered listbox as an absolutely positioned dropdown. */
+.combobox { position: relative; width: 100%; }
+.combobox-input { width: 100%; }
+.combobox-list { position: absolute; z-index: 40; top: calc(100% + 4px); left: 0; right: 0; margin: 0; padding: 4px; list-style: none; max-height: 240px; overflow-y: auto; background: white; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 35px rgba(7,28,52,.14); }
+.combobox-list--up { top: auto; bottom: calc(100% + 4px); box-shadow: 0 -12px 35px rgba(7,28,52,.14); }
+.combobox-option { padding: 9px 11px; border-radius: 7px; font-size: 14px; font-weight: 500; color: var(--ink); cursor: pointer; }
+.combobox-option.active, .combobox-option:hover { background: var(--blue-light); color: var(--blue); }
+.combobox-empty { padding: 9px 11px; font-size: 13px; color: var(--muted); }
+.explorer-filters .combobox-input { border: 1px solid var(--line); border-radius: 12px; padding: 0 12px; height: 46px; background: white; color: var(--ink); outline: 0; width: 100%; }

@@ -18,7 +18,16 @@ test("every location region key is a canonical region code", () => {
 
 test("provincesForRegion returns the region's provinces, sorted", () => {
   const provinces = provincesForRegion("Region VII"); // Central Visayas
-  assert.deepEqual(provinces, ["Bohol", "Cebu", "Siquijor"], "alphabetical, scoped to the region");
+  assert.deepEqual(provinces, ["Bohol", "Cebu"], "alphabetical, scoped to the region (Siquijor moved to NIR)");
+});
+
+test("Siquijor is modeled under the Negros Island Region, not Central Visayas", () => {
+  // Siquijor was reassigned from Region VII to NIR.
+  assert.ok(!provincesForRegion("Region VII").includes("Siquijor"), "Siquijor is no longer in Region VII");
+  assert.ok(provincesForRegion("NIR").includes("Siquijor"), "Siquijor is a province of NIR");
+  assert.ok(citiesForProvince("NIR", "Siquijor").includes("Siquijor"), "Siquijor municipality is scoped to NIR");
+  assert.ok(!isProvinceInRegion("Region VII", "Siquijor"));
+  assert.ok(isProvinceInRegion("NIR", "Siquijor"));
 });
 
 test("provincesForRegion is empty for an unknown or blank region", () => {
@@ -29,8 +38,29 @@ test("provincesForRegion is empty for an unknown or blank region", () => {
 
 test("citiesForProvince returns cities scoped to the province, sorted", () => {
   const cities = citiesForProvince("Region VII", "Bohol");
-  assert.deepEqual(cities, ["Tagbilaran"]);
+  assert.ok(cities.includes("Tagbilaran"), "scoped to the province");
+  // Returned alphabetically sorted.
+  assert.deepEqual(cities, [...cities].sort((a, b) => a.localeCompare(b)), "sorted");
   assert.ok(citiesForProvince("Region VII", "Cebu").includes("Cebu City"));
+});
+
+test("Cebu includes previously-missing municipalities (completeness spot-check)", () => {
+  const cebu = citiesForProvince("Region VII", "Cebu");
+  for (const lgu of ["Liloan", "Argao", "Cordova", "Minglanilla"]) {
+    assert.ok(cebu.includes(lgu), `${lgu} is listed under Cebu`);
+  }
+});
+
+test("city/municipality lists have no duplicates within a province", () => {
+  for (const [regionCode, provinces] of Object.entries(LOCATIONS)) {
+    for (const [province, cities] of Object.entries(provinces)) {
+      assert.equal(
+        new Set(cities).size,
+        cities.length,
+        `${regionCode} / ${province} has duplicate LGUs`,
+      );
+    }
+  }
 });
 
 test("citiesForProvince rejects a province that isn't in the region", () => {

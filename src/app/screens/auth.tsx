@@ -9,6 +9,8 @@ import { useSession } from "@/src/app/shared/session-provider";
 import { useStarlete } from "@/src/app/store";
 import { REGIONS, regionName } from "@/src/app/lib/regions";
 import { provincesForRegion, citiesForProvince } from "@/src/app/lib/locations";
+import { SPORTS, DEFAULT_SPORT } from "@/src/app/lib/sports";
+import { Combobox } from "@/src/app/shared/combobox";
 
 export function AuthScreen({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
@@ -18,7 +20,7 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [sport, setSport] = useState("Track & Field");
+  const [sport, setSport] = useState<string>(DEFAULT_SPORT);
   // Athlete registration location, chosen via cascading dropdowns. regionCode is
   // the canonical code (the region dropdown value); province/city are scoped to
   // the choice above them. Changing a parent resets its children (see handlers).
@@ -121,7 +123,7 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
             {mode === "register" && <label>Full name<input required value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Juan dela Cruz" /></label>}
             <label>Email address<input type="email" required autoComplete="email" value={email} onChange={e => updateEmail(e.target.value)} placeholder="you@example.com" /></label>
             <label>Password<input type="password" required minLength={8} autoComplete={mode === "login" ? "current-password" : "new-password"} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" /></label>
-            {mode === "register" && role === "athlete" && <><div className="field-row"><label>Birth date<input type="date" required value={birth} onChange={e => setBirth(e.target.value)} /></label><label>Sport<select required value={sport} onChange={e => setSport(e.target.value)}><option>Track &amp; Field</option><option>Boxing</option><option>Basketball</option><option>Swimming</option></select></label></div><label>Region<select required value={regionCode} onChange={e => onRegionChange(e.target.value)}><option value="" disabled>Select your region…</option>{REGIONS.map(r => <option key={r.regionCode} value={r.regionCode}>{r.name}</option>)}</select></label><div className="field-row"><label>Province<select required disabled={!regionCode} value={province} onChange={e => onProvinceChange(e.target.value)}><option value="" disabled>{regionCode ? "Select your province…" : "Select a region first"}</option>{provinceOptions.map(p => <option key={p} value={p}>{p}</option>)}</select></label><label>City<select required disabled={!province} value={city} onChange={e => setCity(e.target.value)}><option value="" disabled>{province ? "Select your city…" : "Select a province first"}</option>{cityOptions.map(c => <option key={c} value={c}>{c}</option>)}</select></label></div>{showConsent && <label className="consent"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} /><span><b>Parental consent confirmed</b><small>A parent or guardian has approved this simulated athlete profile.</small></span></label>}</>}
+            {mode === "register" && role === "athlete" && <><div className="field-row"><label>Birth date<input type="date" required value={birth} onChange={e => setBirth(e.target.value)} /></label><label>Sport<Combobox options={SPORTS as readonly string[] as string[]} value={sport} onChange={setSport} required ariaLabel="Sport" placeholder="Type to search sports…" /></label></div><label>Region<Combobox options={REGIONS.map(r => ({ value: r.regionCode, label: r.name }))} value={regionCode} onChange={onRegionChange} required ariaLabel="Region" placeholder="Type to search regions…" /></label><div className="field-row"><label>Province<Combobox options={provinceOptions} value={province} onChange={onProvinceChange} required disabled={!regionCode} ariaLabel="Province" placeholder={regionCode ? "Type to search provinces…" : "Select a region first"} /></label><label>City/Municipality<Combobox options={cityOptions} value={city} onChange={setCity} required disabled={!province} ariaLabel="City or municipality" placeholder={province ? "Type to search cities/municipalities…" : "Select a province first"} /></label></div>{showConsent && <label className="consent"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} /><span><b>Parental consent confirmed</b><small>A parent or guardian has approved this simulated athlete profile.</small></span></label>}</>}
             {(error || sessionError) && (
               <div className="auth-error" role="alert" aria-live="assertive">
                 <span className="auth-error-icon" aria-hidden="true">!</span>
