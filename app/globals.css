@@ -896,6 +896,7 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .combobox { position: relative; width: 100%; }
 .combobox-input { width: 100%; }
 .combobox-list { position: absolute; z-index: 40; top: calc(100% + 4px); left: 0; right: 0; margin: 0; padding: 4px; list-style: none; max-height: 240px; overflow-y: auto; background: white; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 12px 35px rgba(7,28,52,.14); }
+.combobox-list--up { top: auto; bottom: calc(100% + 4px); box-shadow: 0 -12px 35px rgba(7,28,52,.14); }
 .combobox-option { padding: 9px 11px; border-radius: 7px; font-size: 14px; font-weight: 500; color: var(--ink); cursor: pointer; }
 .combobox-option.active, .combobox-option:hover { background: var(--blue-light); color: var(--blue); }
 .combobox-empty { padding: 9px 11px; font-size: 13px; color: var(--muted); }

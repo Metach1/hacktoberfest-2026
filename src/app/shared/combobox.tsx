@@ -49,6 +49,9 @@ function normalizeOptions(
   );
 }
 
+/** Must match the `.combobox-list` max-height in globals.css, plus the 4px gap. */
+const LIST_MAX_HEIGHT = 244;
+
 export function Combobox({
   options,
   value,
@@ -73,6 +76,9 @@ export function Combobox({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(-1);
+  // When there isn't enough room below the input, the listbox opens upward so
+  // the bottom options stay reachable without scrolling/zooming the page.
+  const [dropUp, setDropUp] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -112,13 +118,38 @@ export function Combobox({
     return () => window.removeEventListener("mousedown", onPointerDown);
   }, [open, close]);
 
+  // Decide whether the list drops up or down from the input's live position.
+  // Drop up only when there isn't room below but there IS more room above.
+  const measureDirection = useCallback(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    const rect = input.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    setDropUp(spaceBelow < LIST_MAX_HEIGHT && spaceAbove > spaceBelow);
+  }, []);
+
   const openList = useCallback(() => {
     if (disabled) return;
+    measureDirection();
     setOpen(true);
     setQuery("");
     // Preselect the current value in the list, if present.
     setActiveIndex(normalized.findIndex((option) => option.value === value));
-  }, [disabled, normalized, value]);
+  }, [disabled, measureDirection, normalized, value]);
+
+  // While open, keep the drop direction correct as the page scrolls or resizes.
+  // The listeners run outside render, so setState here does not cascade renders.
+  useEffect(() => {
+    if (!open) return;
+    const onReflow = () => measureDirection();
+    window.addEventListener("scroll", onReflow, true);
+    window.addEventListener("resize", onReflow);
+    return () => {
+      window.removeEventListener("scroll", onReflow, true);
+      window.removeEventListener("resize", onReflow);
+    };
+  }, [open, measureDirection]);
 
   // Clamp the active index to the current match list at render time (rather
   // than writing state in an effect, which can cascade renders). The stored
@@ -208,7 +239,11 @@ export function Combobox({
         />
       )}
       {open && (
-        <ul className="combobox-list" role="listbox" id={listboxId}>
+        <ul
+          className={dropUp ? "combobox-list combobox-list--up" : "combobox-list"}
+          role="listbox"
+          id={listboxId}
+        >
           {matches.length === 0 ? (
             <li className="combobox-empty" role="presentation">No matches</li>
           ) : (
