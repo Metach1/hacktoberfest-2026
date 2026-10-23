@@ -70,7 +70,14 @@ import {
   donationResubmissionNotification,
   postLikeNotification,
   postCommentNotification,
+  recipientForNotification,
 } from "@/src/app/lib/notifications.mjs";
+import {
+  listMyNotifications,
+  createNotification as createDatabaseNotification,
+  markNotificationRead as markDatabaseNotificationRead,
+  markAllMyNotificationsRead as markAllDatabaseNotificationsRead,
+} from "@/src/app/services/notifications";
 
 export type Role = "supporter" | "athlete";
 
@@ -98,6 +105,8 @@ export interface Notification {
   read: boolean;
   /** Optional in-app destination for the notification. */
   href?: string;
+  /** Exclusive recipient user id (Supabase-backed mode). */
+  recipientId?: string;
 }
 
 /** A payment QR code an athlete publishes, labeled by payment method. */
@@ -411,11 +420,16 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
           const reconciled = applyAutoConfirm(loaded) as Donation[];
           setDonations(reconciled);
         }
-        if (savedNotifications) {
+        // Only rehydrate the legacy local cache in demo mode. In Supabase mode
+        // notifications are loaded per-user from the backend (see effect), so
+        // the shared local key must not seed cross-account rows.
+        if (savedNotifications && !isSupabaseConfigured()) {
           const loadedNtf = JSON.parse(savedNotifications) as Partial<Notification>[];
           setNotifications(
             (loadedNtf ?? []).map((n, i) => normalizeNotification(n, `ntf-legacy-${i}`) as Notification),
           );
+        } else if (isSupabaseConfigured()) {
+          window.localStorage.removeItem("starlete-notifications");
         }
       } else {
         // Reset stale caches when the combined payment and social data shape changes.
@@ -452,7 +466,14 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
         window.localStorage.setItem("starlete-qr", JSON.stringify(qrCodes));
         window.localStorage.setItem("starlete-donations", JSON.stringify(donations));
       }
-      window.localStorage.setItem("starlete-notifications", JSON.stringify(notifications));
+      // Notifications are per-user via Supabase in configured mode; never cache
+      // them in the browser-shared key (that was the cross-account leak). Only
+      // the demo (no-Supabase) path persists them locally.
+      if (isSupabaseConfigured()) {
+        window.localStorage.removeItem("starlete-notifications");
+      } else {
+        window.localStorage.setItem("starlete-notifications", JSON.stringify(notifications));
+      }
     } catch {
       // ignore
     }
@@ -486,6 +507,28 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       active = false;
     };
   }, [mounted, sessionLoading, user?.id, role]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // Load the signed-in user's notifications (Supabase mode). RLS scopes the
+  // result to recipient_id = auth.uid(), so an account only ever loads its own.
+  // Clearing first guards against showing the previous account's rows on switch.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!mounted || sessionLoading || !isSupabaseConfigured()) return;
+    let active = true;
+    setNotifications([]);
+    if (!user?.id) return;
+    listMyNotifications()
+      .then((rows) => {
+        if (active) setNotifications(rows as unknown as Notification[]);
+      })
+      .catch(() => {
+        // A failed notifications load must not block the rest of the app.
+      });
+    return () => {
+      active = false;
+    };
+  }, [mounted, sessionLoading, user?.id]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => {
@@ -776,11 +819,70 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   // note in the docs: the demo cannot distinguish multiple real supporters.)
   const supporterId: ActorId = SUPPORTER_ID;
 
-  // Stamp a built notification payload with id/createdAt/read and prepend it
-  // (newest first). No-op when the builder returns null (nothing to emit).
-  const pushNotification = useCallback((event: { type: NotificationType; data: Record<string, unknown> }) => {
+  // Build a notification payload and deliver it to its EXCLUSIVE recipient.
+  //
+  // When Supabase is configured, the row is inserted addressed to `recipientId`
+  // (resolved by the caller from the source records); RLS keeps it private to
+  // that recipient, and it only appears in the local list when the current user
+  // IS the recipient. When a recipient can't be resolved (e.g. new_post has no
+  // follow graph), nothing is emitted. In the demo (no-Supabase) path there is
+  // no cross-account session, so it stays an in-memory/localStorage entry.
+  const currentUserIdForNotify = user?.id;
+  const pushNotification = useCallback((
+    event: { type: NotificationType; data: Record<string, unknown> },
+    recipientId?: string | null,
+  ) => {
     const payload = buildNotification(event) as Omit<Notification, "id" | "createdAt" | "read"> | null;
     if (!payload) return;
+
+    if (isSupabaseConfigured()) {
+      // No concrete recipient -> don't broadcast; simply skip. This is expected
+      // for events without a single addressee (e.g. new_post), but for the
+      // donation/post events it signals a missing recipient id upstream, so
+      // surface it in development instead of failing silently.
+      if (!recipientId) {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn(
+            `[notifications] skipped insert for "${payload.type}": no recipient resolved.`,
+          );
+        }
+        return;
+      }
+      const viewerId = currentUserIdForNotify;
+      void createDatabaseNotification({
+        recipientId,
+        type: payload.type,
+        title: payload.title,
+        body: payload.body,
+        href: payload.href,
+      })
+        .then((saved) => {
+          if (!saved) return;
+          // Surface immediately only when the current user is the recipient.
+          if (!viewerId || saved.recipientId !== viewerId) return;
+          const notification: Notification = {
+            ...payload,
+            id: saved.id,
+            createdAt: saved.createdAt,
+            read: saved.read,
+            recipientId: saved.recipientId,
+          };
+          setNotifications((list) => [notification, ...list]);
+        })
+        .catch((error: unknown) => {
+          // A failed notification insert must never break the triggering action
+          // (donate/confirm/reject still succeeds), but it must not be silent:
+          // surface it in development so a rejected insert (e.g. RLS) is visible.
+          if (process.env.NODE_ENV !== "production") {
+            console.warn(
+              `[notifications] insert failed for "${payload.type}":`,
+              error instanceof Error ? error.message : error,
+            );
+          }
+        });
+      return;
+    }
+
     const notification: Notification = {
       ...payload,
       id: newId("ntf"),
@@ -788,7 +890,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       read: false,
     };
     setNotifications((list) => [notification, ...list]);
-  }, []);
+  }, [currentUserIdForNotify]);
 
   const submitDonation = useCallback<StarleteState["submitDonation"]>((input) => {
     const supporterIdentity = isSupabaseConfigured() ? user?.id ?? SUPPORTER_ID : SUPPORTER_ID;
@@ -800,10 +902,13 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
 
     if (!isSupabaseConfigured()) {
       setDonations((list) => [donation, ...list]);
-      pushNotification({
-        type: "donation_pending",
-        data: { amount: donation.amount, supporterName: donation.supporterName },
-      });
+      pushNotification(
+        {
+          type: "donation_pending",
+          data: { amount: donation.amount, supporterName: donation.supporterName },
+        },
+        recipientForNotification("donation_pending", { donation }),
+      );
       return donation;
     }
 
@@ -820,10 +925,13 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
           athleteName: donation.athleteName,
         } as Donation;
         setDonations((list) => list.map((item) => item.id === donation.id ? persisted : item));
-        pushNotification({
-          type: "donation_pending",
-          data: { amount: persisted.amount, supporterName: persisted.supporterName },
-        });
+        pushNotification(
+          {
+            type: "donation_pending",
+            data: { amount: persisted.amount, supporterName: persisted.supporterName },
+          },
+          recipientForNotification("donation_pending", { donation: persisted }),
+        );
       })
       .catch((error: unknown) => {
         setDonations((list) => list.filter((item) => item.id !== donation.id));
@@ -845,7 +953,12 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
             amount: donation.amount,
             athleteName: getAthlete(donation.athleteId)?.name ?? donation.athleteName,
           });
-          if (event) pushNotification(event);
+          // Resolve the recipient from the SAVED record: its supporterId is the
+          // authoritative supporter UUID (read back via DONATION_COLUMNS). The
+          // athlete's local `donation` may carry a null supporterId (e.g. a row
+          // first seen through the public-confirmed path), which would silently
+          // skip the insert and leave the supporter with no notification.
+          if (event) pushNotification(event, recipientForNotification(event.type, { donation: saved }));
         })
         .catch((error: unknown) => {
           setDonationError(error instanceof Error ? error.message : "Could not confirm this donation.");
@@ -859,7 +972,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       amount: donation.amount,
       athleteName: getAthlete(donation.athleteId)?.name ?? donation.athleteName,
     });
-    if (event) pushNotification(event);
+    if (event) pushNotification(event, recipientForNotification(event.type, { donation }));
   }, [donations, pushNotification, getAthlete]);
 
   const rejectDonation = useCallback((donationId: string, reason: string, note?: string) => {
@@ -876,7 +989,10 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
             athleteName: getAthlete(donation.athleteId)?.name ?? donation.athleteName,
             reasonLabel: rejectionReasonLabel(next.rejectionReason ?? reason),
           });
-          if (event) pushNotification(event);
+          // Resolve the recipient from the SAVED record (authoritative supporter
+          // UUID), not the athlete's local `donation` whose supporterId may be
+          // null. See confirmDonation for the full rationale.
+          if (event) pushNotification(event, recipientForNotification(event.type, { donation: saved }));
         })
         .catch((error: unknown) => {
           setDonationError(error instanceof Error ? error.message : "Could not reject this donation.");
@@ -891,7 +1007,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       athleteName: getAthlete(donation.athleteId)?.name ?? donation.athleteName,
       reasonLabel: rejectionReasonLabel(next.rejectionReason ?? reason),
     });
-    if (event) pushNotification(event);
+    if (event) pushNotification(event, recipientForNotification(event.type, { donation }));
   }, [donations, pushNotification, getAthlete]);
 
   const resubmitDonation = useCallback<StarleteState["resubmitDonation"]>(
@@ -907,7 +1023,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
             const persisted = { ...saved, athleteId: donation.athleteId } as Donation;
             setDonations((list) => list.map((item) => item.id === donationId ? persisted : item));
             const event = donationResubmissionNotification(donation, persisted);
-            if (event) pushNotification(event);
+            if (event) pushNotification(event, recipientForNotification(event.type, { donation: persisted }));
           })
           .catch((error: unknown) => {
             setDonations((list) => list.map((item) => item.id === donationId ? donation : item));
@@ -919,7 +1035,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
 
       setDonations((list) => list.map((item) => (item.id === donationId ? next : item)));
       const event = donationResubmissionNotification(donation, next);
-      if (event) pushNotification(event);
+      if (event) pushNotification(event, recipientForNotification(event.type, { donation: next }));
     },
     [donations, pushNotification, user?.id],
   );
@@ -1070,7 +1186,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
               displayName ?? likerName(actorId),
               user?.id,
             );
-            if (event) pushNotification(event);
+            if (event) pushNotification(event, recipientForNotification(event.type, { post: operation.post }));
           }
         }
       } finally {
@@ -1101,7 +1217,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
             trimmed,
             user?.id,
           );
-          if (event) pushNotification(event);
+          if (event) pushNotification(event, recipientForNotification(event.type, { post }));
         })
         .catch((error: unknown) => {
           setPostError(error instanceof Error ? error.message : "Could not add this comment.");
@@ -1111,23 +1227,43 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   );
 
   // --- Notifications -------------------------------------------------------
-  // Everything is scoped to the current role's audience so an athlete never
-  // sees supporter notifications and vice-versa; a null role sees none.
+  // Supabase-backed: each notification has an exclusive recipient_id and RLS
+  // only returns the signed-in user's own rows, so accounts never see each
+  // other's notifications. The demo (no-Supabase) path keeps the legacy
+  // role/audience scoping purely in-memory for a single local session.
+  //
+  // When Supabase is configured, `notifications` already holds only the current
+  // user's rows (loaded by the effect below + inserts addressed to them), so
+  // no audience filter is applied; the demo path still filters by role.
   const getNotifications = useCallback(
-    () => notificationsForRole(notifications, role) as Notification[],
+    () =>
+      (isSupabaseConfigured()
+        ? [...notifications].sort((a, b) => b.createdAt - a.createdAt)
+        : notificationsForRole(notifications, role)) as Notification[],
     [notifications, role],
   );
 
   const unreadCount = useMemo(
-    () => unreadCountForRole(notifications, role) as number,
+    () =>
+      isSupabaseConfigured()
+        ? notifications.filter((n) => !n.read).length
+        : (unreadCountForRole(notifications, role) as number),
     [notifications, role],
   );
 
   const markNotificationRead = useCallback((id: string) => {
     setNotifications((list) => markReadRecord(list, id) as Notification[]);
+    if (isSupabaseConfigured()) {
+      void markDatabaseNotificationRead(id).catch(() => { /* non-blocking */ });
+    }
   }, []);
 
   const markAllNotificationsRead = useCallback(() => {
+    if (isSupabaseConfigured()) {
+      setNotifications((list) => list.map((n) => (n.read ? n : { ...n, read: true })));
+      void markAllDatabaseNotificationsRead().catch(() => { /* non-blocking */ });
+      return;
+    }
     setNotifications((list) => markAllReadRecord(list, role) as Notification[]);
   }, [role]);
 

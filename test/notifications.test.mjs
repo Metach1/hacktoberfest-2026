@@ -12,6 +12,7 @@ import {
   donationResubmissionNotification,
   postLikeNotification,
   postCommentNotification,
+  recipientForNotification,
 } from "../src/app/lib/notifications.mjs";
 import {
   createPendingDonation,
@@ -26,6 +27,55 @@ import {
  * suppression (own-post like/comment) and like-removal emitting nothing are
  * store-level rules, modeled below as a small reducer mirroring the store.
  */
+
+test("recipientForNotification resolves the exclusive recipient per event type", () => {
+  const donation = { athleteProfileId: "athlete-uuid", supporterId: "supporter-uuid" };
+  const post = { ownerId: "author-uuid" };
+
+  // Pending (and resubmission, which is a pending event) -> the recipient athlete.
+  assert.equal(recipientForNotification("donation_pending", { donation }), "athlete-uuid");
+  // Terminal decisions -> the supporter who paid.
+  assert.equal(recipientForNotification("donation_confirmed", { donation }), "supporter-uuid");
+  assert.equal(recipientForNotification("donation_rejected", { donation }), "supporter-uuid");
+  // Social events -> the post author.
+  assert.equal(recipientForNotification("post_like", { post }), "author-uuid");
+  assert.equal(recipientForNotification("post_comment", { post }), "author-uuid");
+  // No follow graph -> no concrete recipient (do not broadcast).
+  assert.equal(recipientForNotification("new_post", { post }), null);
+});
+
+test("recipientForNotification returns null when the source id is missing", () => {
+  assert.equal(recipientForNotification("donation_pending", { donation: {} }), null);
+  assert.equal(recipientForNotification("donation_confirmed", { donation: {} }), null);
+  assert.equal(recipientForNotification("post_like", { post: {} }), null);
+  assert.equal(recipientForNotification("post_like", {}), null);
+  assert.equal(
+    recipientForNotification("unknown_type", {
+      donation: { athleteProfileId: "a", supporterId: "s" },
+      post: { ownerId: "o" },
+    }),
+    null,
+  );
+});
+
+test("confirm/reject recipient must come from the saved record, not a stale local donation", () => {
+  // Regression: the athlete's locally-held view of a donation can carry a null
+  // supporterId (e.g. a row first seen through the public-confirmed read, which
+  // maps supporterId: null). Resolving the recipient from that stale record
+  // yields null and silently skips the supporter's notification. The store now
+  // resolves from the record returned by confirmDonation/rejectDonation, whose
+  // supporterId is the authoritative supporter UUID.
+  const staleLocal = { athleteProfileId: "athlete-uuid", supporterId: null };
+  const savedFromBackend = { athleteProfileId: "athlete-uuid", supporterId: "supporter-uuid" };
+
+  // The old (buggy) call site resolved to null -> no row created.
+  assert.equal(recipientForNotification("donation_confirmed", { donation: staleLocal }), null);
+  assert.equal(recipientForNotification("donation_rejected", { donation: staleLocal }), null);
+
+  // The fixed call site resolves to the real supporter UUID -> a row is created.
+  assert.equal(recipientForNotification("donation_confirmed", { donation: savedFromBackend }), "supporter-uuid");
+  assert.equal(recipientForNotification("donation_rejected", { donation: savedFromBackend }), "supporter-uuid");
+});
 
 test("buildNotification covers each event type with the right audience", () => {
   assert.equal(buildNotification({ type: "donation_pending", data: { amount: 500, athleteName: "Ana" } }).audience, "athlete");
