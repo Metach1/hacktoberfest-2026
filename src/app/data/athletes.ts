@@ -17,6 +17,28 @@
 import seed from "@/data/athletes.json";
 import { adaptAthletes } from "@/data/athlete-adapter.mjs";
 
+/** One photo in an athlete's gallery (up to 8). In the demo/pre-migration the
+ * `src` is a data URL; once the JSON column lands it's a stored object URL. */
+export interface AthletePhoto {
+  id: string;
+  /** Safe, generated file name (never the client-supplied name). */
+  name: string;
+  /** Data URL (demo) or stored object URL (backend). */
+  src: string;
+  alt: string;
+}
+
+/** One self-reported achievement; at most one may be `isProudest`. */
+export interface Achievement {
+  id: string;
+  title: string;
+  event?: string;
+  /** "YYYY" or "YYYY-MM-DD"; blank when undated. */
+  date?: string;
+  description?: string;
+  isProudest?: boolean;
+}
+
 /** UI view shape used by the Startlete screens. */
 export interface Athlete {
   id: number;
@@ -41,6 +63,12 @@ export interface Athlete {
   featured?: boolean;
   bio: string;
   achievement: string;
+  /** Photo gallery (up to 8). Optional: seed/demo athletes may have none. */
+  photos?: AthletePhoto[];
+  /** Self-reported achievements list (richer than the single `achievement`). */
+  achievements?: Achievement[];
+  /** School / university / club / team the athlete represents. */
+  institution?: string;
 }
 
 const seedAthletes = (seed as { athletes: Record<string, unknown>[] }).athletes;
