@@ -22,6 +22,7 @@ import {
   canResubmitDonation,
   resubmitDonation,
   canDeleteDonation,
+  resolveSupporterName,
 } from "../src/app/lib/donations.mjs";
 
 test("createPendingDonation builds a pending record with defaults", () => {
@@ -540,4 +541,29 @@ test("removeDonation is a no-op for a confirmed donation or a non-owner", () => 
   ];
   assert.equal(storeRemove(list, "c", "supporter").length, 2, "confirmed not deletable, totals safe");
   assert.equal(storeRemove(list, "r", "supporter").length, 2, "another supporter's donation untouched");
+});
+
+test("resolveSupporterName returns the trimmed display name when not anonymous", () => {
+  assert.equal(resolveSupporterName("Nina A.", false), "Nina A.");
+  assert.equal(resolveSupporterName("  Nina A.  ", false), "Nina A.");
+});
+
+test("resolveSupporterName returns blank when anonymous, regardless of name", () => {
+  // Blank -> createPendingDonation / store normalize to "Anonymous supporter".
+  assert.equal(resolveSupporterName("Nina A.", true), "");
+  assert.equal(resolveSupporterName("", true), "");
+  assert.equal(resolveSupporterName(null, true), "");
+});
+
+test("resolveSupporterName falls back to blank when there is no display name", () => {
+  assert.equal(resolveSupporterName(null, false), "");
+  assert.equal(resolveSupporterName(undefined, false), "");
+  assert.equal(resolveSupporterName("   ", false), "");
+});
+
+test("resolveSupporterName output feeds createPendingDonation to the right sentinel", () => {
+  const named = createPendingDonation({ athleteId: 1, amount: 50, supporterName: resolveSupporterName("Nina A.", false) });
+  assert.equal(named.supporterName, "Nina A.");
+  const anon = createPendingDonation({ athleteId: 1, amount: 50, supporterName: resolveSupporterName("Nina A.", true) });
+  assert.equal(anon.supporterName, "Anonymous supporter");
 });

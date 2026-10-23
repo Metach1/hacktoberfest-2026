@@ -4,10 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon, peso } from "@/src/app/shared/ui";
 import { useStarlete, type QrCode } from "@/src/app/store";
+import { useSession } from "@/src/app/shared/session-provider";
 import { recognizeReceipt } from "@/src/app/lib/ocr";
 import {
   canReviewDonation,
   parseClaimedAmount,
+  resolveSupporterName,
+  ANONYMOUS_DONOR_NAME,
   PAYMENT_METHODS,
 } from "@/src/app/lib/donations.mjs";
 import { classifyReceipt, RECEIPT_DECISION } from "@/src/app/lib/receipt-filter.mjs";
@@ -50,6 +53,9 @@ function validateReceipt(file: File): string | null {
 export function DonationModal() {
   const { donationTarget, donationPrefill, closeDonation, submitDonation, resubmitDonation, getQrCodes } =
     useStarlete();
+  // The supporter's display name comes from the session; the final submitted
+  // supporterName is derived from it + the "donate anonymously" toggle.
+  const { displayName } = useSession();
   // True when the modal is retrying a previously rejected donation in place.
   const isResubmission = donationPrefill != null;
 
@@ -67,7 +73,11 @@ export function DonationModal() {
   // GCash QR — and is the method recorded on the donation.
   const [payerMethod, setPayerMethod] = useState("");
   const [reference, setReference] = useState("");
-  const [supporterName, setSupporterName] = useState("");
+  // Whether the supporter opted to donate anonymously (hide their session name).
+  // When true the submitted supporterName is blank -> stored "Anonymous
+  // supporter". When false the session display name is submitted. If there is no
+  // usable display name, the submission falls back to blank/anonymous regardless.
+  const [anonymous, setAnonymous] = useState(false);
   const [note, setNote] = useState("");
   // Amount-confirmation safeguard shown before the final submit.
   const [confirmingAmount, setConfirmingAmount] = useState(false);
@@ -122,13 +132,11 @@ export function DonationModal() {
     setSelectedQrId("");
     setPayerMethod(donationPrefill.method ?? "");
     setReference(donationPrefill.reference ?? "");
-    // Don't surface the stored "Anonymous supporter" sentinel as an editable
-    // name; leave it blank so it stays anonymous unless the supporter types one.
-    setSupporterName(
-      donationPrefill.supporterName && donationPrefill.supporterName !== "Anonymous supporter"
-        ? donationPrefill.supporterName
-        : "",
-    );
+    // Restore the anonymity choice: if the prior donation was anonymous (blank
+    // or the sentinel name), default the toggle to checked; otherwise show the
+    // session name (toggle unchecked). The name itself is always the session's.
+    const priorName = (donationPrefill.supporterName ?? "").trim();
+    setAnonymous(priorName === "" || priorName === ANONYMOUS_DONOR_NAME);
     setNote(donationPrefill.note ?? "");
     setReceiptName(donationPrefill.receiptName ?? "");
     setReceiptPreview(donationPrefill.receiptPreview ?? "");
@@ -151,6 +159,14 @@ export function DonationModal() {
   const activeQr = qrCodes.find((q) => q.id === selectedQrId) ?? qrCodes[0];
   // The recorded donation method is the supporter's chosen paying wallet/bank.
   const method = payerMethod;
+  // Whether the session provides a usable display name to show/submit. When it
+  // doesn't (edge case), the flow behaves as before: anonymous/blank.
+  const hasDisplayName = (displayName ?? "").trim() !== "";
+  // The supporterName actually submitted: the session name, or "" when the
+  // supporter donates anonymously (or there's no display name to show).
+  const finalSupporterName = resolveSupporterName(displayName, anonymous || !hasDisplayName);
+  // What the review/summary line shows for "From".
+  const fromLabel = finalSupporterName.trim() || ANONYMOUS_DONOR_NAME;
 
   if (!athlete) return null;
 
@@ -160,7 +176,7 @@ export function DonationModal() {
     setSelectedQrId("");
     setPayerMethod("");
     setReference("");
-    setSupporterName("");
+    setAnonymous(false);
     setNote("");
     setConfirmingAmount(false);
     setReceiptName("");
@@ -270,7 +286,7 @@ export function DonationModal() {
       amount: actual,
       method,
       reference: reference.trim(),
-      supporterName,
+      supporterName: finalSupporterName,
       receiptName: keepPrivate ? "" : receiptName,
       receiptPreview: keepPrivate ? "" : receiptPreview,
       note: note.trim(),
@@ -520,12 +536,25 @@ export function DonationModal() {
             </label>
 
             <label>
-              Your name (optional)
+              Your name
               <input
-                value={supporterName}
-                onChange={(e) => setSupporterName(e.target.value)}
-                placeholder="Shown to the athlete, or leave blank for Anonymous"
+                value={anonymous || !hasDisplayName ? ANONYMOUS_DONOR_NAME : displayName!}
+                readOnly
+                aria-readonly="true"
+                disabled={anonymous || !hasDisplayName}
               />
+              {hasDisplayName ? (
+                <label className="checkbox-row">
+                  <input
+                    type="checkbox"
+                    checked={anonymous}
+                    onChange={(e) => setAnonymous(e.target.checked)}
+                  />
+                  <span className="checkbox-label">Donate anonymously</span>
+                </label>
+              ) : (
+                <small className="field-hint">You&rsquo;ll appear as {ANONYMOUS_DONOR_NAME}.</small>
+              )}
             </label>
 
             <label>
@@ -559,7 +588,7 @@ export function DonationModal() {
               <span><small>Amount</small><b>{peso(actual)}</b></span>
               <span><small>Method</small><b>{method}</b></span>
               <span><small>Reference</small><b>{reference}</b></span>
-              <span><small>From</small><b>{supporterName.trim() || "Anonymous supporter"}</b></span>
+              <span><small>From</small><b>{fromLabel}</b></span>
               {receiptName && <span><small>Receipt</small><b>{receiptName}</b></span>}
             </div>
             {receiptPreview && (

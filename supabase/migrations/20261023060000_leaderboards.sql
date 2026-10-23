@@ -125,12 +125,22 @@ $$;
 revoke all on function public.leaderboard_top_athletes(integer) from public;
 grant execute on function public.leaderboard_top_athletes(integer) to anon, authenticated;
 
--- 3. Trending athletes by DISTINCT supporter count (confirmed).
---    Deliberately a DIFFERENT metric from "top athletes": breadth of support
---    (how many distinct accounts backed them) rather than total amount. An
---    anonymous/account-less confirmed donation counts as one distinct supporter
---    per donation (it cannot be deduplicated), so grassroots support still
---    registers. Tie-break: supporters desc, then id.
+-- 3. Trending athletes by SUPPORTER count (confirmed), measuring BREADTH of
+--    support rather than total amount (that is `leaderboard_top_athletes`).
+--
+--    "Supporter count" uses the SAME anonymity rule as leaderboard_top_donors /
+--    rankDonors(): a confirmed donation is ANONYMOUS when it has no account
+--    (supporter_id is null) OR its name is blank/the sentinel
+--    (btrim(supporter_name) = '' or = 'Anonymous supporter'). The count is:
+--      (distinct NON-anonymous supporters)
+--        + (one per anonymous confirmed donation)
+--    Non-anonymous supporters are deduped by supporter_id, falling back to the
+--    trimmed name when the id is null but a name is present — exactly how
+--    top-donors groups named donors. So a logged-in supporter who chooses to
+--    donate "anonymously" (real supporter_id, sentinel name) is NOT merged into
+--    their named identity: their anonymous gifts each count once, like any other
+--    anonymous contribution the system cannot deduplicate. Repeat NON-anonymous
+--    gifts from the same supporter count once. Tie-break: supporters desc, id.
 create or replace function public.leaderboard_trending_athletes(limit_count integer default 10)
 returns table (
   athlete_id uuid,
@@ -142,21 +152,47 @@ stable
 security definer
 set search_path = public, pg_temp
 as $$
+  with confirmed as (
+    select
+      d.id,
+      d.athlete_owner_id,
+      d.supporter_id,
+      -- A contribution is "anonymous" when it has no account OR a blank/sentinel
+      -- name; mirror leaderboard_top_donors exactly.
+      (d.supporter_id is null
+        or btrim(coalesce(d.supporter_name, '')) = ''
+        or btrim(d.supporter_name) = 'Anonymous supporter') as is_anonymous,
+      -- Stable identity for NON-anonymous supporters: the account id when
+      -- present, else the trimmed display name (matches how top-donors dedupes
+      -- named donors when supporter_id is null).
+      coalesce(d.supporter_id::text, btrim(d.supporter_name)) as supporter_key
+    from public.donations d
+    where d.status = 'confirmed'
+      and d.athlete_owner_id is not null
+  ),
+  counts as (
+    -- One contribution unit per distinct non-anonymous supporter.
+    select athlete_owner_id, supporter_key as unit
+    from confirmed
+    where not is_anonymous
+    group by athlete_owner_id, supporter_key
+    union all
+    -- One contribution unit per anonymous confirmed donation (never merged).
+    select athlete_owner_id, id::text as unit
+    from confirmed
+    where is_anonymous
+  )
   select
-    d.athlete_owner_id as athlete_id,
+    c.athlete_owner_id as athlete_id,
     coalesce(
       nullif(btrim(concat_ws(' ', p.first_name, p.last_name)), ''),
       'Athlete'
     ) as athlete_name,
-    -- Distinct accounts, plus one per account-less confirmed donation.
-    (count(distinct d.supporter_id)
-      + count(*) filter (where d.supporter_id is null))::bigint as supporter_count
-  from public.donations d
-  join public.profiles p on p.id = d.athlete_owner_id
-  where d.status = 'confirmed'
-    and d.athlete_owner_id is not null
-  group by d.athlete_owner_id, p.first_name, p.last_name
-  order by supporter_count desc, d.athlete_owner_id
+    count(*)::bigint as supporter_count
+  from counts c
+  join public.profiles p on p.id = c.athlete_owner_id
+  group by c.athlete_owner_id, p.first_name, p.last_name
+  order by supporter_count desc, c.athlete_owner_id
   limit greatest(coalesce(limit_count, 10), 0);
 $$;
 

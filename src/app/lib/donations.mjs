@@ -466,6 +466,26 @@ export function isAnonymousDonation(donation) {
 }
 
 /**
+ * Resolve the supporterName value to submit from the supporter's session
+ * display name plus their "donate anonymously" choice. Pure so the modal and
+ * tests share one rule.
+ *
+ * - Anonymous (toggle on), OR no usable display name -> "" (blank). The store /
+ *   createPendingDonation then normalizes blank to the "Anonymous supporter"
+ *   sentinel, so it reads as anonymous everywhere (rankDonors, leaderboards).
+ * - Otherwise -> the trimmed display name.
+ *
+ * @param {string|null|undefined} displayName  Session display name, if any.
+ * @param {boolean} anonymous                  Whether the supporter opted out of showing their name.
+ * @returns {string}
+ */
+export function resolveSupporterName(displayName, anonymous) {
+  if (anonymous) return "";
+  const name = (displayName ?? "").trim();
+  return name;
+}
+
+/**
  * Rank contributors for an athlete by their TOTAL confirmed contribution,
  * highest first. Only confirmed donations are considered.
  *
