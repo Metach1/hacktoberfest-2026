@@ -836,8 +836,18 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
     if (!payload) return;
 
     if (isSupabaseConfigured()) {
-      // No concrete recipient -> don't broadcast; simply skip.
-      if (!recipientId) return;
+      // No concrete recipient -> don't broadcast; simply skip. This is expected
+      // for events without a single addressee (e.g. new_post), but for the
+      // donation/post events it signals a missing recipient id upstream, so
+      // surface it in development instead of failing silently.
+      if (!recipientId) {
+        if (process.env.NODE_ENV !== "production") {
+          console.warn(
+            `[notifications] skipped insert for "${payload.type}": no recipient resolved.`,
+          );
+        }
+        return;
+      }
       const viewerId = currentUserIdForNotify;
       void createDatabaseNotification({
         recipientId,
@@ -859,8 +869,16 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
           };
           setNotifications((list) => [notification, ...list]);
         })
-        .catch(() => {
-          // A failed notification insert must never break the triggering action.
+        .catch((error: unknown) => {
+          // A failed notification insert must never break the triggering action
+          // (donate/confirm/reject still succeeds), but it must not be silent:
+          // surface it in development so a rejected insert (e.g. RLS) is visible.
+          if (process.env.NODE_ENV !== "production") {
+            console.warn(
+              `[notifications] insert failed for "${payload.type}":`,
+              error instanceof Error ? error.message : error,
+            );
+          }
         });
       return;
     }
@@ -935,7 +953,12 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
             amount: donation.amount,
             athleteName: getAthlete(donation.athleteId)?.name ?? donation.athleteName,
           });
-          if (event) pushNotification(event, recipientForNotification(event.type, { donation }));
+          // Resolve the recipient from the SAVED record: its supporterId is the
+          // authoritative supporter UUID (read back via DONATION_COLUMNS). The
+          // athlete's local `donation` may carry a null supporterId (e.g. a row
+          // first seen through the public-confirmed path), which would silently
+          // skip the insert and leave the supporter with no notification.
+          if (event) pushNotification(event, recipientForNotification(event.type, { donation: saved }));
         })
         .catch((error: unknown) => {
           setDonationError(error instanceof Error ? error.message : "Could not confirm this donation.");
@@ -966,7 +989,10 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
             athleteName: getAthlete(donation.athleteId)?.name ?? donation.athleteName,
             reasonLabel: rejectionReasonLabel(next.rejectionReason ?? reason),
           });
-          if (event) pushNotification(event, recipientForNotification(event.type, { donation }));
+          // Resolve the recipient from the SAVED record (authoritative supporter
+          // UUID), not the athlete's local `donation` whose supporterId may be
+          // null. See confirmDonation for the full rationale.
+          if (event) pushNotification(event, recipientForNotification(event.type, { donation: saved }));
         })
         .catch((error: unknown) => {
           setDonationError(error instanceof Error ? error.message : "Could not reject this donation.");

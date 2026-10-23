@@ -73,13 +73,25 @@ export interface CreateNotificationInput {
 }
 
 /** Insert a notification addressed to a recipient. No-op (returns null) when
- *  there is no recipient to address. */
+ *  there is no recipient to address.
+ *
+ *  IMPORTANT: this intentionally does NOT chain `.select()`/`.single()` after
+ *  the insert. The actor creating a notification is (almost) never its
+ *  recipient — a supporter's donation addresses the athlete, an athlete's
+ *  decision addresses the supporter, a liker/commenter addresses the post
+ *  author. The notifications_recipient_read RLS policy only returns rows where
+ *  recipient_id = auth.uid(), so an insert-returning read is filtered to zero
+ *  rows for the actor and `.single()` would throw (PGRST116) even though the
+ *  INSERT itself committed. That is the exact failure that made every
+ *  notification silently vanish. We only need to know the insert succeeded; the
+ *  recipient loads the row for themselves via listMyNotifications (RLS-scoped),
+ *  so there is nothing to surface back to the actor here. */
 export async function createNotification(
   input: CreateNotificationInput,
 ): Promise<NotificationRecord | null> {
   if (!input.recipientId) return null;
   const supabase = createClient();
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("notifications")
     .insert({
       recipient_id: input.recipientId,
@@ -87,11 +99,12 @@ export async function createNotification(
       title: input.title,
       body: input.body,
       href: input.href ?? null,
-    })
-    .select(COLUMNS)
-    .single();
+    });
   if (error) throw new Error(error.message);
-  return mapNotification(data as NotificationRow);
+  // The inserted row is not readable by the actor under RLS, so there is no
+  // server-assigned id/created_at to return. Returning null signals "inserted,
+  // nothing to surface locally"; the recipient's own session will load it.
+  return null;
 }
 
 /** Mark a single notification read (recipient-scoped by RLS). */

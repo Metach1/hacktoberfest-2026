@@ -58,6 +58,25 @@ test("recipientForNotification returns null when the source id is missing", () =
   );
 });
 
+test("confirm/reject recipient must come from the saved record, not a stale local donation", () => {
+  // Regression: the athlete's locally-held view of a donation can carry a null
+  // supporterId (e.g. a row first seen through the public-confirmed read, which
+  // maps supporterId: null). Resolving the recipient from that stale record
+  // yields null and silently skips the supporter's notification. The store now
+  // resolves from the record returned by confirmDonation/rejectDonation, whose
+  // supporterId is the authoritative supporter UUID.
+  const staleLocal = { athleteProfileId: "athlete-uuid", supporterId: null };
+  const savedFromBackend = { athleteProfileId: "athlete-uuid", supporterId: "supporter-uuid" };
+
+  // The old (buggy) call site resolved to null -> no row created.
+  assert.equal(recipientForNotification("donation_confirmed", { donation: staleLocal }), null);
+  assert.equal(recipientForNotification("donation_rejected", { donation: staleLocal }), null);
+
+  // The fixed call site resolves to the real supporter UUID -> a row is created.
+  assert.equal(recipientForNotification("donation_confirmed", { donation: savedFromBackend }), "supporter-uuid");
+  assert.equal(recipientForNotification("donation_rejected", { donation: savedFromBackend }), "supporter-uuid");
+});
+
 test("buildNotification covers each event type with the right audience", () => {
   assert.equal(buildNotification({ type: "donation_pending", data: { amount: 500, athleteName: "Ana" } }).audience, "athlete");
   assert.equal(buildNotification({ type: "post_like", data: { actorName: "Ben" } }).audience, "athlete");
