@@ -11,6 +11,13 @@ import { type Post } from "@/src/app/data/posts";
 import { TimeAgo } from "@/src/app/shared/time-ago";
 import { msUntilAutoConfirm } from "@/src/app/lib/donations.mjs";
 import { getMyProfile } from "@/src/app/services/profile";
+import { isSupabaseConfigured } from "@/src/app/lib/supabase/client";
+import {
+  listTopAthletes,
+  listTrendingAthletes,
+  type TopAthleteRow,
+  type TrendingAthleteRow,
+} from "@/src/app/services/leaderboards";
 import { useSession } from "@/src/app/shared/session-provider";
 import {
   REJECTION_REASONS,
@@ -161,8 +168,37 @@ function PaymentRowMenu({ donation, athleteName }: { donation: Donation; athlete
 
 function SupporterDashboard({ athletes, displayName }: { athletes: Athlete[]; displayName: string | null }) {
   const { getDonationsForSupporter, getAthlete, donationError } = useStarlete();
+  // Client-side fallback ranking for the demo (no-Supabase) path.
   const top = [...athletes].sort((a, b) => b.raised - a.raised);
   const myPayments = getDonationsForSupporter();
+
+  // DB-computed leaderboards (Supabase mode). Ranking is done by SQL RPCs; the
+  // demo path keeps the array-sort fallback above. A failed load is non-fatal
+  // and simply leaves the DB-backed lists empty.
+  const supabase = isSupabaseConfigured();
+  const [topAthletes, setTopAthletes] = useState<TopAthleteRow[]>([]);
+  const [trending, setTrending] = useState<TrendingAthleteRow[]>([]);
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
+  // Resolve an athlete's display extras (image/sport/location/profileId) from the
+  // loaded roster by Supabase owner id, so DB rows can link and show a thumbnail.
+  const byProfileId = new Map(athletes.filter((a) => a.profileId).map((a) => [a.profileId as string, a]));
+
+  useEffect(() => {
+    if (!supabase) return;
+    let active = true;
+    Promise.all([listTopAthletes(4), listTrendingAthletes(3)])
+      .then(([athleteRows, trendingRows]) => {
+        if (!active) return;
+        setTopAthletes(athleteRows);
+        setTrending(trendingRows);
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setLeaderboardError(error instanceof Error ? error.message : "Could not load leaderboards.");
+        }
+      });
+    return () => { active = false; };
+  }, [supabase]);
   // Real "total impact": the current supporter's CONFIRMED donations summed
   // across every athlete. Mirrors how confirmedTotals sums confirmed amounts
   // for an athlete, but scoped to this supporter's own payments. Empty -> ₱0.
@@ -213,8 +249,37 @@ function SupporterDashboard({ athletes, displayName }: { athletes: Athlete[]; di
         </div>
       </section>
       <section className="dashboard-grid">
-        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Rising now</span><h2>Trending athletes</h2></div></div>{athletes.slice(1, 4).map((a, i) => <MiniAthlete key={a.id} athlete={a} rank={i + 1} />)}</div>
-        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Community</span><h2>Funding leaderboard</h2></div></div>{top.slice(0, 4).map((a, i) => <div className="leader-row" key={a.id}><span className={i === 0 ? "rank first" : "rank"}>{i + 1}</span><div><strong>{a.name}</strong><small>{a.supporters} supporters</small></div><b>{peso(a.raised)}</b></div>)}</div>
+        <div className="dash-card">
+          <div className="section-head"><div><span className="eyebrow">Rising now</span><h2>Trending athletes</h2></div></div>
+          {supabase
+            ? trending.map((row, i) => {
+                const known = byProfileId.get(row.athleteId);
+                const athlete: Athlete = known
+                  ? { ...known, name: row.name, supporters: row.supporters }
+                  : { ...athletes[0], id: -(i + 1), profileId: row.athleteId, name: row.name, supporters: row.supporters };
+                return <MiniAthlete key={row.athleteId} athlete={athlete} rank={i + 1} />;
+              })
+            : athletes.slice(1, 4).map((a, i) => <MiniAthlete key={a.id} athlete={a} rank={i + 1} />)}
+        </div>
+        <div className="dash-card">
+          <div className="section-head"><div><span className="eyebrow">Community</span><h2>Funding leaderboard</h2></div></div>
+          {leaderboardError && <p className="field-error" role="alert">{leaderboardError}</p>}
+          {supabase
+            ? topAthletes.map((row, i) => (
+                <div className="leader-row" key={row.athleteId}>
+                  <span className={i === 0 ? "rank first" : "rank"}>{i + 1}</span>
+                  <div><strong>{row.name}</strong><small>{row.count} donation{row.count === 1 ? "" : "s"}</small></div>
+                  <b>{peso(row.total)}</b>
+                </div>
+              ))
+            : top.slice(0, 4).map((a, i) => (
+                <div className="leader-row" key={a.id}>
+                  <span className={i === 0 ? "rank first" : "rank"}>{i + 1}</span>
+                  <div><strong>{a.name}</strong><small>{a.supporters} supporters</small></div>
+                  <b>{peso(a.raised)}</b>
+                </div>
+              ))}
+        </div>
       </section>
     </main>
   );
