@@ -74,7 +74,7 @@ export function LandingScreen() {
               <Link className="button funding-primary" href="/discover">
                 Find an athlete to support <Icon name="arrow" />
               </Link>
-              <Link className="funding-secondary" href="/register">I&apos;m an athlete</Link>
+              <Link className="funding-secondary" href="/register?role=athlete">I&apos;m an athlete</Link>
             </div>
             <div className="funding-promise">
               <span />
@@ -201,7 +201,7 @@ export function LandingScreen() {
           <p>Discover their potential. Support their journey. Help Filipino athletes reach their next milestone.</p>
           <div className="funding-actions">
             <Link className="button funding-primary" href="/discover">Support an athlete <Icon name="arrow" /></Link>
-            <Link className="funding-secondary light" href="/register">Join as an athlete</Link>
+            <Link className="funding-secondary light" href="/register?role=athlete">Join as an athlete</Link>
           </div>
         </div>
       </section>

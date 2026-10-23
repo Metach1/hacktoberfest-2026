@@ -944,7 +944,7 @@ function AthleteDashboard({
           <article className="dash-post" key={p.id}>
             <small><TimeAgo iso={p.createdAt} />{p.editedAt ? " · edited" : ""}</small>
             <strong>{p.text}</strong>
-            <span>{p.likes} cheers · {p.comments.length} comments</span>
+            <span>{p.likes} {p.likes === 1 ? "heart" : "hearts"} · {p.comments.length} comments</span>
             {confirmDeleteId === p.id ? (
               <div className="post-actions">
                 <span className="confirm-text">Delete this post?</span>

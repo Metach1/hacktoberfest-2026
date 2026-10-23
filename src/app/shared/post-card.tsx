@@ -60,7 +60,7 @@ export function PostCard({ post, showAuthor = true }: { post: Post; showAuthor?:
           aria-pressed={liked}
           onClick={() => toggleLike(post.id, actorId)}
         >
-          <Icon name="heart" size={18} /> {post.likes} {post.likes === 1 ? "like" : "likes"}
+          <Icon name="heart" size={18} /> {post.likes} {post.likes === 1 ? "heart" : "hearts"}
         </button>
         <button
           type="button"
