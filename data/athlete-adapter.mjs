@@ -57,6 +57,41 @@ export function imageForAthlete(record) {
 }
 
 /**
+ * Seed photo gallery for an athlete. The three fictional seed athletes keep a
+ * single sport/override photo so their cards, the map, Browse, and profiles all
+ * render exactly as before — the array form is just the new shape. Alt text is
+ * generated so screen readers get "Photo of <name>".
+ */
+export function seedPhotos(record) {
+  return [
+    {
+      id: `seed-photo-${record.id}`,
+      name: `seed-${record.id}.jpg`,
+      src: imageForAthlete(record),
+      alt: `Photo of ${record.name}`,
+    },
+  ];
+}
+
+/**
+ * Seed achievements for an athlete from the plural `achievements` array the
+ * seed already carries. The FIRST seed achievement is marked proudest so the
+ * existing "Proudest achievement" copy on the profile keeps showing the same
+ * text. Event/date/description are left blank (the seed has only titles).
+ */
+export function seedAchievements(record) {
+  const titles = Array.isArray(record.achievements) ? record.achievements : [];
+  return titles.map((title, i) => ({
+    id: `seed-ach-${record.id}-${i}`,
+    title: String(title ?? ""),
+    event: "",
+    date: "",
+    description: "",
+    isProudest: i === 0,
+  }));
+}
+
+/**
  * Convert a stable seed id (e.g. "ath-007") into the numeric id the UI uses.
  * @param {string} seedId
  * @returns {number}
@@ -72,6 +107,9 @@ export function numericId(seedId) {
  */
 export function toAthlete(record) {
   const regionCode = resolveRegionCode(record.regionCode) ?? record.regionCode;
+  const photos = seedPhotos(record);
+  const achievements = seedAchievements(record);
+  const proudest = achievements.find((a) => a.isProudest) ?? achievements[0];
   return {
     id: numericId(record.id),
     name: record.name,
@@ -79,13 +117,18 @@ export function toAthlete(record) {
     location: record.provinceOrLocality,
     regionCode,
     region: record.region,
-    image: imageForAthlete(record),
+    // Full gallery. The first photo is the profile picture.
+    photos,
+    // Backward-compatible single image = profile picture (first photo src).
+    image: photos[0]?.src ?? PLACEHOLDER_IMAGE,
     raised: record.fundingRaised,
     goal: record.fundingGoal,
     supporters: record.votes,
     verified: record.verified,
     bio: record.bio,
-    achievement: Array.isArray(record.achievements) ? record.achievements[0] ?? "" : "",
+    // Full achievement list plus a backward-compatible proudest-title string.
+    achievements,
+    achievement: proudest?.title ?? "",
     featured: record.ranking >= 1 && record.ranking <= 3,
   };
 }

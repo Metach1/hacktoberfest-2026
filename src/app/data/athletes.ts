@@ -27,6 +27,16 @@ export interface Athlete {
   regionCode: string;
   /** Full administrative region name, for labels. */
   region: string;
+  /**
+   * Photo gallery. The FIRST photo is the profile picture shown on the card,
+   * map, leaderboard, and navbar circle. Empty when the athlete has no photos
+   * (the UI then falls back to a placeholder).
+   */
+  photos: AthletePhoto[];
+  /**
+   * Backward-compatible single image: the profile picture src (first photo) or
+   * the placeholder. Kept so existing render sites work unchanged.
+   */
   image: string;
   raised: number;
   goal: number;
@@ -34,7 +44,34 @@ export interface Athlete {
   verified: boolean;
   featured?: boolean;
   bio: string;
+  /** Full achievement list; at most one is flagged `isProudest`. */
+  achievements: Achievement[];
+  /** Backward-compatible proudest achievement title (or first), for old copy. */
   achievement: string;
+}
+
+/** A single gallery photo. `src` is a data URL (demo) or seed image URL. */
+export interface AthletePhoto {
+  id: string;
+  /** Safe, generated file name (never a client-supplied name). */
+  name: string;
+  src: string;
+  /** Alt text, e.g. "Photo of <name>". */
+  alt: string;
+}
+
+/** A self-reported achievement. Per-achievement verification is not modeled. */
+export interface Achievement {
+  id: string;
+  title: string;
+  /** Competition / meet / event name (optional). */
+  event: string;
+  /** "YYYY" or "YYYY-MM-DD" (optional). */
+  date: string;
+  /** Short description (optional). */
+  description: string;
+  /** At most one achievement per athlete is the proudest. */
+  isProudest: boolean;
 }
 
 const seedAthletes = (seed as { athletes: Record<string, unknown>[] }).athletes;

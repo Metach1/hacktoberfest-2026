@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Icon } from "@/src/app/shared/ui";
+import { Avatar, Icon } from "@/src/app/shared/ui";
 import { TimeAgo } from "@/src/app/shared/time-ago";
 import { useStarlete, actorIdForRole } from "@/src/app/store";
 import { postAuthor, type Post } from "@/src/app/data/posts";
@@ -39,7 +39,7 @@ export function PostCard({ post, showAuthor = true }: { post: Post; showAuthor?:
       {showAuthor && (
         <header className="feed-post-head">
           <Link className="feed-author" href={`/athletes/${post.authorAthleteId}`}>
-            {author.image ? <img src={author.image} alt="" /> : <span className="feed-avatar-fallback" aria-hidden="true">{author.name.charAt(0)}</span>}
+            <Avatar src={author.image} name={author.name} size={46} className="feed-author-avatar" />
             <span className="feed-author-meta">
               <strong>{author.name}{author.verified && <span className="verified inline-verified"><Icon name="check" size={11} /></span>}</strong>
               <small>{author.sport} · <TimeAgo iso={post.createdAt} /></small>

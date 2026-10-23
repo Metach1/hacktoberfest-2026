@@ -29,23 +29,28 @@ test("logged-out navbar exposes no profile menu options", () => {
   assert.deepEqual(profileMenuItems(undefined), []);
 });
 
-test("athlete menu offers Edit profile then Log out, in order", () => {
+test("athlete menu offers View profile, Edit profile, then Log out, in order", () => {
   const items = profileMenuItems("athlete");
   assert.deepEqual(
     items.map((i) => i.id),
-    ["edit-profile", "logout"],
+    ["view-profile", "edit-profile", "logout"],
   );
   assert.deepEqual(
     items.map((i) => i.label),
-    ["Edit profile", "Log out"],
+    ["View profile", "Edit profile", "Log out"],
   );
 });
 
-test("supporter menu offers the same two options", () => {
+test("supporter menu offers Edit profile and Log out but no View profile", () => {
   assert.deepEqual(
     profileMenuItems("supporter").map((i) => i.id),
     ["edit-profile", "logout"],
   );
+});
+
+test("only an athlete gets a View profile option (supporters have no public profile)", () => {
+  assert.ok(profileMenuItems("athlete").some((i) => i.id === "view-profile"));
+  assert.ok(!profileMenuItems("supporter").some((i) => i.id === "view-profile"));
 });
 
 test("Edit profile navigates to the shared edit route for both roles", () => {

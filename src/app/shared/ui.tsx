@@ -41,6 +41,42 @@ export function Icon({ name, size = 20 }: { name: string; size?: number }) {
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
 }
 
+/**
+ * One shared circular avatar used everywhere a profile picture is shown as a
+ * circle (navbar, leaderboard, post author). A fixed square box with
+ * `object-fit: cover` and `overflow: hidden` guarantees any image shape — tall,
+ * wide, or the placeholder — renders as a perfect, unstretched circle. When
+ * there is no image, the initials fall back inside the same circle.
+ *
+ * `size` sets the pixel diameter; `className` lets a caller theme the fallback
+ * background (e.g. the navbar's navy circle) without changing the shape.
+ */
+export function Avatar({
+  src,
+  name,
+  size = 40,
+  className = "",
+}: {
+  src?: string | null;
+  name?: string;
+  size?: number;
+  className?: string;
+}) {
+  const initials = (name ?? "")
+    .split(" ")
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+  const style = { width: size, height: size } as const;
+  return (
+    <span className={className ? `avatar ${className}` : "avatar"} style={style} aria-hidden={src ? "true" : undefined}>
+      {src ? <img src={src} alt="" /> : <span className="avatar-initials">{initials || "?"}</span>}
+    </span>
+  );
+}
+
 /** Brand mark that links home. */
 export function Logo() {
   return <Link className="logo" href="/" aria-label="Startlete home"><img className="logo-mark" src="/logo.svg" alt="" width={32} height={32} /><span>startlete</span></Link>;

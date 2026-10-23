@@ -3,14 +3,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Icon, Logo } from "@/src/app/shared/ui";
+import { Avatar, Icon, Logo } from "@/src/app/shared/ui";
 import { DonationModal } from "@/src/app/shared/donation";
 import { useStarlete } from "@/src/app/store";
 import { REGION_MAP } from "@/src/app/lib/region-map";
 import {
   EDIT_PROFILE_HREF,
   LOGOUT_HREF,
-  avatarInitials,
   isDismissKey,
   profileMenuItems,
 } from "@/src/app/lib/profile-menu.mjs";
@@ -124,17 +123,25 @@ function NotificationsBell() {
  * account at /dashboard/edit, so the Edit profile option is always shown.
  */
 function ProfileMenu({ onNavigate }: { onNavigate: () => void }) {
-  const { role, logout, athletes } = useStarlete();
+  const { role, logout, currentAthlete } = useStarlete();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
-  const athleteName = athletes[0]?.name;
-  const initials = avatarInitials(role, athleteName);
+  const athleteName = currentAthlete?.name;
+  // Supporters have no athlete name; the Avatar falls back to "JD"-style
+  // initials via avatarInitials to match the previous supporter avatar.
+  const initialsName = role === "athlete" ? athleteName : "Jamie Dela Cruz";
+  // Profile picture (first gallery photo) for an athlete avatar, when present.
+  const avatarSrc = role === "athlete" && currentAthlete?.photos?.length ? currentAthlete.image : null;
   const label = role === "athlete" ? athleteName ?? "Your profile" : "Your account";
   const roleLabel = role === "athlete" ? "Athlete" : "Supporter";
   const items = profileMenuItems(role);
-  const iconFor: Record<string, string> = { "edit-profile": "users", logout: "logout" };
+  const iconFor: Record<string, string> = {
+    "view-profile": "users",
+    "edit-profile": "plus",
+    logout: "logout",
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -154,12 +161,17 @@ function ProfileMenu({ onNavigate }: { onNavigate: () => void }) {
 
   // Run an option: close the menu and the mobile nav, then act. "logout" ends
   // the session first so protected routes redirect afterward, then lands home.
+  // "view-profile" resolves to the current athlete's own public profile.
   const runItem = (id: string, href?: string) => {
     setOpen(false);
     onNavigate();
     if (id === "logout") {
       logout();
       router.push(LOGOUT_HREF);
+      return;
+    }
+    if (id === "view-profile") {
+      if (currentAthlete) router.push(`/athletes/${currentAthlete.id}`);
       return;
     }
     router.push(href ?? EDIT_PROFILE_HREF);
@@ -175,7 +187,7 @@ function ProfileMenu({ onNavigate }: { onNavigate: () => void }) {
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        {initials}
+        <Avatar src={avatarSrc} name={initialsName} size={37} />
       </button>
 
       {open && (

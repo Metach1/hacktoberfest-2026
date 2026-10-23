@@ -37,6 +37,13 @@ yarn-error.log*
 # vercel
 .vercel
 
+# uploaded athlete photos (local dev only; never committed).
+# The demo stores photos as in-browser data URLs in localStorage, so this
+# folder is reserved for a future server-backed upload target. Local file
+# storage is for development only — production must use object storage.
+/public/uploads
+/uploads
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

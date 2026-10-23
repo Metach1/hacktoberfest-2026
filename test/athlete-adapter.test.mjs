@@ -111,3 +111,41 @@ test("toAthlete maps seed fields onto the view fields", () => {
   assert.equal(a.achievement, "Fictional achievement");
   assert.equal(a.featured, true);
 });
+
+test("toAthlete produces a one-photo gallery whose first photo is the profile image", () => {
+  const a = toAthlete({
+    id: "ath-050", name: "Gallery Seed", sport: "Boxing",
+    regionCode: "NCR", region: "National Capital Region", provinceOrLocality: "Taguig",
+    bio: "Fictional.", achievements: ["First", "Second"], verified: false,
+    fundingGoal: 50000, fundingRaised: 10000, votes: 3, ranking: 20,
+  });
+  assert.ok(Array.isArray(a.photos));
+  assert.equal(a.photos.length, 1);
+  assert.equal(a.photos[0].src, a.image); // profile picture == first photo
+  assert.match(a.photos[0].alt, /Photo of Gallery Seed/);
+});
+
+test("toAthlete expands the seed achievements array with exactly one proudest", () => {
+  const a = toAthlete({
+    id: "ath-051", name: "Ach Seed", sport: "Swimming",
+    regionCode: "NCR", region: "National Capital Region", provinceOrLocality: "Pasig",
+    bio: "Fictional.", achievements: ["Alpha", "Beta", "Gamma"], verified: false,
+    fundingGoal: 60000, fundingRaised: 20000, votes: 8, ranking: 15,
+  });
+  assert.equal(a.achievements.length, 3);
+  const proudest = a.achievements.filter((x) => x.isProudest);
+  assert.equal(proudest.length, 1, "exactly one proudest");
+  assert.equal(proudest[0].title, "Alpha", "first seed achievement is proudest");
+  assert.equal(a.achievement, "Alpha", "backward-compatible string tracks proudest");
+});
+
+test("the three real seed athletes keep a single rendering photo (no break)", async () => {
+  const athletes = adaptAthletes(await loadSeed());
+  for (const a of athletes) {
+    assert.ok(Array.isArray(a.photos) && a.photos.length >= 1);
+    assert.ok(a.photos[0].src.length > 0);
+    assert.equal(a.image, a.photos[0].src);
+    assert.ok(Array.isArray(a.achievements));
+    assert.ok(a.achievements.filter((x) => x.isProudest).length <= 1);
+  }
+});

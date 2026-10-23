@@ -12,7 +12,26 @@ import {
 import {
   athletes as seedAthletes,
   type Athlete,
+  type AthletePhoto,
+  type Achievement,
 } from "@/src/app/data/athletes";
+import {
+  addPhoto as addPhotoRecord,
+  buildPhoto,
+  movePhoto as movePhotoRecord,
+  profilePhotoSrc,
+  removePhoto as removePhotoRecord,
+  PHOTO_PLACEHOLDER,
+} from "@/src/app/lib/athlete-photos.mjs";
+import {
+  addAchievement as addAchievementRecord,
+  buildAchievement,
+  deleteAchievement as deleteAchievementRecord,
+  editAchievement as editAchievementRecord,
+  markProudest as markProudestRecord,
+  proudestAchievement,
+  validateAchievement,
+} from "@/src/app/lib/achievements.mjs";
 import {
   applyAutoConfirm,
   confirmDonation as confirmDonationRecord,
@@ -119,7 +138,59 @@ export interface Donation {
  * (on top of v5's supporter identity + reject lifecycle, v4's QR codes,
  * donations, and structured social posts).
  */
-const DATA_VERSION = "v6";
+const DATA_VERSION = "v7";
+
+/**
+ * Backfill the photo gallery + achievement list onto a persisted athlete saved
+ * before v7 (which only had a single `image`/`achievement`). Keeps existing
+ * athletes — including the three seed athletes — rendering correctly:
+ *  - no `photos`      -> wrap the legacy `image` as a one-photo gallery
+ *  - no `achievements`-> wrap the legacy `achievement` string as one proudest
+ *  - always re-derive `image` (first photo) and `achievement` (proudest title)
+ *    so the backward-compatible fields stay in sync with the arrays.
+ * Defensive only; never drops data a newer record already has.
+ */
+function normalizeAthlete(a: Partial<Athlete> & { id: number; name: string }): Athlete {
+  const photos: AthletePhoto[] = Array.isArray(a.photos) && a.photos.length > 0
+    ? a.photos.map((p, i) => ({
+        id: String(p?.id ?? `photo-${a.id}-${i}`),
+        name: String(p?.name ?? `photo-${a.id}-${i}.img`),
+        src: String(p?.src ?? ""),
+        alt: String(p?.alt ?? `Photo of ${a.name}`),
+      }))
+    : a.image
+      ? [{ id: `photo-${a.id}-legacy`, name: `legacy-${a.id}.img`, src: a.image, alt: `Photo of ${a.name}` }]
+      : [];
+
+  const achievements: Achievement[] = Array.isArray(a.achievements) && a.achievements.length > 0
+    ? a.achievements.map((ac, i) => ({
+        id: String(ac?.id ?? `ach-${a.id}-${i}`),
+        title: String(ac?.title ?? ""),
+        event: String(ac?.event ?? ""),
+        date: String(ac?.date ?? ""),
+        description: String(ac?.description ?? ""),
+        isProudest: Boolean(ac?.isProudest),
+      }))
+    : a.achievement
+      ? [{ id: `ach-${a.id}-legacy`, title: a.achievement, event: "", date: "", description: "", isProudest: true }]
+      : [];
+
+  // Enforce the "at most one proudest" invariant defensively on load.
+  let seenProudest = false;
+  for (const ac of achievements) {
+    if (ac.isProudest && !seenProudest) seenProudest = true;
+    else ac.isProudest = false;
+  }
+  const proudest = achievements.find((ac) => ac.isProudest) ?? achievements[0];
+
+  return {
+    ...(a as Athlete),
+    photos,
+    image: photos[0]?.src ?? PHOTO_PLACEHOLDER,
+    achievements,
+    achievement: proudest?.title ?? "",
+  };
+}
 
 /** Build a fictional QR entry for a method. */
 function makeQr(athleteId: number, method: string, label: string, accountNumber: string): QrCode {
@@ -184,6 +255,41 @@ interface StarleteState {
   login: (role: Role) => void;
   logout: () => void;
   getAthlete: (id: number) => Athlete | undefined;
+  /** The current logged-in athlete (demo convention: the first athlete). */
+  currentAthlete: Athlete | undefined;
+
+  // --- Athlete profile editing (owner-only; demo = athletes[0]) -----------
+  /** Patch an athlete's editable profile fields (name, location, bio, goal). */
+  updateAthlete: (id: number, patch: Partial<Pick<Athlete, "name" | "location" | "bio" | "goal" | "sport">>) => void;
+  /**
+   * Commit a full edited profile draft in one atomic update: text fields plus
+   * the complete photos and achievements arrays (used by the edit page's
+   * "Save changes", so nothing persists until the athlete confirms). The
+   * backward-compatible `image`/`achievement` fields are re-derived.
+   */
+  saveAthleteProfile: (
+    id: number,
+    draft: Pick<Athlete, "name" | "location" | "bio" | "sport" | "goal" | "photos" | "achievements">,
+  ) => void;
+  // Photo gallery.
+  /**
+   * Validate and append a photo from a data URL. Returns `{ ok }` or
+   * `{ ok: false, error }` so the UI can surface a clear message.
+   */
+  addAthletePhoto: (id: number, input: { type: string; size?: number; dataUrl: string }) => { ok: boolean; error?: string };
+  /** Move a photo one slot toward the start (-1) or end (+1). First = profile. */
+  moveAthletePhoto: (id: number, index: number, dir: -1 | 1) => void;
+  /** Delete a photo by id. */
+  removeAthletePhoto: (id: number, photoId: string) => void;
+  // Achievements.
+  /** Validate and add an achievement. Returns `{ ok }` or `{ ok, errors }`. */
+  addAchievement: (id: number, input: { title: string; event?: string; date?: string; description?: string }) => { ok: boolean; errors?: Record<string, string> };
+  /** Validate and edit an achievement in place. */
+  editAchievement: (id: number, achievementId: string, input: { title: string; event?: string; date?: string; description?: string }) => { ok: boolean; errors?: Record<string, string> };
+  /** Delete an achievement by id. */
+  deleteAchievement: (id: number, achievementId: string) => void;
+  /** Mark exactly one achievement proudest (clears any previous proudest). */
+  markProudestAchievement: (id: number, achievementId: string) => void;
   openDonation: (athlete: Athlete) => void;
   /**
    * Open the donation flow to edit and retry a REJECTED donation the current
@@ -323,8 +429,12 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       const savedPosts = window.localStorage.getItem("starlete-posts");
       const savedNotifications = window.localStorage.getItem("starlete-notifications");
       setRole(savedRole ?? null);
-      if (savedVersion === DATA_VERSION || savedVersion === "v4" || savedVersion === "v3") {
-        if (savedAthletes) setAthletes(JSON.parse(savedAthletes) as Athlete[]);
+      if (savedVersion === DATA_VERSION || savedVersion === "v6" || savedVersion === "v4" || savedVersion === "v3") {
+        if (savedAthletes) {
+          // Normalize so athletes saved before v7 gain photos[]/achievements[].
+          const loadedAthletes = JSON.parse(savedAthletes) as (Partial<Athlete> & { id: number; name: string })[];
+          setAthletes(loadedAthletes.map(normalizeAthlete));
+        }
         if (savedQr) {
           // Normalize older QR records to the current shape: default a missing
           // accountNumber to "" and a missing image to "" (no placeholder).
@@ -440,6 +550,118 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   const getAthlete = useCallback(
     (id: number) => reconciledAthletes.find((a) => a.id === id),
     [reconciledAthletes],
+  );
+
+  const currentAthlete = reconciledAthletes[0];
+
+  // --- Athlete profile editing -------------------------------------------
+  // All athlete edits go through this helper, which maps over the *base*
+  // athletes state (raised/supporters are re-derived by reconciledAthletes, so
+  // we never touch them here) and re-derives the backward-compatible `image`
+  // and `achievement` fields so they always track the arrays.
+  const patchAthlete = useCallback(
+    (id: number, mutate: (a: Athlete) => Athlete) => {
+      setAthletes((list) =>
+        list.map((a) => {
+          if (a.id !== id) return a;
+          const next = mutate(a);
+          const photos = Array.isArray(next.photos) ? next.photos : [];
+          const proudest = proudestAchievement(next.achievements) as Achievement | null;
+          return {
+            ...next,
+            image: profilePhotoSrc(photos) as string,
+            achievement: proudest?.title ?? "",
+          };
+        }),
+      );
+    },
+    [],
+  );
+
+  const updateAthlete = useCallback<StarleteState["updateAthlete"]>(
+    (id, patch) => patchAthlete(id, (a) => ({ ...a, ...patch })),
+    [patchAthlete],
+  );
+
+  const saveAthleteProfile = useCallback<StarleteState["saveAthleteProfile"]>(
+    (id, draft) =>
+      patchAthlete(id, (a) => ({
+        ...a,
+        name: draft.name,
+        location: draft.location,
+        bio: draft.bio,
+        sport: draft.sport,
+        goal: draft.goal,
+        photos: Array.isArray(draft.photos) ? draft.photos : a.photos,
+        achievements: Array.isArray(draft.achievements) ? draft.achievements : a.achievements,
+      })),
+    [patchAthlete],
+  );
+
+  const addAthletePhoto = useCallback<StarleteState["addAthletePhoto"]>(
+    (id, input) => {
+      const athlete = athletes.find((a) => a.id === id);
+      if (!athlete) return { ok: false, error: "Athlete not found." };
+      const built = buildPhoto({
+        athleteId: id,
+        athleteName: athlete.name,
+        type: input.type,
+        size: input.size,
+        dataUrl: input.dataUrl,
+        currentCount: athlete.photos?.length ?? 0,
+      }) as { ok: boolean; error?: string; photo?: AthletePhoto };
+      if (!built.ok || !built.photo) return { ok: false, error: built.error };
+      const photo = built.photo;
+      patchAthlete(id, (a) => ({ ...a, photos: addPhotoRecord(a.photos, photo) as AthletePhoto[] }));
+      return { ok: true };
+    },
+    [athletes, patchAthlete],
+  );
+
+  const moveAthletePhoto = useCallback<StarleteState["moveAthletePhoto"]>(
+    (id, index, dir) =>
+      patchAthlete(id, (a) => ({ ...a, photos: movePhotoRecord(a.photos, index, dir) as AthletePhoto[] })),
+    [patchAthlete],
+  );
+
+  const removeAthletePhoto = useCallback<StarleteState["removeAthletePhoto"]>(
+    (id, photoId) =>
+      patchAthlete(id, (a) => ({ ...a, photos: removePhotoRecord(a.photos, photoId) as AthletePhoto[] })),
+    [patchAthlete],
+  );
+
+  const addAchievement = useCallback<StarleteState["addAchievement"]>(
+    (id, input) => {
+      const built = buildAchievement(id, input) as { ok: boolean; errors?: Record<string, string>; achievement?: Achievement };
+      if (!built.ok || !built.achievement) return { ok: false, errors: built.errors };
+      const achievement = built.achievement;
+      patchAthlete(id, (a) => ({ ...a, achievements: addAchievementRecord(a.achievements, achievement) as Achievement[] }));
+      return { ok: true };
+    },
+    [patchAthlete],
+  );
+
+  const editAchievement = useCallback<StarleteState["editAchievement"]>(
+    (id, achievementId, input) => {
+      const result = validateAchievement(input) as { ok: boolean; errors?: Record<string, string>; fields?: Omit<Achievement, "id" | "isProudest"> };
+      if (!result.ok || !result.fields) return { ok: false, errors: result.errors };
+      const fields = result.fields;
+      patchAthlete(id, (a) => ({ ...a, achievements: editAchievementRecord(a.achievements, achievementId, fields) as Achievement[] }));
+      return { ok: true };
+    },
+    [patchAthlete],
+  );
+
+  const deleteAchievement = useCallback<StarleteState["deleteAchievement"]>(
+    (id, achievementId) =>
+      patchAthlete(id, (a) => ({ ...a, achievements: deleteAchievementRecord(a.achievements, achievementId) as Achievement[] })),
+    [patchAthlete],
+  );
+
+  const markProudestAchievement = useCallback<StarleteState["markProudestAchievement"]>(
+    (id, achievementId) =>
+      patchAthlete(id, (a) => ({ ...a, achievements: markProudestRecord(a.achievements, achievementId) as Achievement[] })),
+    [patchAthlete],
   );
 
   // Resolve an actor id to a display name for notification copy. The demo
@@ -734,6 +956,16 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       getAthlete,
+      currentAthlete,
+      updateAthlete,
+      saveAthleteProfile,
+      addAthletePhoto,
+      moveAthletePhoto,
+      removeAthletePhoto,
+      addAchievement,
+      editAchievement,
+      deleteAchievement,
+      markProudestAchievement,
       openDonation,
       openResubmission,
       closeDonation,
@@ -761,7 +993,10 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
     }),
     [
       mounted, role, reconciledAthletes, posts, donationTarget, donationPrefill, qrCodes, donations, notifications,
-      login, logout, getAthlete, openDonation, openResubmission, closeDonation,
+      login, logout, getAthlete, currentAthlete, updateAthlete, saveAthleteProfile,
+      addAthletePhoto, moveAthletePhoto, removeAthletePhoto,
+      addAchievement, editAchievement, deleteAchievement, markProudestAchievement,
+      openDonation, openResubmission, closeDonation,
       getQrCodes, addQrCode, replaceQrCode, removeQrCode,
       submitDonation, confirmDonation, rejectDonation, resubmitDonation, removeDonation, getDonationsForAthlete,
       supporterId, getDonationsForSupporter, addPost, editPost, deletePost, toggleLike, addComment,
