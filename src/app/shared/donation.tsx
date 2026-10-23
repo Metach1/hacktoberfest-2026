@@ -604,29 +604,12 @@ export function DonationModal() {
               Submit for confirmation <Icon name="heart" />
             </button>
 
-            {/* Amount-confirmation safeguard: guards against accidental typos.
-                It is NOT proof of payment — the demo cannot verify transactions. */}
-            {confirmingAmount && (
-              <div className="modal-backdrop" onClick={() => setConfirmingAmount(false)}>
-                <div className="modal small-modal confirm-amount" onClick={(e) => e.stopPropagation()}>
-                  <span className="eyebrow">Check the amount</span>
-                  <h2>Did you pay {peso(actual)}?</h2>
-                  <p>
-                    Please confirm the amount you actually sent to {athlete.name.split(" ")[0]} is{" "}
-                    <strong>{peso(actual)}</strong>. This is a safeguard against typos — it does not
-                    verify your payment.
-                  </p>
-                  <div className="form-actions">
-                    <button className="button secondary" onClick={() => { setConfirmingAmount(false); setStep(2); }}>
-                      Edit amount
-                    </button>
-                    <button className="button gold" onClick={submit}>
-                      Yes, {peso(actual)} is correct
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* The amount-confirmation safeguard renders at the document
+                level via a portal (see end of component). The donation modal's
+                backdrop-filter creates a containing block, which would make a
+                nested position:fixed backdrop position against the modal rather
+                than the viewport — the portal escapes that so the popup is
+                truly viewport-fixed. */}
           </div>
         )}
 
@@ -651,6 +634,32 @@ export function DonationModal() {
         )}
       </div>
     </div>
+    {/* Amount-confirmation safeguard, portaled to <body> so its fixed backdrop
+        fills the viewport (the donation modal's backdrop-filter would otherwise
+        create a containing block and misposition this nested fixed element).
+        It is NOT proof of payment — the demo cannot verify transactions. */}
+    {confirmingAmount && createPortal(
+      <div className="modal-backdrop" onClick={() => setConfirmingAmount(false)}>
+        <div className="modal small-modal confirm-amount" role="dialog" aria-modal="true" aria-label="Check the amount" onClick={(e) => e.stopPropagation()}>
+          <span className="eyebrow">Check the amount</span>
+          <h2>Did you pay {peso(actual)}?</h2>
+          <p>
+            Please confirm the amount you actually sent to {athlete.name.split(" ")[0]} is{" "}
+            <strong>{peso(actual)}</strong>. This is a safeguard against typos — it does not
+            verify your payment.
+          </p>
+          <div className="form-actions">
+            <button className="button secondary" onClick={() => { setConfirmingAmount(false); setStep(2); }}>
+              Edit amount
+            </button>
+            <button className="button gold" onClick={submit}>
+              Yes, {peso(actual)} is correct
+            </button>
+          </div>
+        </div>
+      </div>,
+      document.body,
+    )}
     {showFullQr && activeQr?.image && createPortal(
       <div className="qr-fullscreen-backdrop" onClick={() => setShowFullQr(false)}>
         <div

@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient } from "@/src/app/lib/supabase/client";
+import type { AthletePhoto, Achievement } from "@/src/app/data/athletes";
 
 const PROFILE_IMAGE_BUCKET = "profile-images";
 const MAX_PROFILE_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -21,6 +22,12 @@ export interface MyProfile {
   achievement: string;
   fundingGoal: number | null;
   verified: boolean;
+  /** Photo gallery (up to 8). Empty until the JSON column exists / is set. */
+  photos: AthletePhoto[];
+  /** Rich achievements list. Empty until the JSON column exists / is set. */
+  achievements: Achievement[];
+  /** School / university / club / team. Blank until the column exists / is set. */
+  institution: string;
 }
 
 export interface PublicAthleteProfile {
@@ -36,6 +43,9 @@ export interface PublicAthleteProfile {
   achievement: string;
   fundingGoal: number | null;
   verified: boolean;
+  photos: AthletePhoto[];
+  achievements: Achievement[];
+  institution: string;
 }
 
 interface ProfileRow {
@@ -58,6 +68,28 @@ interface AthleteProfileRow {
   achievement: string | null;
   funding_goal: number | null;
   verified: boolean;
+  // Group B (Option 3): JSON columns added by a later migration. Optional here
+  // so reads stay safe BEFORE the migration — the select strings below omit
+  // these columns until the migration lands, then add
+  // "photos, achievements, institution" and these map through unchanged.
+  photos?: unknown;
+  achievements?: unknown;
+  institution?: string | null;
+}
+
+/** Defensively parse a JSON column that may be a JS array, a JSON string, or
+ * absent (pre-migration). Always returns a typed array, never throws. */
+function parseJsonArray<T>(value: unknown): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? (parsed as T[]) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
 }
 
 /** Load the signed-in user's profile and athlete-specific fields, if applicable. */
@@ -103,6 +135,9 @@ export async function getMyProfile(): Promise<MyProfile | null> {
     achievement: athleteProfile?.achievement ?? "",
     fundingGoal: athleteProfile?.funding_goal ?? null,
     verified: athleteProfile?.verified ?? false,
+    photos: parseJsonArray<AthletePhoto>(athleteProfile?.photos),
+    achievements: parseJsonArray<Achievement>(athleteProfile?.achievements),
+    institution: athleteProfile?.institution ?? "",
   };
 }
 
@@ -146,6 +181,9 @@ export async function getPublicAthleteProfiles(userId?: string): Promise<PublicA
       achievement: athlete?.achievement ?? "",
       fundingGoal: athlete?.funding_goal ?? null,
       verified: athlete?.verified ?? false,
+      photos: parseJsonArray<AthletePhoto>(athlete?.photos),
+      achievements: parseJsonArray<Achievement>(athlete?.achievements),
+      institution: athlete?.institution ?? "",
     };
   });
 }
@@ -167,6 +205,10 @@ export interface UpdateMyProfileInput {
   city?: string;
   achievement?: string;
   fundingGoal?: number | null;
+  // Group B (Option 3): persisted to JSON columns once the migration lands.
+  photos?: AthletePhoto[];
+  achievements?: Achievement[];
+  institution?: string;
 }
 
 /** Update profile fields without changing the account's role. */
@@ -205,20 +247,40 @@ export async function updateMyProfile(input: UpdateMyProfileInput): Promise<void
   if (!updatedProfile) throw new Error("Your profile changes could not be saved.");
 
   if (role === "athlete") {
+    const base = {
+      user_id: userId,
+      sport: input.sport?.trim() || null,
+      region_code: input.regionCode?.trim() || null,
+      location: input.location?.trim() || null,
+      province: input.province?.trim() || null,
+      city: input.city?.trim() || null,
+      bio: input.bio.trim() || null,
+      achievement: input.achievement?.trim() || null,
+      funding_goal: input.fundingGoal ?? null,
+    };
+    // Group B (Option 3): photos/achievements/institution persist to JSON
+    // columns that a later migration adds. To keep saves working BEFORE that
+    // migration, try the upsert with the extra columns first; if Postgres
+    // rejects an unknown column, fall back to the base columns so the rest of
+    // the profile still saves. Once the migration lands, the first upsert
+    // succeeds and the fields persist with no code change.
+    const extended = {
+      ...base,
+      photos: input.photos ?? [],
+      achievements: input.achievements ?? [],
+      institution: input.institution?.trim() || null,
+    };
     const { error } = await supabase
       .from("athlete_profiles")
-      .upsert({
-        user_id: userId,
-        sport: input.sport?.trim() || null,
-        region_code: input.regionCode?.trim() || null,
-        location: input.location?.trim() || null,
-        province: input.province?.trim() || null,
-        city: input.city?.trim() || null,
-        bio: input.bio.trim() || null,
-        achievement: input.achievement?.trim() || null,
-        funding_goal: input.fundingGoal ?? null,
-      }, { onConflict: "user_id" });
-    if (error) throw new Error(error.message);
+      .upsert(extended, { onConflict: "user_id" });
+    if (error) {
+      const missingColumn = /column .* does not exist|could not find/i.test(error.message);
+      if (!missingColumn) throw new Error(error.message);
+      const { error: baseError } = await supabase
+        .from("athlete_profiles")
+        .upsert(base, { onConflict: "user_id" });
+      if (baseError) throw new Error(baseError.message);
+    }
   }
 }
 

@@ -21,5 +21,8 @@ export function toAthlete(profile: PublicAthleteProfile, localId: number): Athle
     verified: profile.verified,
     bio: profile.bio,
     achievement: profile.achievement,
+    photos: profile.photos,
+    achievements: profile.achievements,
+    institution: profile.institution,
   };
 }
