@@ -16,6 +16,7 @@ import {
   countByRegion,
   filterAthletes,
 } from "@/src/app/lib/region-map";
+import { Combobox } from "@/src/app/shared/combobox";
 
 /** Map an athlete count to a choropleth intensity bucket (0 = empty). */
 function intensity(count: number): 0 | 1 | 2 | 3 | 4 {
@@ -311,14 +312,20 @@ export function DiscoverScreen() {
           <div className="explorer-controls">
             <label className="search-box"><Icon name="search" /><input value={search} onChange={(e) => onSearchChange(e.target.value)} placeholder="Search athletes, sports, or cities" /></label>
             <div className="explorer-filters">
-              <select value={sport} onChange={(e) => onSportChange(e.target.value)} aria-label="Filter by sport">
-                <option>All sports</option>
-                {[...new Set(athletes.map((a) => a.sport))].map((s) => <option key={s}>{s}</option>)}
-              </select>
-              <select value={selectedRegion ?? ""} onChange={(e) => setSelectedRegion(e.target.value || null)} aria-label="Filter by region">
-                <option value="">All regions</option>
-                {REGION_MAP.regions.map((r) => <option key={r.regionCode} value={r.regionCode}>{r.name}</option>)}
-              </select>
+              <Combobox
+                options={["All sports", ...new Set(athletes.map((a) => a.sport))]}
+                value={sport}
+                onChange={onSportChange}
+                ariaLabel="Filter by sport"
+                placeholder="Type to filter sports…"
+              />
+              <Combobox
+                options={[{ value: "", label: "All regions" }, ...REGION_MAP.regions.map((r) => ({ value: r.regionCode, label: r.name }))]}
+                value={selectedRegion ?? ""}
+                onChange={(v) => setSelectedRegion(v || null)}
+                ariaLabel="Filter by region"
+                placeholder="Type to filter regions…"
+              />
             </div>
           </div>
 

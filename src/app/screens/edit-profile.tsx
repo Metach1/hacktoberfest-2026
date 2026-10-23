@@ -9,6 +9,7 @@ import { useSession } from "@/src/app/shared/session-provider";
 import { REGIONS, regionName } from "@/src/app/lib/regions";
 import { provincesForRegion, citiesForProvince } from "@/src/app/lib/locations";
 import { SPORTS } from "@/src/app/lib/sports";
+import { Combobox } from "@/src/app/shared/combobox";
 
 export function EditProfileScreen() {
   const { role, athletes, mounted } = useStarlete();
@@ -72,6 +73,10 @@ export function EditProfileScreen() {
   // a selection can never be inconsistent with the one above it.
   const provinceOptions = provincesForRegion(regionCode);
   const cityOptions = citiesForProvince(regionCode, province);
+  // Preserve a saved sport that predates (or isn't in) the canonical list.
+  const sportOptions = sport && !SPORTS.includes(sport as (typeof SPORTS)[number])
+    ? [sport, ...SPORTS]
+    : [...SPORTS];
   const onRegionChange = (value: string) => { setRegionCode(value); setProvince(""); setCity(""); };
   const onProvinceChange = (value: string) => { setProvince(value); setCity(""); };
 
@@ -129,7 +134,7 @@ export function EditProfileScreen() {
         </div>
         <form onSubmit={save}>
           <label>Full name<input required value={fullName} onChange={(event) => setFullName(event.target.value)} /></label>
-          {role === "athlete" && <><div className="field-row"><label>Region<select value={regionCode} onChange={(event) => onRegionChange(event.target.value)}><option value="">Select your region…</option>{REGIONS.map(r => <option key={r.regionCode} value={r.regionCode}>{r.name}</option>)}</select></label><label>Sport<select value={sport} onChange={(event) => setSport(event.target.value)}>{sport && !SPORTS.includes(sport as (typeof SPORTS)[number]) && <option value={sport}>{sport}</option>}{SPORTS.map(s => <option key={s} value={s}>{s}</option>)}</select></label></div><div className="field-row"><label>Province<select disabled={!regionCode} value={province} onChange={(event) => onProvinceChange(event.target.value)}><option value="">{regionCode ? "Select your province…" : "Select a region first"}</option>{provinceOptions.map(p => <option key={p} value={p}>{p}</option>)}</select></label><label>City/Municipality<select disabled={!province} value={city} onChange={(event) => setCity(event.target.value)}><option value="">{province ? "Select your city/municipality…" : "Select a province first"}</option>{cityOptions.map(c => <option key={c} value={c}>{c}</option>)}</select></label></div></>}
+          {role === "athlete" && <><div className="field-row"><label>Region<select value={regionCode} onChange={(event) => onRegionChange(event.target.value)}><option value="">Select your region…</option>{REGIONS.map(r => <option key={r.regionCode} value={r.regionCode}>{r.name}</option>)}</select></label><label>Sport<Combobox options={sportOptions} value={sport} onChange={setSport} ariaLabel="Sport" placeholder="Type to search sports…" /></label></div><div className="field-row"><label>Province<Combobox options={provinceOptions} value={province} onChange={onProvinceChange} disabled={!regionCode} ariaLabel="Province" placeholder={regionCode ? "Type to search provinces…" : "Select a region first"} /></label><label>City/Municipality<Combobox options={cityOptions} value={city} onChange={setCity} disabled={!province} ariaLabel="City or municipality" placeholder={province ? "Type to search cities/municipalities…" : "Select a province first"} /></label></div></>}
           <label>Bio<textarea value={bio} onChange={(event) => setBio(event.target.value)} /></label>
           {role === "athlete" && <div className="field-row"><label>Achievement<input value={achievement} onChange={(event) => setAchievement(event.target.value)} /></label><label>Funding goal (₱)<input type="number" min="1" step="1" inputMode="numeric" value={goal} onChange={event => setGoal(event.target.value)} aria-invalid={goalError ? true : undefined} />{goalError && <small className="field-error">{goalError}</small>}</label></div>}
           {error && <p className="field-error" role="alert">{error}</p>}

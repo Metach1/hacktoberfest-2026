@@ -44,6 +44,25 @@ test("citiesForProvince returns cities scoped to the province, sorted", () => {
   assert.ok(citiesForProvince("Region VII", "Cebu").includes("Cebu City"));
 });
 
+test("Cebu includes previously-missing municipalities (completeness spot-check)", () => {
+  const cebu = citiesForProvince("Region VII", "Cebu");
+  for (const lgu of ["Liloan", "Argao", "Cordova", "Minglanilla"]) {
+    assert.ok(cebu.includes(lgu), `${lgu} is listed under Cebu`);
+  }
+});
+
+test("city/municipality lists have no duplicates within a province", () => {
+  for (const [regionCode, provinces] of Object.entries(LOCATIONS)) {
+    for (const [province, cities] of Object.entries(provinces)) {
+      assert.equal(
+        new Set(cities).size,
+        cities.length,
+        `${regionCode} / ${province} has duplicate LGUs`,
+      );
+    }
+  }
+});
+
 test("citiesForProvince rejects a province that isn't in the region", () => {
   // Cebu belongs to Region VII, not Region XI.
   assert.deepEqual(citiesForProvince("Region XI", "Cebu"), []);
