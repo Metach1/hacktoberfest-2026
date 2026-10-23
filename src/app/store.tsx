@@ -590,8 +590,11 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   const reconciledAthletes = useMemo<Athlete[]>(
     () =>
       athletes.map((a) => {
-        const base = BASELINES[a.id];
-        if (!base) return a;
+        // Seed athletes carry a fixed baseline; Supabase-registered athletes
+        // (synthetic negative ids) have none, so treat their baseline as zero
+        // and still fold in confirmed donations. This keeps raised/supporters
+        // derived for ALL athletes, not just seeded ones.
+        const base = BASELINES[a.id] ?? { raised: 0, supporters: 0 };
         const { total, count } = confirmedTotals(donations, a.id) as {
           total: number;
           count: number;
@@ -606,14 +609,20 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       const athlete = reconciledAthletes.find((item) => item.id === id);
       if (athlete) return athlete;
       const donation = donations.find((item) => item.athleteId === id && item.athleteName);
-      return donation?.athleteName
-        ? {
-            ...seedAthletes[0],
-            id,
-            profileId: donation.athleteProfileId ?? undefined,
-            name: donation.athleteName,
-          }
-        : undefined;
+      if (!donation?.athleteName) return undefined;
+      // A Supabase-registered athlete the store only knows through donations
+      // (synthetic negative id): derive raised/supporters from confirmed
+      // donations with a zero baseline, rather than inheriting the seed
+      // athlete's fictional funding figures.
+      const { total, count } = confirmedTotals(donations, id) as { total: number; count: number };
+      return {
+        ...seedAthletes[0],
+        id,
+        profileId: donation.athleteProfileId ?? undefined,
+        name: donation.athleteName,
+        raised: total,
+        supporters: count,
+      };
     },
     [reconciledAthletes, donations],
   );

@@ -552,6 +552,7 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 
 .suggestion-chip { align-self: flex-start; margin-top: 7px; border: 1px solid var(--blue); background: var(--blue-light); color: var(--blue); border-radius: 999px; padding: 4px 12px; font-size: 11px; font-weight: 700; }
 .donation-step select, .qr-add-form select { border: 1px solid var(--line); border-radius: 10px; min-height: 46px; padding: 0 12px; background: white; }
+.readonly-field { display: flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; min-height: 46px; padding: 0 13px; background: var(--blue-light, #f1f5fb); color: var(--ink); font-weight: 700; }
 
 .review-receipt { margin: 14px 0; text-align: center; }
 .review-receipt img { max-width: 100%; max-height: 220px; width: auto; height: auto; object-fit: contain; border-radius: 12px; border: 1px solid var(--line); margin: 0 auto; }

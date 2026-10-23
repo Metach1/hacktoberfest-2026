@@ -10,11 +10,12 @@ import { DonationsPanel } from "@/src/app/shared/donations-panel";
 import { useStarlete } from "@/src/app/store";
 import { getPublicAthleteProfile } from "@/src/app/services/profile";
 import { toAthlete } from "@/src/app/lib/profile-adapter";
+import { confirmedTotalsByProfile } from "@/src/app/lib/donations.mjs";
 import type { Athlete } from "@/src/app/data/athletes";
 import { REGION_MAP } from "@/src/app/lib/region-map";
 
 export function AthleteProfileScreen({ id }: { id: string }) {
-  const { getAthlete, role, openDonation, posts, postsLoading, postError, mounted } = useStarlete();
+  const { getAthlete, role, openDonation, posts, postsLoading, postError, mounted, donations } = useStarlete();
   const router = useRouter();
   const numericId = /^\d+$/.test(id) ? Number(id) : null;
   const demoAthlete = numericId == null ? undefined : getAthlete(numericId);
@@ -38,7 +39,19 @@ export function AthleteProfileScreen({ id }: { id: string }) {
     return () => { active = false; };
   }, [id, numericId]);
 
-  const athlete = demoAthlete ?? registeredAthlete;
+  // Reconcile a registered athlete's funding totals against the store's
+  // donations. toAthlete() seeds raised/supporters at 0 and is sourced outside
+  // the store's reconciledAthletes, so confirmed donations (matched by the
+  // stable Supabase profile id) must be folded in here or "Raised so far"
+  // would always read ₱0. Demo/seed athletes are already reconciled by the
+  // store, so they pass through untouched.
+  const reconciledRegistered = registeredAthlete
+    ? (() => {
+        const { total, count } = confirmedTotalsByProfile(donations, registeredAthlete.profileId ?? "");
+        return { ...registeredAthlete, raised: total, supporters: count };
+      })()
+    : null;
+  const athlete = demoAthlete ?? reconciledRegistered;
   const searchParams = useSearchParams();
 
   // "Back to athletes" returns to the region the user came from, when a valid

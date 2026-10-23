@@ -9,6 +9,7 @@ import type { Athlete } from "@/src/app/data/athletes";
 import { regionName } from "@/src/app/lib/regions";
 import { isSupabaseConfigured } from "@/src/app/lib/supabase/client";
 import { toAthlete } from "@/src/app/lib/profile-adapter";
+import { confirmedTotalsByProfile } from "@/src/app/lib/donations.mjs";
 import { getPublicAthleteProfiles } from "@/src/app/services/profile";
 import {
   REGION_MAP,
@@ -157,7 +158,7 @@ function AthleteRow({ athlete, from }: { athlete: Athlete; from?: string | null 
 }
 
 export function DiscoverScreen() {
-  const { athletes: demoAthletes } = useStarlete();
+  const { athletes: demoAthletes, donations } = useStarlete();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -201,8 +202,17 @@ export function DiscoverScreen() {
   }, []);
 
   const athletes = useMemo(
-    () => [...demoAthletes, ...registeredAthletes],
-    [demoAthletes, registeredAthletes],
+    () => [
+      ...demoAthletes,
+      // Registered athletes come from toAthlete() with raised/supporters at 0
+      // and aren't reconciled by the store. Fold in confirmed donations by the
+      // stable Supabase profile id so cards/rows show real raised totals.
+      ...registeredAthletes.map((a) => {
+        const { total, count } = confirmedTotalsByProfile(donations, a.profileId ?? "");
+        return { ...a, raised: total, supporters: count };
+      }),
+    ],
+    [demoAthletes, registeredAthletes, donations],
   );
 
   // The selected region is held in the URL so it is shareable and works with

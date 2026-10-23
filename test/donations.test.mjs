@@ -11,6 +11,7 @@ import {
   applyAutoConfirm,
   msUntilAutoConfirm,
   confirmedTotals,
+  confirmedTotalsByProfile,
   parseClaimedAmount,
   isAmountAcceptable,
   canReviewDonation,
@@ -112,6 +113,27 @@ test("confirmedTotals sums only confirmed donations for the given athlete", () =
   const { total, count } = confirmedTotals(donations, 1);
   assert.equal(total, 3500);
   assert.equal(count, 2);
+});
+
+test("confirmedTotalsByProfile sums only confirmed donations for the given profile id", () => {
+  const donations = [
+    { ...confirmDonation(createPendingDonation({ athleteId: -1, amount: 1000, id: "1" })), athleteProfileId: "uuid-a" },
+    { ...confirmDonation(createPendingDonation({ athleteId: -2, amount: 2500, id: "2" })), athleteProfileId: "uuid-a" },
+    { ...createPendingDonation({ athleteId: -1, amount: 777, id: "3" }), athleteProfileId: "uuid-a" }, // pending
+    { ...confirmDonation(createPendingDonation({ athleteId: -3, amount: 9999, id: "4" })), athleteProfileId: "uuid-b" }, // other profile
+  ];
+  const { total, count } = confirmedTotalsByProfile(donations, "uuid-a");
+  assert.equal(total, 3500, "sums confirmed donations matched by profile id, ignoring synthetic numeric ids");
+  assert.equal(count, 2);
+});
+
+test("confirmedTotalsByProfile is zero for a missing/blank profile id", () => {
+  const donations = [
+    { ...confirmDonation(createPendingDonation({ athleteId: -1, amount: 1000, id: "1" })), athleteProfileId: "uuid-a" },
+  ];
+  assert.deepEqual(confirmedTotalsByProfile(donations, "uuid-z"), { total: 0, count: 0 });
+  assert.deepEqual(confirmedTotalsByProfile(donations, ""), { total: 0, count: 0 });
+  assert.deepEqual(confirmedTotalsByProfile(donations, null), { total: 0, count: 0 });
 });
 
 test("confirmedTotals is zero when an athlete has no confirmed donations", () => {

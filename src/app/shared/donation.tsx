@@ -8,6 +8,7 @@ import { recognizeReceipt } from "@/src/app/lib/ocr";
 import {
   canReviewDonation,
   parseClaimedAmount,
+  PAYMENT_METHODS,
 } from "@/src/app/lib/donations.mjs";
 import { classifyReceipt, RECEIPT_DECISION } from "@/src/app/lib/receipt-filter.mjs";
 import { moderateImage } from "@/src/app/lib/moderation";
@@ -61,6 +62,10 @@ export function DonationModal() {
   // app — e.g. GCash, Maya, GCash — can select the correct one; the recorded
   // donation method remains the provider name (see `method` below).
   const [selectedQrId, setSelectedQrId] = useState("");
+  // The e-wallet / bank the SUPPORTER paid FROM. This is independent of the
+  // athlete's QR provider (selectedQrId) — a supporter can pay via Maya to a
+  // GCash QR — and is the method recorded on the donation.
+  const [payerMethod, setPayerMethod] = useState("");
   const [reference, setReference] = useState("");
   const [supporterName, setSupporterName] = useState("");
   const [note, setNote] = useState("");
@@ -111,12 +116,11 @@ export function DonationModal() {
   useEffect(() => {
     if (!donationPrefill) return;
     setCustom(donationPrefill.amount ? String(donationPrefill.amount) : "");
-    // Select a published QR matching the stored provider name (first match is
-    // fine — the recorded method is the provider name, not a specific account).
-    const prefillQr = donationPrefill.method
-      ? qrCodes.find((q) => q.method === donationPrefill.method)
-      : undefined;
-    setSelectedQrId(prefillQr?.id ?? "");
+    // The stored method is the supporter's paying wallet/bank; restore it as
+    // the payer method. The QR account (step 1) is left to the first published
+    // QR; the supporter can re-pick it when retrying.
+    setSelectedQrId("");
+    setPayerMethod(donationPrefill.method ?? "");
     setReference(donationPrefill.reference ?? "");
     // Don't surface the stored "Anonymous supporter" sentinel as an editable
     // name; leave it blank so it stays anonymous unless the supporter types one.
@@ -142,10 +146,11 @@ export function DonationModal() {
 
   const actual = parseClaimedAmount(custom);
   // Resolve the active QR by its unique id; fall back to the first published QR
-  // when nothing is selected yet. The provider name recorded on the donation is
-  // derived from the active QR (e.g. "GCash"), never from a bare name match.
+  // when nothing is selected yet. This is the account the supporter is paying
+  // TO (chosen in step 1), NOT the method recorded on the donation.
   const activeQr = qrCodes.find((q) => q.id === selectedQrId) ?? qrCodes[0];
-  const method = activeQr?.method ?? "";
+  // The recorded donation method is the supporter's chosen paying wallet/bank.
+  const method = payerMethod;
 
   if (!athlete) return null;
 
@@ -153,6 +158,7 @@ export function DonationModal() {
     setStep(1);
     setCustom("");
     setSelectedQrId("");
+    setPayerMethod("");
     setReference("");
     setSupporterName("");
     setNote("");
@@ -229,11 +235,11 @@ export function DonationModal() {
     // Pre-fill empty fields from suggestions; never overwrite user edits.
     if (result.amount != null && !custom) setCustom(String(result.amount));
     if (result.reference != null && !reference) setReference(result.reference);
-    if (result.method != null) {
-      // Only adopt a suggested method the athlete actually publishes. Select by
-      // id; don't override an account the supporter already picked.
-      const match = qrCodes.find((q) => q.method.toLowerCase() === result.method!.toLowerCase());
-      if (match && !selectedQrId) setSelectedQrId(match.id);
+    if (result.method != null && !payerMethod) {
+      // Pre-fill the supporter's paying method from OCR only when it matches a
+      // known option, and never overwrite a method the supporter already chose.
+      const match = PAYMENT_METHODS.find((m) => m.toLowerCase() === result.method!.toLowerCase());
+      if (match) setPayerMethod(match);
     }
   };
 
@@ -242,8 +248,8 @@ export function DonationModal() {
     if (field === "amount" && suggested.amount != null) setCustom(String(suggested.amount));
     if (field === "reference" && suggested.reference != null) setReference(suggested.reference);
     if (field === "method" && suggested.method != null) {
-      const match = qrCodes.find((q) => q.method.toLowerCase() === suggested.method!.toLowerCase());
-      if (match) setSelectedQrId(match.id);
+      const match = PAYMENT_METHODS.find((m) => m.toLowerCase() === suggested.method!.toLowerCase());
+      if (match) setPayerMethod(match);
     }
   };
 
@@ -462,20 +468,18 @@ export function DonationModal() {
 
             <label>
               Payment method
-              {/* Valued by unique QR id so duplicate providers (e.g. two GCash
-                  accounts) stay distinct; the donation still records q.method. */}
-              <select value={selectedQrId} onChange={(e) => setSelectedQrId(e.target.value)}>
-                <option value="" disabled>Select the method you used</option>
-                {qrCodes.map((q) => {
-                  const dupe = qrCodes.filter((o) => o.method === q.method).length > 1;
-                  return (
-                    <option key={q.id} value={q.id}>
-                      {dupe && q.label ? `${q.method} · ${q.label}` : q.method}
-                    </option>
-                  );
-                })}
+              {/* The e-wallet / bank the SUPPORTER paid FROM. This is chosen by
+                  the supporter and is independent of the athlete's QR provider
+                  (step 1) — e.g. paying via Maya to a GCash QR. The recorded
+                  donation method is this value (see `method`). */}
+              <select value={payerMethod} onChange={(e) => setPayerMethod(e.target.value)}>
+                <option value="" disabled>Select the wallet or bank you paid with</option>
+                {PAYMENT_METHODS.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
               </select>
-              {suggested?.method && method !== suggested.method && (
+              {suggested?.method && payerMethod !== suggested.method
+                && PAYMENT_METHODS.some((m) => m.toLowerCase() === suggested.method!.toLowerCase()) && (
                 <button type="button" className="suggestion-chip" onClick={() => applySuggestion("method")}>
                   Use “{suggested.method}”
                 </button>

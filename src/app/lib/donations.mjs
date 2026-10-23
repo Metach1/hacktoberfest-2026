@@ -22,6 +22,26 @@
 /** Demo auto-confirm window: 3 days, expressed in milliseconds. */
 export const AUTO_CONFIRM_MS = 3 * 24 * 60 * 60 * 1000;
 
+/**
+ * Common Philippine e-wallets / banks a SUPPORTER might pay FROM. This is the
+ * payment method the supporter actually used to send the money, which can
+ * differ from the provider of the athlete's QR (e.g. pay via Maya to a GCash
+ * QR). Shared by the supporter donation flow and the athlete QR editor.
+ */
+export const PAYMENT_METHODS = Object.freeze([
+  "GCash",
+  "Maya",
+  "MariBank",
+  "GrabPay",
+  "BPI",
+  "BDO",
+  "LandBank",
+  "UnionBank",
+  "Metrobank",
+  "Bank transfer",
+  "Other",
+]);
+
 /** Donation lifecycle states. */
 export const DONATION_STATUS = Object.freeze({
   PENDING: "pending",
@@ -316,6 +336,29 @@ export function confirmedTotals(donations, athleteId) {
   let count = 0;
   for (const d of donations) {
     if (d.athleteId === athleteId && d.status === DONATION_STATUS.CONFIRMED) {
+      total += d.amount;
+      count += 1;
+    }
+  }
+  return { total, count };
+}
+
+/**
+ * Sum the confirmed donations for a given athlete by their STABLE Supabase
+ * profile id (UUID). Registered athletes are keyed on a synthetic, per-load
+ * numeric id, so numeric-id matching (confirmedTotals) is unreliable for them;
+ * the donation's athleteProfileId is the stable link.
+ *
+ * @param {Array<Object>} donations
+ * @param {string} profileId  Supabase athlete profile UUID.
+ * @returns {{ total: number, count: number }}
+ */
+export function confirmedTotalsByProfile(donations, profileId) {
+  let total = 0;
+  let count = 0;
+  if (!profileId) return { total, count };
+  for (const d of donations) {
+    if (d.athleteProfileId === profileId && d.status === DONATION_STATUS.CONFIRMED) {
       total += d.amount;
       count += 1;
     }
