@@ -492,6 +492,9 @@ function PendingDonations({ athleteId }: { athleteId: number }) {
   const all = getDonationsForAthlete(athleteId);
   const pending = all.filter((d) => d.status === "pending");
   const [open, setOpen] = useState<Donation | null>(null);
+  // Confirm flow: the donation awaiting a final "yes, I received it" prompt so
+  // a stray click on Confirm can't record a donation by accident.
+  const [confirming, setConfirming] = useState<Donation | null>(null);
   // Reject flow: target donation, chosen reason, optional note, confirm step.
   const [rejecting, setRejecting] = useState<Donation | null>(null);
   const [reason, setReason] = useState("");
@@ -509,6 +512,19 @@ function PendingDonations({ athleteId }: { athleteId: number }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [fullReceipt]);
+
+  // Open the confirmation prompt for a donation (from the row or the review
+  // modal) instead of confirming immediately.
+  const startConfirm = (d: Donation) => {
+    setOpen(null);
+    setConfirming(d);
+  };
+
+  const applyConfirm = () => {
+    if (!confirming) return;
+    confirmDonation(confirming.id);
+    setConfirming(null);
+  };
 
   const startReject = (d: Donation) => {
     setOpen(null);
@@ -556,7 +572,7 @@ function PendingDonations({ athleteId }: { athleteId: number }) {
             <div className="pending-actions">
               <button className="text-button" onClick={() => setOpen(d)}>View</button>
               <button className="text-button danger" onClick={() => startReject(d)}>Reject</button>
-              <button className="button small" onClick={() => confirmDonation(d.id)}>Confirm</button>
+              <button className="button small" onClick={() => startConfirm(d)}>Confirm</button>
             </div>
           </div>
         ))
@@ -593,7 +609,28 @@ function PendingDonations({ athleteId }: { athleteId: number }) {
             <p className="safe-note"><Icon name="shield" /> Confirming records this demo donation toward your total. OCR and this flow do not verify real payments.</p>
             <div className="form-actions">
               <button className="button secondary danger" onClick={() => startReject(open)}>Reject…</button>
-              <button className="button gold" onClick={() => { confirmDonation(open.id); setOpen(null); }}>Confirm receipt</button>
+              <button className="button gold" onClick={() => startConfirm(open)}>Confirm receipt</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirming && (
+        <div className="modal-backdrop" onClick={() => setConfirming(null)}>
+          <div className="modal small-modal" role="dialog" aria-modal="true" aria-label="Confirm receipt" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close" onClick={() => setConfirming(null)} aria-label="Close"><Icon name="close" /></button>
+            <span className="eyebrow">Confirm receipt</span>
+            <h2>Confirm {peso(confirming.amount)} from {confirming.supporterName}?</h2>
+            <div className="review-rows">
+              <span><small>Amount</small><b>{peso(confirming.amount)}</b></span>
+              <span><small>From</small><b>{confirming.supporterName}</b></span>
+              <span><small>Method</small><b>{confirming.method || "—"}</b></span>
+              <span><small>Reference</small><b>{confirming.reference || "—"}</b></span>
+            </div>
+            <p className="safe-note"><Icon name="shield" /> Only confirm if you actually received this payment. Confirming counts it toward your total and can&rsquo;t be undone.</p>
+            <div className="form-actions">
+              <button className="button secondary" onClick={() => setConfirming(null)}>Cancel</button>
+              <button className="button gold" onClick={applyConfirm}>Yes, I received it</button>
             </div>
           </div>
         </div>
