@@ -12,6 +12,8 @@ export function toAthlete(profile: PublicAthleteProfile, localId: number): Athle
     location: profile.location,
     regionCode: profile.regionCode,
     region: regionName(profile.regionCode) ?? profile.location,
+    province: profile.province,
+    city: profile.city,
     image: profile.image,
     raised: 0,
     goal: profile.fundingGoal ?? 0,

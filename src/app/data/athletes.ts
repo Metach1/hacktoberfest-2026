@@ -29,6 +29,10 @@ export interface Athlete {
   regionCode: string;
   /** Full administrative region name, for labels. */
   region: string;
+  /** Province within the region (registered athletes; blank for seed demo). */
+  province?: string;
+  /** City/municipality within the province (registered athletes; blank for seed demo). */
+  city?: string;
   image: string;
   raised: number;
   goal: number;

@@ -16,6 +16,8 @@ export interface MyProfile {
   sport: string;
   regionCode: string;
   location: string;
+  province: string;
+  city: string;
   achievement: string;
   fundingGoal: number | null;
   verified: boolean;
@@ -27,6 +29,8 @@ export interface PublicAthleteProfile {
   sport: string;
   location: string;
   regionCode: string;
+  province: string;
+  city: string;
   image: string;
   bio: string;
   achievement: string;
@@ -48,6 +52,8 @@ interface AthleteProfileRow {
   sport: string | null;
   region_code: string | null;
   location: string | null;
+  province: string | null;
+  city: string | null;
   bio: string | null;
   achievement: string | null;
   funding_goal: number | null;
@@ -75,7 +81,7 @@ export async function getMyProfile(): Promise<MyProfile | null> {
   if (profile.role === "athlete") {
     const { data, error } = await supabase
       .from("athlete_profiles")
-      .select("user_id, sport, region_code, location, bio, achievement, funding_goal, verified")
+      .select("user_id, sport, region_code, location, province, city, bio, achievement, funding_goal, verified")
       .eq("user_id", userId)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -92,6 +98,8 @@ export async function getMyProfile(): Promise<MyProfile | null> {
     sport: athleteProfile?.sport ?? "",
     regionCode: athleteProfile?.region_code ?? "",
     location: athleteProfile?.location ?? "",
+    province: athleteProfile?.province ?? "",
+    city: athleteProfile?.city ?? "",
     achievement: athleteProfile?.achievement ?? "",
     fundingGoal: athleteProfile?.funding_goal ?? null,
     verified: athleteProfile?.verified ?? false,
@@ -116,7 +124,7 @@ export async function getPublicAthleteProfiles(userId?: string): Promise<PublicA
   const userIds = profiles.map((profile) => profile.id);
   const { data: athleteData, error: athleteError } = await supabase
     .from("athlete_profiles")
-    .select("user_id, sport, region_code, location, bio, achievement, funding_goal, verified")
+    .select("user_id, sport, region_code, location, province, city, bio, achievement, funding_goal, verified")
     .in("user_id", userIds);
   if (athleteError) throw new Error(athleteError.message);
 
@@ -131,6 +139,8 @@ export async function getPublicAthleteProfiles(userId?: string): Promise<PublicA
       sport: athlete?.sport ?? "",
       location: athlete?.location ?? "",
       regionCode: athlete?.region_code ?? "",
+      province: athlete?.province ?? "",
+      city: athlete?.city ?? "",
       image: profile.profile_picture ?? "/athlete-placeholder.svg",
       bio: athlete?.bio ?? profile.bio ?? "",
       achievement: athlete?.achievement ?? "",

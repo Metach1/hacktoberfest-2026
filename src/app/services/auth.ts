@@ -15,9 +15,13 @@ interface SignUpInput {
   regionCode?: string;
   /** Human-readable region/location label stored alongside the code. */
   location?: string;
+  /** Province within the chosen region; stored as province. */
+  province?: string;
+  /** City/municipality within the chosen province; stored as city. */
+  city?: string;
 }
 
-export async function signUp({ email, password, role, firstName, lastName, sport, regionCode, location }: SignUpInput) {
+export async function signUp({ email, password, role, firstName, lastName, sport, regionCode, location, province, city }: SignUpInput) {
   const supabase = createClient();
   const { data, error } = await supabase.auth.signUp({
     email,
@@ -33,6 +37,8 @@ export async function signUp({ email, password, role, firstName, lastName, sport
         // region filtering works, plus the readable name as the location.
         region_code: role === "athlete" ? regionCode ?? null : null,
         location: role === "athlete" ? location ?? null : null,
+        province: role === "athlete" ? province ?? null : null,
+        city: role === "athlete" ? city ?? null : null,
       },
     },
   });

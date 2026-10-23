@@ -8,6 +8,7 @@ import { signIn, signUp, type Role } from "@/src/app/services/auth";
 import { useSession } from "@/src/app/shared/session-provider";
 import { useStarlete } from "@/src/app/store";
 import { REGIONS, regionName } from "@/src/app/lib/regions";
+import { provincesForRegion, citiesForProvince } from "@/src/app/lib/locations";
 
 export function AuthScreen({ mode }: { mode: "login" | "register" }) {
   const router = useRouter();
@@ -18,9 +19,12 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [sport, setSport] = useState("Track & Field");
-  // Athlete registration region, held as the canonical region code (the dropdown
-  // value). The readable region name is derived from it for the location label.
+  // Athlete registration location, chosen via cascading dropdowns. regionCode is
+  // the canonical code (the region dropdown value); province/city are scoped to
+  // the choice above them. Changing a parent resets its children (see handlers).
   const [regionCode, setRegionCode] = useState("");
+  const [province, setProvince] = useState("");
+  const [city, setCity] = useState("");
   const [birth, setBirth] = useState("");
   const [consent, setConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -72,6 +76,8 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
           sport,
           regionCode: regionCode || undefined,
           location: regionName(regionCode) || undefined,
+          province: province || undefined,
+          city: city || undefined,
         });
         login(role);
       } else {
@@ -96,6 +102,13 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
 
   const showConsent = role === "athlete" && birth !== "" && new Date(birth) > new Date("2008-10-19");
 
+  // Cascading location options + resets: a parent change clears its children so
+  // a selection can never be inconsistent with the one above it.
+  const provinceOptions = provincesForRegion(regionCode);
+  const cityOptions = citiesForProvince(regionCode, province);
+  const onRegionChange = (value: string) => { setRegionCode(value); setProvince(""); setCity(""); };
+  const onProvinceChange = (value: string) => { setProvince(value); setCity(""); };
+
   return (
     <main className="auth-page">
       <div className="auth-art"><Logo /><div><span className="eyebrow light">A community behind every dream</span><h1>{mode === "login" ? "Welcome back to your team." : "Your journey starts with people who believe."}</h1><p>Connect with the Filipino sports community and help turn potential into podiums.</p></div><small>© 2025 Startlete · Built for the Filipino athlete</small></div>
@@ -108,7 +121,7 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
             {mode === "register" && <label>Full name<input required value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Juan dela Cruz" /></label>}
             <label>Email address<input type="email" required autoComplete="email" value={email} onChange={e => updateEmail(e.target.value)} placeholder="you@example.com" /></label>
             <label>Password<input type="password" required minLength={8} autoComplete={mode === "login" ? "current-password" : "new-password"} value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" /></label>
-            {mode === "register" && role === "athlete" && <><div className="field-row"><label>Birth date<input type="date" required value={birth} onChange={e => setBirth(e.target.value)} /></label><label>Sport<select required value={sport} onChange={e => setSport(e.target.value)}><option>Track &amp; Field</option><option>Boxing</option><option>Basketball</option><option>Swimming</option></select></label></div><label>Location<select required value={regionCode} onChange={e => setRegionCode(e.target.value)}><option value="" disabled>Select your region…</option>{REGIONS.map(r => <option key={r.regionCode} value={r.regionCode}>{r.name}</option>)}</select></label>{showConsent && <label className="consent"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} /><span><b>Parental consent confirmed</b><small>A parent or guardian has approved this simulated athlete profile.</small></span></label>}</>}
+            {mode === "register" && role === "athlete" && <><div className="field-row"><label>Birth date<input type="date" required value={birth} onChange={e => setBirth(e.target.value)} /></label><label>Sport<select required value={sport} onChange={e => setSport(e.target.value)}><option>Track &amp; Field</option><option>Boxing</option><option>Basketball</option><option>Swimming</option></select></label></div><label>Region<select required value={regionCode} onChange={e => onRegionChange(e.target.value)}><option value="" disabled>Select your region…</option>{REGIONS.map(r => <option key={r.regionCode} value={r.regionCode}>{r.name}</option>)}</select></label><div className="field-row"><label>Province<select required disabled={!regionCode} value={province} onChange={e => onProvinceChange(e.target.value)}><option value="" disabled>{regionCode ? "Select your province…" : "Select a region first"}</option>{provinceOptions.map(p => <option key={p} value={p}>{p}</option>)}</select></label><label>City<select required disabled={!province} value={city} onChange={e => setCity(e.target.value)}><option value="" disabled>{province ? "Select your city…" : "Select a province first"}</option>{cityOptions.map(c => <option key={c} value={c}>{c}</option>)}</select></label></div>{showConsent && <label className="consent"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} /><span><b>Parental consent confirmed</b><small>A parent or guardian has approved this simulated athlete profile.</small></span></label>}</>}
             {(error || sessionError) && (
               <div className="auth-error" role="alert" aria-live="assertive">
                 <span className="auth-error-icon" aria-hidden="true">!</span>
