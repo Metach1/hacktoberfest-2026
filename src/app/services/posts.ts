@@ -284,3 +284,23 @@ export async function createPostComment(
     createdAt: comment.created_at,
   };
 }
+
+/** Update a comment's text. RLS restricts this to the comment's owner. */
+export async function updatePostComment(commentId: string, text: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("comments")
+    .update({ content: text.trim() })
+    .eq("id", commentId);
+  if (error) throw new Error(error.message);
+}
+
+/** Delete a comment. RLS restricts this to the comment's owner. */
+export async function deletePostComment(commentId: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("comments")
+    .delete()
+    .eq("id", commentId);
+  if (error) throw new Error(error.message);
+}

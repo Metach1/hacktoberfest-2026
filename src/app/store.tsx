@@ -34,6 +34,8 @@ import {
 import {
   createPost as createDatabasePost,
   createPostComment,
+  updatePostComment,
+  deletePostComment,
   deletePost as deleteDatabasePost,
   listPosts,
   setPostReaction,
@@ -298,6 +300,10 @@ interface StarleteState {
   toggleLike: (postId: string, actorId: ActorId) => void;
   /** Add a comment to a post. */
   addComment: (postId: string, authorId: ActorId, authorName: string, text: string) => void;
+  /** Edit a comment's text (owner-scoped by the caller + RLS). */
+  editComment: (postId: string, commentId: string, text: string) => void;
+  /** Delete a comment (owner-scoped by the caller + RLS). */
+  deleteComment: (postId: string, commentId: string) => void;
 
   // Notifications (scoped to the current role's audience).
   /** Notifications for the current role, newest first (empty when role null). */
@@ -1249,6 +1255,38 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
     [posts, pushNotification, likerName, displayName, user?.id],
   );
 
+  const editComment = useCallback((postId: string, commentId: string, text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return; // blank edit is a no-op (treated as cancel)
+    setPostError(null);
+    void updatePostComment(commentId, trimmed)
+      .then(() => {
+        setPosts((previous) => previous.map((post) =>
+          post.id === postId
+            ? { ...post, comments: post.comments.map((c) => (c.id === commentId ? { ...c, text: trimmed } : c)) }
+            : post,
+        ));
+      })
+      .catch((error: unknown) => {
+        setPostError(error instanceof Error ? error.message : "Could not update this comment.");
+      });
+  }, []);
+
+  const deleteComment = useCallback((postId: string, commentId: string) => {
+    setPostError(null);
+    void deletePostComment(commentId)
+      .then(() => {
+        setPosts((previous) => previous.map((post) =>
+          post.id === postId
+            ? { ...post, comments: post.comments.filter((c) => c.id !== commentId) }
+            : post,
+        ));
+      })
+      .catch((error: unknown) => {
+        setPostError(error instanceof Error ? error.message : "Could not delete this comment.");
+      });
+  }, []);
+
   // --- Notifications -------------------------------------------------------
   // Supabase-backed: each notification has an exclusive recipient_id and RLS
   // only returns the signed-in user's own rows, so accounts never see each
@@ -1327,6 +1365,8 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       deletePost,
       toggleLike,
       addComment,
+      editComment,
+      deleteComment,
       getNotifications,
       unreadCount,
       markNotificationRead,
@@ -1339,7 +1379,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       login, logout, getAthlete, openDonation, openResubmission, closeDonation,
       getQrCodes, addQrCode, replaceQrCode, removeQrCode,
       submitDonation, confirmDonation, rejectDonation, resubmitDonation, removeDonation, getDonationsForAthlete,
-      supporterId, getDonationsForSupporter, addPost, editPost, deletePost, toggleLike, addComment,
+      supporterId, getDonationsForSupporter, addPost, editPost, deletePost, toggleLike, addComment, editComment, deleteComment,
       getNotifications, unreadCount, markNotificationRead, markAllNotificationsRead,
       registerLeaveGuard, requestLeaveConfirm,
     ],
