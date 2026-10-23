@@ -7,10 +7,18 @@ import { useRouter } from "next/navigation";
 import { AthleteCard, Icon, MiniAthlete, Progress, peso } from "@/src/app/shared/ui";
 import { useStarlete, DONATION_STATUS, type Donation, type QrCode } from "@/src/app/store";
 import type { Athlete } from "@/src/app/data/athletes";
+import { PLACEHOLDER_IMAGE } from "@/data/athlete-adapter.mjs";
 import { type Post } from "@/src/app/data/posts";
 import { TimeAgo } from "@/src/app/shared/time-ago";
 import { msUntilAutoConfirm } from "@/src/app/lib/donations.mjs";
 import { getMyProfile } from "@/src/app/services/profile";
+import { isSupabaseConfigured } from "@/src/app/lib/supabase/client";
+import {
+  listTopAthletes,
+  listTrendingAthletes,
+  type TopAthleteRow,
+  type TrendingAthleteRow,
+} from "@/src/app/services/leaderboards";
 import { useSession } from "@/src/app/shared/session-provider";
 import {
   REJECTION_REASONS,
@@ -161,8 +169,61 @@ function PaymentRowMenu({ donation, athleteName }: { donation: Donation; athlete
 
 function SupporterDashboard({ athletes, displayName }: { athletes: Athlete[]; displayName: string | null }) {
   const { getDonationsForSupporter, getAthlete, donationError } = useStarlete();
+  // Client-side fallback ranking for the demo (no-Supabase) path.
   const top = [...athletes].sort((a, b) => b.raised - a.raised);
   const myPayments = getDonationsForSupporter();
+
+  // "My payments" filter + pagination (client-only). Filter by status, then
+  // show PAYMENTS_PER_PAGE rows per page. Both are local UI state so they never
+  // touch the demo/Supabase data source.
+  const [paymentFilter, setPaymentFilter] = useState<"all" | Donation["status"]>("all");
+  const [paymentPage, setPaymentPage] = useState(1);
+  const filteredPayments = paymentFilter === "all"
+    ? myPayments
+    : myPayments.filter((d) => d.status === paymentFilter);
+  const PAYMENTS_PER_PAGE = 5;
+  const paymentPageCount = Math.max(1, Math.ceil(filteredPayments.length / PAYMENTS_PER_PAGE));
+  // Clamp the page without a setState-in-effect: derive the safe page for this
+  // render, and the filter's onChange resets to page 1 explicitly.
+  const safePaymentPage = Math.min(paymentPage, paymentPageCount);
+  const pagedPayments = filteredPayments.slice(
+    (safePaymentPage - 1) * PAYMENTS_PER_PAGE,
+    safePaymentPage * PAYMENTS_PER_PAGE,
+  );
+  const PAYMENT_FILTERS: Array<{ value: "all" | Donation["status"]; label: string }> = [
+    { value: "all", label: "All" },
+    { value: DONATION_STATUS.PENDING, label: "Pending" },
+    { value: DONATION_STATUS.CONFIRMED, label: "Confirmed" },
+    { value: DONATION_STATUS.REJECTED, label: "Rejected" },
+  ];
+
+  // DB-computed leaderboards (Supabase mode). Ranking is done by SQL RPCs; the
+  // demo path keeps the array-sort fallback above. A failed load is non-fatal
+  // and simply leaves the DB-backed lists empty.
+  const supabase = isSupabaseConfigured();
+  const [topAthletes, setTopAthletes] = useState<TopAthleteRow[]>([]);
+  const [trending, setTrending] = useState<TrendingAthleteRow[]>([]);
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
+  // Resolve an athlete's display extras (image/sport/location/profileId) from the
+  // loaded roster by Supabase owner id, so DB rows can link and show a thumbnail.
+  const byProfileId = new Map(athletes.filter((a) => a.profileId).map((a) => [a.profileId as string, a]));
+
+  useEffect(() => {
+    if (!supabase) return;
+    let active = true;
+    Promise.all([listTopAthletes(4), listTrendingAthletes(3)])
+      .then(([athleteRows, trendingRows]) => {
+        if (!active) return;
+        setTopAthletes(athleteRows);
+        setTrending(trendingRows);
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setLeaderboardError(error instanceof Error ? error.message : "Could not load leaderboards.");
+        }
+      });
+    return () => { active = false; };
+  }, [supabase]);
   // Real "total impact": the current supporter's CONFIRMED donations summed
   // across every athlete. Mirrors how confirmedTotals sums confirmed amounts
   // for an athlete, but scoped to this supporter's own payments. Empty -> ₱0.
@@ -176,14 +237,33 @@ function SupporterDashboard({ athletes, displayName }: { athletes: Athlete[]; di
       <section><div className="section-head"><div><span className="eyebrow">Picked for you</span><h2>Athletes making moves</h2></div></div><div className="card-grid">{athletes.slice(0, 3).map(a => <AthleteCard key={a.id} athlete={a} />)}</div></section>
       <section className="dashboard-grid">
         <div className="dash-card">
-          <div className="section-head"><div><span className="eyebrow">Your payments</span><h2>My payments</h2></div>{myPayments.length > 0 && <span className="count-pill">{myPayments.length}</span>}</div>
+          <div className="section-head"><div><span className="eyebrow">Your payments</span><h2>My payments</h2></div>{filteredPayments.length > 0 && <span className="count-pill">{filteredPayments.length}</span>}</div>
           {donationError && <p className="field-error" role="alert">{donationError}</p>}
           <p className="muted-line">Donations you submitted. A <strong>pending</strong> submission is awaiting athlete review — it is not yet accepted. A <strong>confirmed</strong> status reflects this demo workflow, not independently verified bank settlement.</p>
+          {myPayments.length > 0 && (
+            <div className="payment-filters" role="tablist" aria-label="Filter payments by status">
+              {PAYMENT_FILTERS.map((f) => (
+                <button
+                  key={f.value}
+                  type="button"
+                  role="tab"
+                  aria-selected={paymentFilter === f.value}
+                  className={paymentFilter === f.value ? "payment-filter active" : "payment-filter"}
+                  onClick={() => { setPaymentFilter(f.value); setPaymentPage(1); }}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          )}
           {myPayments.length === 0 ? (
             <div className="empty-note small"><p>You haven&rsquo;t submitted any donations yet.</p></div>
+          ) : filteredPayments.length === 0 ? (
+            <div className="empty-note small"><p>No {paymentFilter} donations.</p></div>
           ) : (
+            <>
             <div className="payment-history">
-              {myPayments.map((d) => {
+              {pagedPayments.map((d) => {
                 const athlete = getAthlete(d.athleteId);
                 const athleteName = athlete?.name ?? `Athlete #${d.athleteId}`;
                 return (
@@ -209,12 +289,78 @@ function SupporterDashboard({ athletes, displayName }: { athletes: Athlete[]; di
                 );
               })}
             </div>
+            {paymentPageCount > 1 && (
+              <div className="pager">
+                <button
+                  type="button"
+                  className="button secondary small"
+                  disabled={safePaymentPage <= 1}
+                  onClick={() => setPaymentPage((p) => Math.max(1, p - 1))}
+                >
+                  <Icon name="back" size={14} /> Prev
+                </button>
+                <span className="pager-info">Page {safePaymentPage} of {paymentPageCount}</span>
+                <button
+                  type="button"
+                  className="button secondary small"
+                  disabled={safePaymentPage >= paymentPageCount}
+                  onClick={() => setPaymentPage((p) => Math.min(paymentPageCount, p + 1))}
+                >
+                  Next <Icon name="arrow" size={14} />
+                </button>
+              </div>
+            )}
+            </>
           )}
         </div>
       </section>
       <section className="dashboard-grid">
-        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Rising now</span><h2>Trending athletes</h2></div></div>{athletes.slice(1, 4).map((a, i) => <MiniAthlete key={a.id} athlete={a} rank={i + 1} />)}</div>
-        <div className="dash-card"><div className="section-head"><div><span className="eyebrow">Community</span><h2>Funding leaderboard</h2></div></div>{top.slice(0, 4).map((a, i) => <div className="leader-row" key={a.id}><span className={i === 0 ? "rank first" : "rank"}>{i + 1}</span><div><strong>{a.name}</strong><small>{a.supporters} supporters</small></div><b>{peso(a.raised)}</b></div>)}</div>
+        <div className="dash-card">
+          <div className="section-head"><div><span className="eyebrow">Rising now</span><h2>Trending athletes</h2></div></div>
+          {supabase
+            ? trending.map((row, i) => {
+                const known = byProfileId.get(row.athleteId);
+                // When the roster has the athlete, use their real photo/sport/
+                // location. When it doesn't, never borrow another athlete's
+                // image (athletes[0]): fall back to the neutral placeholder and
+                // a blank sport/location so the row stays truthful. The link
+                // still resolves via profileId (MiniAthlete uses profileId ?? id;
+                // the /athletes/<profileId> route loads the real profile).
+                const athlete: Athlete = known
+                  ? { ...known, name: row.name, supporters: row.supporters }
+                  : { ...athletes[0], id: -(i + 1), profileId: row.athleteId, name: row.name, supporters: row.supporters, image: PLACEHOLDER_IMAGE, sport: "Athlete", location: "" };
+                return <MiniAthlete key={row.athleteId} athlete={athlete} rank={i + 1} />;
+              })
+            : athletes.slice(1, 4).map((a, i) => <MiniAthlete key={a.id} athlete={a} rank={i + 1} />)}
+        </div>
+        <div className="dash-card">
+          <div className="section-head"><div><span className="eyebrow">Community</span><h2>Funding leaderboard</h2></div></div>
+          {leaderboardError && <p className="field-error" role="alert">{leaderboardError}</p>}
+          {supabase
+            ? topAthletes.map((row, i) => {
+                // Link to the public profile route. Prefer the catalog
+                // athlete's numeric id when resolvable; otherwise link by the
+                // profileId (row.athleteId) directly — the /athletes/<id> route
+                // resolves a non-numeric id as a Supabase profileId via
+                // getPublicAthleteProfile, so the row is always clickable.
+                const known = byProfileId.get(row.athleteId);
+                const href = `/athletes/${known?.id ?? row.athleteId}`;
+                return (
+                  <Link className="leader-row" href={href} key={row.athleteId}>
+                    <span className={i === 0 ? "rank first" : "rank"}>{i + 1}</span>
+                    <div><strong>{row.name}</strong><small>{row.count} donation{row.count === 1 ? "" : "s"}</small></div>
+                    <b>{peso(row.total)}</b>
+                  </Link>
+                );
+              })
+            : top.slice(0, 4).map((a, i) => (
+                <Link className="leader-row" href={`/athletes/${a.id}`} key={a.id}>
+                  <span className={i === 0 ? "rank first" : "rank"}>{i + 1}</span>
+                  <div><strong>{a.name}</strong><small>{a.supporters} supporters</small></div>
+                  <b>{peso(a.raised)}</b>
+                </Link>
+              ))}
+        </div>
       </section>
     </main>
   );

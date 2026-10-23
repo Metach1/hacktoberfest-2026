@@ -276,6 +276,8 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .mini-athlete span { display: flex; flex-direction: column; flex: 1; gap: 3px; }
 .mini-athlete small, .leader-row small, .donation-row small { color: var(--muted); font-size: 10px; }
 .leader-row, .donation-row { display: flex; align-items: center; gap: 13px; padding: 13px 0; border-top: 1px solid var(--line); font-size: 12px; }
+a.leader-row { color: inherit; text-decoration: none; }
+a.leader-row:hover strong { color: var(--blue); }
 .leader-row div, .donation-row div { display: flex; flex-direction: column; gap: 3px; flex: 1; }
 .rank { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; background: #f1f3f5; font-size: 11px; }
 .rank.first { color: #956600; background: #fff0bd; }
@@ -543,6 +545,9 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .receipt-preview div { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
 .form-error { color: #c0392b; font-size: 11px; margin: 8px 0 0; }
 .field-hint { color: var(--muted); font-size: 11px; text-align: center; margin: 10px 0 0; }
+.checkbox-row { flex-direction: row !important; align-items: center !important; gap: 0 !important; margin: 8px 0 0 !important; font-size: 11px; font-weight: 400; color: var(--muted); cursor: pointer; line-height: 1; }
+.checkbox-row input[type="checkbox"] { appearance: auto; -webkit-appearance: checkbox; flex: 0 0 auto; width: 14px; height: 14px; min-height: 0; margin: 0 8px 0 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; cursor: pointer; }
+.checkbox-row .checkbox-label { position: relative; top: -3.5px; }
 .field-hint.warn { color: #9a6314; display: flex; align-items: center; gap: 6px; justify-content: center; }
 
 .ocr-status { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 10px 12px; border-radius: 10px; margin-bottom: 14px; background: var(--blue-light); color: var(--blue); }
@@ -618,6 +623,14 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .payment-row { padding: 12px 0; border-top: 1px solid var(--line); font-size: 12px; }
 .payment-main { display: flex; align-items: center; gap: 10px; }
 .payment-main strong { font-size: 13px; margin-right: auto; }
+/* "My payments" status filter tabs + pagination */
+.payment-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.payment-filter { background: none; border: 1px solid var(--line); border-radius: 999px; padding: 5px 13px; font-size: 11px; font-weight: 700; color: var(--muted); cursor: pointer; }
+.payment-filter:hover { border-color: var(--blue); color: var(--blue); }
+.payment-filter.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
+.pager-info { font-size: 12px; color: var(--muted); font-weight: 700; }
+.pager .button:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
 /* Three-dot actions menu on a supporter payment row. */
 .payment-menu { position: relative; display: inline-flex; }
 .icon-button { background: none; border: 0; border-radius: 8px; width: 30px; height: 30px; display: grid; place-items: center; color: var(--muted); cursor: pointer; }
