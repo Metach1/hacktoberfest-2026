@@ -134,10 +134,11 @@ export interface Donation {
 }
 
 /**
- * Bumped whenever persisted data shapes change. v8 adds post image references;
- * v7 added notifications on top of the earlier payment and post shapes.
+ * Bumped whenever persisted data shapes change. v9 adds the athlete
+ * `institution` field; v8 added post image references; v7 added notifications
+ * on top of the earlier payment and post shapes.
  */
-const DATA_VERSION = "v8";
+const DATA_VERSION = "v9";
 
 /**
  * Backfill the photo gallery + achievement list onto a persisted athlete saved
@@ -188,6 +189,9 @@ function normalizeAthlete(a: Partial<Athlete> & { id: number; name: string }): A
     image: photos[0]?.src ?? PHOTO_PLACEHOLDER,
     achievements,
     achievement: proudest?.title ?? "",
+    // Backfill institution for athletes saved before v9 ("" = not yet provided;
+    // they are prompted to fill it in on their next profile edit).
+    institution: typeof a.institution === "string" ? a.institution : "",
   };
 }
 
@@ -259,7 +263,7 @@ interface StarleteState {
 
   // --- Athlete profile editing (owner-only; demo = athletes[0]) -----------
   /** Patch an athlete's editable profile fields (name, location, bio, goal). */
-  updateAthlete: (id: number, patch: Partial<Pick<Athlete, "name" | "location" | "bio" | "goal" | "sport">>) => void;
+  updateAthlete: (id: number, patch: Partial<Pick<Athlete, "name" | "location" | "bio" | "goal" | "sport" | "institution">>) => void;
   /**
    * Commit a full edited profile draft in one atomic update: text fields plus
    * the complete photos and achievements arrays (used by the edit page's
@@ -268,7 +272,7 @@ interface StarleteState {
    */
   saveAthleteProfile: (
     id: number,
-    draft: Pick<Athlete, "name" | "location" | "bio" | "sport" | "goal" | "photos" | "achievements">,
+    draft: Pick<Athlete, "name" | "location" | "bio" | "sport" | "goal" | "institution" | "photos" | "achievements">,
   ) => void;
   // Photo gallery.
   /**
@@ -439,7 +443,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
           console.error("Could not restore the local demo upload session.", error);
         });
       }
-      if (savedVersion === DATA_VERSION || savedVersion === "v7" || savedVersion === "v6" || savedVersion === "v4" || savedVersion === "v3") {
+      if (savedVersion === DATA_VERSION || savedVersion === "v8" || savedVersion === "v7" || savedVersion === "v6" || savedVersion === "v4" || savedVersion === "v3") {
         if (savedAthletes) {
           // Normalize so athletes saved before v7 gain photos[]/achievements[].
           const loadedAthletes = JSON.parse(savedAthletes) as (Partial<Athlete> & { id: number; name: string })[];
@@ -605,6 +609,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
         bio: draft.bio,
         sport: draft.sport,
         goal: draft.goal,
+        institution: draft.institution,
         photos: Array.isArray(draft.photos) ? draft.photos : a.photos,
         achievements: Array.isArray(draft.achievements) ? draft.achievements : a.achievements,
       })),

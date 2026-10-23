@@ -2,9 +2,10 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Icon } from "@/src/app/shared/ui";
+import { Icon, InstitutionField } from "@/src/app/shared/ui";
 import { AthleteProfileView } from "@/src/app/shared/athlete-profile-view";
 import { useStarlete } from "@/src/app/store";
+import { INSTITUTION_MAX, institutionSuggestions } from "@/src/app/lib/institution.mjs";
 import type { Athlete, Achievement } from "@/src/app/data/athletes";
 import {
   ALLOWED_PHOTO_TYPES,
@@ -41,7 +42,7 @@ function readDataUrl(file: File): Promise<string> {
 }
 
 export function EditProfileScreen() {
-  const { role, mounted, currentAthlete, saveAthleteProfile } = useStarlete();
+  const { role, mounted, currentAthlete, saveAthleteProfile, athletes } = useStarlete();
   const router = useRouter();
 
   // The DRAFT holds all unsaved edits. Nothing is written to the store until
@@ -96,10 +97,13 @@ export function EditProfileScreen() {
   if (!draft) return null;
 
   // --- Validation (text fields; shared with the tested draft model) -------
-  const errors = draftErrors(draft) as { name?: string; goal?: string };
+  const errors = draftErrors(draft) as { name?: string; goal?: string; institution?: string };
   const goalError = errors.goal ?? null;
   const nameError = errors.name ?? null;
-  const hasErrors = !!goalError || !!nameError;
+  const institutionError = errors.institution ?? null;
+  const hasErrors = !!goalError || !!nameError || !!institutionError;
+  // Autocomplete from institutions other athletes already entered.
+  const institutionOptions = institutionSuggestions(athletes);
 
   // --- Photos -------------------------------------------------------------
   const onPickPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -269,6 +273,13 @@ export function EditProfileScreen() {
               <input value={draft.location} onChange={(e) => mutateDraft((d) => ({ ...d, location: e.target.value }))} />
             </label>
           </div>
+          <InstitutionField
+            value={draft.institution}
+            onChange={(value) => mutateDraft((d) => ({ ...d, institution: value }))}
+            suggestions={institutionOptions}
+            error={institutionError}
+            maxLength={INSTITUTION_MAX}
+          />
           <label>Bio<textarea value={draft.bio} onChange={(e) => mutateDraft((d) => ({ ...d, bio: e.target.value }))} /></label>
           <div className="field-row">
             <label>Sport<input value={draft.sport} onChange={(e) => mutateDraft((d) => ({ ...d, sport: e.target.value }))} /></label>

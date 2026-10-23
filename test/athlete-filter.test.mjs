@@ -11,9 +11,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, "..");
 
 const sample = [
-  { name: "Ana Cruz", sport: "Boxing", location: "Baguio City", regionCode: "CAR" },
-  { name: "Ben Dizon", sport: "Boxing", location: "Naga City", regionCode: "Region V" },
-  { name: "Cy Reyes", sport: "Swimming", location: "Davao City", regionCode: "Region XI" },
+  { name: "Ana Cruz", sport: "Boxing", location: "Baguio City", regionCode: "CAR", institution: "Baguio Boxing Club" },
+  { name: "Ben Dizon", sport: "Boxing", location: "Naga City", regionCode: "Region V", institution: "Naga City Boxing Gym" },
+  { name: "Cy Reyes", sport: "Swimming", location: "Davao City", regionCode: "Region XI", institution: "University of the Philippines Cebu" },
 ];
 
 test("returns all athletes when no filters are set", () => {
@@ -35,6 +35,16 @@ test("search matches across name, sport and location", () => {
   assert.equal(filterAthletes(sample, { search: "davao" }).length, 1);
   assert.equal(filterAthletes(sample, { search: "boxing" }).length, 2);
   assert.equal(filterAthletes(sample, { search: "cruz" }).length, 1);
+});
+
+test("search also matches the institution name", () => {
+  // Searching an institution keyword finds the athlete who represents it.
+  const cebu = filterAthletes(sample, { search: "university of the philippines" });
+  assert.equal(cebu.length, 1);
+  assert.equal(cebu[0].name, "Cy Reyes");
+  // A club-name keyword matches too (and only the right athlete).
+  assert.equal(filterAthletes(sample, { search: "boxing gym" }).length, 1);
+  assert.equal(filterAthletes(sample, { search: "naga city boxing" })[0].name, "Ben Dizon");
 });
 
 test("region intersects with sport and search (AND semantics)", () => {

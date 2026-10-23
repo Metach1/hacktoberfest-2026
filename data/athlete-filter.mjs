@@ -4,7 +4,7 @@
  * and reused by the app's Discover view.
  *
  * Filters are ANDed together:
- *   - `search`  matches (case-insensitively) across name, sport and location.
+ *   - `search`  matches (case-insensitively) across name, sport, location, and institution.
  *   - `sport`   matches an exact sport, unless it is the "all" sentinel.
  *   - `region`  matches an exact canonical regionCode, when set (null = any).
  *
@@ -23,7 +23,7 @@ export function filterAthletes(athletes, filters = {}) {
   return athletes.filter((athlete) => {
     const matchesSearch =
       search === "" ||
-      `${athlete.name ?? ""}${athlete.sport ?? ""}${athlete.location ?? ""}`
+      `${athlete.name ?? ""} ${athlete.sport ?? ""} ${athlete.location ?? ""} ${athlete.institution ?? ""}`
         .toLowerCase()
         .includes(search);
     const matchesSport = sport === allSports || sport === "" || athlete.sport === sport;

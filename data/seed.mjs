@@ -24,37 +24,40 @@ const regions = {
   BARMM: { name: "Bangsamoro Autonomous Region in Muslim Mindanao", locality: "Cotabato City" },
 };
 
+// Each tuple's final entry is a fictional `institution` (school/university/
+// club/team). ath-001 and ath-002 intentionally have "" to exercise the
+// "not provided → omitted on cards/profile, prompted on next edit" path.
 const seedProfiles = [
-  ["ath-001", "Mikaela Solis", "Track and Field", 23, 164, "NCR", "Quezon City", "A fictional middle-distance runner focused on consistent community training.", ["Fictional Metro Manila open meet finisher"], 80000, 28000, 124],
-  ["ath-002", "Tomas Alvar", "Basketball", 21, 178, "CAR", "Baguio City", "A fictional guard who helps organize youth-free adult recreational leagues.", ["Fictional Cordillera invitational participant"], 65000, 22000, 97],
-  ["ath-003", "Neri Villanueva", "Volleyball", 24, 169, "Region I", "Vigan City, Ilocos Sur", "A fictional volleyball setter supporting a local adult club.", ["Fictional Ilocos club tournament finalist"], 72000, 31000, 88],
-  ["ath-004", "Ivo Santiago", "Cycling", 26, 172, "Region II", "Tuguegarao City, Cagayan", "A fictional endurance cyclist preparing for a regional road event.", ["Fictional Cagayan Valley road event finisher"], 90000, 40000, 112],
-  ["ath-005", "Amara de Vera", "Arnis", 22, 160, "Region III", "San Fernando, Pampanga", "A fictional arnis practitioner training for a regional demonstration.", ["Fictional Central Luzon arnis medalist"], 60000, 18000, 76],
-  ["ath-006", "Paolo Dizon", "Weightlifting", 25, 170, "Region IV-A", "Lipa City, Batangas", "A fictional weightlifter seeking support for equipment and travel.", ["Fictional Batangas strength meet participant"], 85000, 51000, 146],
-  ["ath-007", "Lian Mercado", "Swimming", 20, 166, "Region IV-B", "Calapan City, Oriental Mindoro", "A fictional swimmer balancing training with community coaching.", ["Fictional MIMAROPA swim meet finalist"], 70000, 24000, 91],
-  ["ath-008", "Sela Magsino", "Boxing", 27, 163, "Region V", "Naga City, Camarines Sur", "A fictional amateur boxer working toward a regional tournament.", ["Fictional Bicol boxing invitational finalist"], 95000, 33000, 139],
-  ["ath-009", "Renzo Ledesma", "Football", 23, 175, "Region VI", "Iloilo City, Iloilo", "A fictional midfielder representing a community adult football club.", ["Fictional Western Visayas league participant"], 76000, 29000, 105],
-  ["ath-010", "Tala Cordero", "Volleyball", 22, 168, "Region VII", "Tagbilaran City, Bohol", "A fictional volleyball outside hitter from an adult community team.", ["Fictional Central Visayas cup finalist"], 68000, 37000, 154],
-  ["ath-011", "Nico Abellanosa", "Dragon Boat", 28, 180, "Region VIII", "Tacloban City, Leyte", "A fictional paddler training with a regional adult crew.", ["Fictional Eastern Visayas regatta finisher"], 88000, 30000, 83],
-  ["ath-012", "Rhea Cabato", "Taekwondo", 24, 162, "Region IX", "Zamboanga City", "A fictional taekwondo athlete preparing for a regional open.", ["Fictional Zamboanga open podium finisher"], 64000, 26000, 119],
-  ["ath-013", "Elian Roque", "Basketball", 20, 181, "Region X", "Cagayan de Oro City", "A fictional forward training in an adult city basketball program.", ["Fictional Northern Mindanao league finalist"], 73000, 42000, 171],
-  ["ath-014", "Mara Quinto", "Sepak Takraw", 26, 158, "Region XI", "Davao City", "A fictional sepak takraw player committed to regional competition.", ["Fictional Davao regional games participant"], 69000, 19000, 73],
-  ["ath-015", "Juno Sarmiento", "Wrestling", 25, 174, "Region XII", "Koronadal City, South Cotabato", "A fictional wrestler training for an adult open tournament.", ["Fictional SOCCSKSARGEN grappling finalist"], 81000, 27000, 99],
-  ["ath-016", "Arielle Pangan", "Badminton", 21, 165, "Region XIII", "Butuan City, Agusan del Norte", "A fictional badminton player building experience on the regional circuit.", ["Fictional Caraga doubles finalist"], 57000, 23000, 108],
-  ["ath-017", "Samira Hadji", "Track and Field", 24, 167, "BARMM", "Cotabato City", "A fictional sprinter representing a community athletics club.", ["Fictional Bangsamoro athletics meet finisher"], 78000, 35000, 132],
-  ["ath-018", "Luca Manalo", "Basketball", 22, 176, "NCR", "Pasig City", "A fictional point guard who volunteers at an adult neighborhood sports club.", ["Fictional Pasig invitational finalist"], 71000, 36000, 181],
-  ["ath-019", "Dara Fuentebella", "Trail Running", 29, 159, "CAR", "La Trinidad, Benguet", "A fictional trail runner training on community routes in Benguet.", ["Fictional Cordillera trail challenge finisher"], 92000, 47000, 143],
-  ["ath-020", "Noel Esguerra", "Cycling", 23, 173, "Region I", "Laoag City, Ilocos Norte", "A fictional cyclist preparing for a long-distance regional ride.", ["Fictional Ilocos road challenge finisher"], 63000, 21000, 80],
-  ["ath-021", "Celine Manabat", "Weightlifting", 26, 161, "Region III", "Cabanatuan City, Nueva Ecija", "A fictional lifter looking for support for competition equipment.", ["Fictional Nueva Ecija strength event finalist"], 84000, 45000, 167],
-  ["ath-022", "Basti Lontoc", "Swimming", 22, 177, "Region IV-A", "Santa Rosa City, Laguna", "A fictional distance swimmer training with a local adult club.", ["Fictional CALABARZON open-water finisher"], 76000, 39000, 127],
-  ["ath-023", "Yana Gatchalian", "Boxing", 23, 165, "Region V", "Legazpi City, Albay", "A fictional boxer preparing for a regional amateur event.", ["Fictional Albay boxing open finalist"], 88000, 32000, 94],
-  ["ath-024", "Kean Jover", "Football", 25, 179, "Region VI", "Roxas City, Capiz", "A fictional defender training with a community adult football team.", ["Fictional Western Visayas cup semifinalist"], 67000, 25000, 115],
-  ["ath-025", "Mavi Llorente", "Basketball", 27, 183, "Region VII", "Cebu City, Cebu", "A fictional center who competes in local adult leagues.", ["Fictional Cebu city league finalist"], 97000, 58000, 202],
-  ["ath-026", "Inez Ocampo", "Arnis", 21, 157, "Region X", "Iligan City, Lanao del Norte", "A fictional arnis practitioner training for a friendly regional meet.", ["Fictional Northern Mindanao arnis finalist"], 59000, 16000, 69],
-  ["ath-027", "Rafi Natividad", "Dragon Boat", 30, 182, "Region XI", "Tagum City, Davao del Norte", "A fictional paddler supporting an adult community crew.", ["Fictional Davao paddling regatta finisher"], 86000, 41000, 156],
-  ["ath-028", "Asha Macapaar", "Sepak Takraw", 23, 160, "Region XII", "General Santos City", "A fictional sepak takraw player preparing for a regional tournament.", ["Fictional SOCCSKSARGEN takraw finalist"], 74000, 34000, 121],
-  ["ath-029", "Dino Balane", "Badminton", 24, 171, "Region XIII", "Surigao City, Surigao del Norte", "A fictional singles player building experience at local events.", ["Fictional Caraga badminton open finalist"], 62000, 20000, 87],
-  ["ath-030", "Nawal Karim", "Taekwondo", 28, 168, "BARMM", "Marawi City, Lanao del Sur", "A fictional taekwondo athlete training with a community sports group.", ["Fictional BARMM martial arts open finalist"], 80000, 43000, 148],
+  ["ath-001", "Mikaela Solis", "Track and Field", 23, 164, "NCR", "Quezon City", "A fictional middle-distance runner focused on consistent community training.", ["Fictional Metro Manila open meet finisher"], 80000, 28000, 124, ""],
+  ["ath-002", "Tomas Alvar", "Basketball", 21, 178, "CAR", "Baguio City", "A fictional guard who helps organize youth-free adult recreational leagues.", ["Fictional Cordillera invitational participant"], 65000, 22000, 97, ""],
+  ["ath-003", "Neri Villanueva", "Volleyball", 24, 169, "Region I", "Vigan City, Ilocos Sur", "A fictional volleyball setter supporting a local adult club.", ["Fictional Ilocos club tournament finalist"], 72000, 31000, 88, "Vigan Heritage Volleyball Club"],
+  ["ath-004", "Ivo Santiago", "Cycling", 26, 172, "Region II", "Tuguegarao City, Cagayan", "A fictional endurance cyclist preparing for a regional road event.", ["Fictional Cagayan Valley road event finisher"], 90000, 40000, 112, "Cagayan Valley Cycling Collective"],
+  ["ath-005", "Amara de Vera", "Arnis", 22, 160, "Region III", "San Fernando, Pampanga", "A fictional arnis practitioner training for a regional demonstration.", ["Fictional Central Luzon arnis medalist"], 60000, 18000, 76, "Pampanga Arnis Guild"],
+  ["ath-006", "Paolo Dizon", "Weightlifting", 25, 170, "Region IV-A", "Lipa City, Batangas", "A fictional weightlifter seeking support for equipment and travel.", ["Fictional Batangas strength meet participant"], 85000, 51000, 146, "Lipa City Strength Club"],
+  ["ath-007", "Lian Mercado", "Swimming", 20, 166, "Region IV-B", "Calapan City, Oriental Mindoro", "A fictional swimmer balancing training with community coaching.", ["Fictional MIMAROPA swim meet finalist"], 70000, 24000, 91, "Mindoro State University"],
+  ["ath-008", "Sela Magsino", "Boxing", 27, 163, "Region V", "Naga City, Camarines Sur", "A fictional amateur boxer working toward a regional tournament.", ["Fictional Bicol boxing invitational finalist"], 95000, 33000, 139, "Naga City Boxing Gym"],
+  ["ath-009", "Renzo Ledesma", "Football", 23, 175, "Region VI", "Iloilo City, Iloilo", "A fictional midfielder representing a community adult football club.", ["Fictional Western Visayas league participant"], 76000, 29000, 105, "Iloilo City Football Club"],
+  ["ath-010", "Tala Cordero", "Volleyball", 22, 168, "Region VII", "Tagbilaran City, Bohol", "A fictional volleyball outside hitter from an adult community team.", ["Fictional Central Visayas cup finalist"], 68000, 37000, 154, "Bohol Island State University"],
+  ["ath-011", "Nico Abellanosa", "Dragon Boat", 28, 180, "Region VIII", "Tacloban City, Leyte", "A fictional paddler training with a regional adult crew.", ["Fictional Eastern Visayas regatta finisher"], 88000, 30000, 83, "Leyte Paddlers Association"],
+  ["ath-012", "Rhea Cabato", "Taekwondo", 24, 162, "Region IX", "Zamboanga City", "A fictional taekwondo athlete preparing for a regional open.", ["Fictional Zamboanga open podium finisher"], 64000, 26000, 119, "Zamboanga Taekwondo Center"],
+  ["ath-013", "Elian Roque", "Basketball", 20, 181, "Region X", "Cagayan de Oro City", "A fictional forward training in an adult city basketball program.", ["Fictional Northern Mindanao league finalist"], 73000, 42000, 171, "Cagayan de Oro Hoops Academy"],
+  ["ath-014", "Mara Quinto", "Sepak Takraw", 26, 158, "Region XI", "Davao City", "A fictional sepak takraw player committed to regional competition.", ["Fictional Davao regional games participant"], 69000, 19000, 73, "University of the Philippines Mindanao"],
+  ["ath-015", "Juno Sarmiento", "Wrestling", 25, 174, "Region XII", "Koronadal City, South Cotabato", "A fictional wrestler training for an adult open tournament.", ["Fictional SOCCSKSARGEN grappling finalist"], 81000, 27000, 99, "Koronadal Grappling Club"],
+  ["ath-016", "Arielle Pangan", "Badminton", 21, 165, "Region XIII", "Butuan City, Agusan del Norte", "A fictional badminton player building experience on the regional circuit.", ["Fictional Caraga doubles finalist"], 57000, 23000, 108, "Caraga State University"],
+  ["ath-017", "Samira Hadji", "Track and Field", 24, 167, "BARMM", "Cotabato City", "A fictional sprinter representing a community athletics club.", ["Fictional Bangsamoro athletics meet finisher"], 78000, 35000, 132, "Cotabato City Athletics Club"],
+  ["ath-018", "Luca Manalo", "Basketball", 22, 176, "NCR", "Pasig City", "A fictional point guard who volunteers at an adult neighborhood sports club.", ["Fictional Pasig invitational finalist"], 71000, 36000, 181, "Pasig City Community Sports Club"],
+  ["ath-019", "Dara Fuentebella", "Trail Running", 29, 159, "CAR", "La Trinidad, Benguet", "A fictional trail runner training on community routes in Benguet.", ["Fictional Cordillera trail challenge finisher"], 92000, 47000, 143, "Benguet State University"],
+  ["ath-020", "Noel Esguerra", "Cycling", 23, 173, "Region I", "Laoag City, Ilocos Norte", "A fictional cyclist preparing for a long-distance regional ride.", ["Fictional Ilocos road challenge finisher"], 63000, 21000, 80, "Ilocos Norte Cycling Club"],
+  ["ath-021", "Celine Manabat", "Weightlifting", 26, 161, "Region III", "Cabanatuan City, Nueva Ecija", "A fictional lifter looking for support for competition equipment.", ["Fictional Nueva Ecija strength event finalist"], 84000, 45000, 167, "Nueva Ecija Barbell Club"],
+  ["ath-022", "Basti Lontoc", "Swimming", 22, 177, "Region IV-A", "Santa Rosa City, Laguna", "A fictional distance swimmer training with a local adult club.", ["Fictional CALABARZON open-water finisher"], 76000, 39000, 127, "Laguna Aquatics Club"],
+  ["ath-023", "Yana Gatchalian", "Boxing", 23, 165, "Region V", "Legazpi City, Albay", "A fictional boxer preparing for a regional amateur event.", ["Fictional Albay boxing open finalist"], 88000, 32000, 94, "Legazpi Boxing Club"],
+  ["ath-024", "Kean Jover", "Football", 25, 179, "Region VI", "Roxas City, Capiz", "A fictional defender training with a community adult football team.", ["Fictional Western Visayas cup semifinalist"], 67000, 25000, 115, "Capiz Football Association"],
+  ["ath-025", "Mavi Llorente", "Basketball", 27, 183, "Region VII", "Cebu City, Cebu", "A fictional center who competes in local adult leagues.", ["Fictional Cebu city league finalist"], 97000, 58000, 202, "University of the Philippines Cebu"],
+  ["ath-026", "Inez Ocampo", "Arnis", 21, 157, "Region X", "Iligan City, Lanao del Norte", "A fictional arnis practitioner training for a friendly regional meet.", ["Fictional Northern Mindanao arnis finalist"], 59000, 16000, 69, "Iligan Arnis Circle"],
+  ["ath-027", "Rafi Natividad", "Dragon Boat", 30, 182, "Region XI", "Tagum City, Davao del Norte", "A fictional paddler supporting an adult community crew.", ["Fictional Davao paddling regatta finisher"], 86000, 41000, 156, "Davao del Norte Paddling Crew"],
+  ["ath-028", "Asha Macapaar", "Sepak Takraw", 23, 160, "Region XII", "General Santos City", "A fictional sepak takraw player preparing for a regional tournament.", ["Fictional SOCCSKSARGEN takraw finalist"], 74000, 34000, 121, "General Santos Takraw Club"],
+  ["ath-029", "Dino Balane", "Badminton", 24, 171, "Region XIII", "Surigao City, Surigao del Norte", "A fictional singles player building experience at local events.", ["Fictional Caraga badminton open finalist"], 62000, 20000, 87, "Surigao Badminton Club"],
+  ["ath-030", "Nawal Karim", "Taekwondo", 28, 168, "BARMM", "Marawi City, Lanao del Sur", "A fictional taekwondo athlete training with a community sports group.", ["Fictional BARMM martial arts open finalist"], 80000, 43000, 148, "Mindanao State University"],
 ];
 
 function createProfiles() {
@@ -67,7 +70,7 @@ function createProfiles() {
   const presentRegions = new Set();
 
   const athletes = seedProfiles.map(
-    ([id, name, sport, age, heightCm, regionCode, provinceOrLocality, bio, achievements, fundingGoal, fundingRaised, votes]) => {
+    ([id, name, sport, age, heightCm, regionCode, provinceOrLocality, bio, achievements, fundingGoal, fundingRaised, votes, institution]) => {
       if (ids.has(id) || names.has(name)) {
         throw new Error(`Duplicate seed athlete identity: ${id} / ${name}.`);
       }
@@ -93,6 +96,7 @@ function createProfiles() {
         provinceOrLocality,
         bio,
         achievements,
+        institution: institution ?? "",
         verified: true,
         fundingGoal,
         fundingRaised,

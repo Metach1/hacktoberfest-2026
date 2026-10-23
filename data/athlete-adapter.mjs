@@ -126,6 +126,9 @@ export function toAthlete(record) {
     supporters: record.votes,
     verified: record.verified,
     bio: record.bio,
+    // School / university / club / team. The fictional seed has none, so it
+    // defaults to "" — existing athletes are prompted to fill it on next edit.
+    institution: typeof record.institution === "string" ? record.institution : "",
     // Full achievement list plus a backward-compatible proudest-title string.
     achievements,
     achievement: proudest?.title ?? "",

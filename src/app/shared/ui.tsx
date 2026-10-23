@@ -77,6 +77,51 @@ export function Avatar({
   );
 }
 
+/**
+ * Institution text input with autocomplete, shared by the registration form and
+ * the edit-profile page so both behave identically. Suggestions come from
+ * institutions other athletes already entered (via a native `<datalist>`), so
+ * spelling stays consistent — but any new value can still be typed. The field
+ * is required; the caller passes a validation `error` to display.
+ */
+export function InstitutionField({
+  value,
+  onChange,
+  suggestions,
+  error,
+  maxLength,
+  listId = "institution-options",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  suggestions: string[];
+  error?: string | null;
+  maxLength?: number;
+  listId?: string;
+}) {
+  return (
+    <label>
+      Institution
+      <input
+        type="text"
+        list={listId}
+        value={value}
+        maxLength={maxLength}
+        placeholder="School, university, club, or team"
+        onChange={(e) => onChange(e.target.value)}
+        aria-invalid={error ? true : undefined}
+        autoComplete="off"
+      />
+      <datalist id={listId}>
+        {suggestions.map((name) => (
+          <option key={name} value={name} />
+        ))}
+      </datalist>
+      {error && <small className="field-error">{error}</small>}
+    </label>
+  );
+}
+
 /** Brand mark that links home. */
 export function Logo() {
   return <Link className="logo" href="/" aria-label="Startlete home"><img className="logo-mark" src="/logo.svg" alt="" width={32} height={32} /><span>startlete</span></Link>;
@@ -104,6 +149,9 @@ export function AthleteCard({ athlete, from }: { athlete: Athlete; from?: string
       <div className="card-content">
         <div className="name-line"><h3>{athlete.name}</h3>{athlete.verified && <span className="verified" title="Verified athlete"><Icon name="check" size={12} /></span>}</div>
         <p className="location"><Icon name="pin" size={15} />{athlete.location}</p>
+        {athlete.institution && (
+          <p className="location institution"><Icon name="users" size={15} /><span className="institution-name">{athlete.institution}</span></p>
+        )}
         <Progress value={percent} />
         <div className="funding-line"><span><strong>{peso(athlete.raised)}</strong> raised</span><span>{percent}%</span></div>
         <span className="card-link">View story <Icon name="arrow" size={16} /></span>

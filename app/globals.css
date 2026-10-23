@@ -114,6 +114,11 @@ h1, h2, h3 { letter-spacing: -.035em; }
 .name-line.large h1 { font-size: 45px; margin: 0; }
 .verified { width: 20px; height: 20px; border-radius: 50%; background: var(--blue); color: white; display: grid; place-items: center; flex: none; }
 .location { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 13px; margin: 8px 0 18px; }
+/* Institution reuses the location text style; it sits just under the location
+   line and truncates with an ellipsis so long names never break the card. */
+.location.institution { margin: -12px 0 18px; }
+.location.institution svg { flex: none; }
+.institution-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .progress { height: 7px; width: 100%; background: #e8edf2; border-radius: 99px; overflow: hidden; }
 .progress span { height: 100%; display: block; border-radius: inherit; background: linear-gradient(90deg, var(--blue), #4384ed); }
 .funding-line { display: flex; justify-content: space-between; margin-top: 9px; color: var(--muted); font-size: 11px; }

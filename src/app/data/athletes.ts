@@ -44,6 +44,12 @@ export interface Athlete {
   verified: boolean;
   featured?: boolean;
   bio: string;
+  /**
+   * The athlete's school, university, club, or team (public, name only).
+   * Empty string when not yet provided (existing/seed athletes), in which case
+   * the UI omits it. Required when an athlete saves their profile edits.
+   */
+  institution: string;
   /** Full achievement list; at most one is flagged `isProudest`. */
   achievements: Achievement[];
   /** Backward-compatible proudest achievement title (or first), for old copy. */

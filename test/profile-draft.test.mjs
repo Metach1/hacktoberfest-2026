@@ -14,6 +14,7 @@ const baseDraft = {
   bio: "Runner.",
   sport: "Track and Field",
   goal: 80000,
+  institution: "University of the Philippines Cebu",
   photos: [{ id: "p1", src: "a.jpg" }],
   achievements: [{ id: "a1", title: "Finalist", isProudest: true }],
 };
@@ -23,6 +24,27 @@ test("a draft requires a name and a positive goal", () => {
   assert.match(draftErrors({ ...baseDraft, name: "  " }).name, /required/i);
   assert.match(draftErrors({ ...baseDraft, goal: 0 }).goal, /greater than zero/i);
   assert.match(draftErrors({ ...baseDraft, goal: -5 }).goal, /greater than zero/i);
+});
+
+test("a draft requires a non-empty institution", () => {
+  assert.match(draftErrors({ ...baseDraft, institution: "" }).institution, /school, university/i);
+  assert.match(draftErrors({ ...baseDraft, institution: "   " }).institution, /school, university/i);
+  assert.equal(draftErrors({ ...baseDraft, institution: undefined }).institution !== undefined, true);
+});
+
+test("a too-long institution is rejected and blocks saving", () => {
+  const tooLong = { ...baseDraft, institution: "x".repeat(200) };
+  assert.equal(isDraftValid(tooLong), false);
+  assert.equal(commitDraft(tooLong, true), null);
+});
+
+test("commit saves and normalizes the institution", () => {
+  const patch = commitDraft({ ...baseDraft, institution: "  UP   Cebu  " }, true);
+  assert.equal(patch.institution, "UP Cebu");
+});
+
+test("an empty institution never saves, even when confirmed", () => {
+  assert.equal(commitDraft({ ...baseDraft, institution: "" }, true), null);
 });
 
 test("PREVIEW does not save: commitDraft(draft, false) returns null", () => {
@@ -39,6 +61,7 @@ test("only a confirmed, valid draft produces a patch to persist", () => {
   assert.ok(patch);
   assert.equal(patch.name, "Mikaela Solis");
   assert.equal(patch.goal, 80000);
+  assert.equal(patch.institution, "University of the Philippines Cebu");
   assert.deepEqual(patch.photos.map((p) => p.id), ["p1"]);
   assert.deepEqual(patch.achievements.map((a) => a.id), ["a1"]);
 });

@@ -9,12 +9,16 @@
  * is valid; otherwise it returns null and the store is left untouched.
  */
 
-/** Validate the draft's own text fields (name required, goal > 0). */
+import { validateInstitution } from "./institution.mjs";
+
+/** Validate the draft's own text fields (name required, goal > 0, institution). */
 export function draftErrors(draft) {
   const errors = {};
   if (!draft || String(draft.name ?? "").trim() === "") errors.name = "Name is required.";
   const goal = Number(draft?.goal);
   if (!Number.isFinite(goal) || goal <= 0) errors.goal = "Funding goal must be greater than zero.";
+  const institution = validateInstitution(draft?.institution);
+  if (!institution.ok) errors.institution = institution.error;
   return errors;
 }
 
@@ -38,6 +42,8 @@ export function commitDraft(draft, confirmed) {
     bio: String(draft.bio ?? ""),
     sport: String(draft.sport ?? ""),
     goal: Number(draft.goal),
+    // Store the normalized institution (trimmed, collapsed whitespace).
+    institution: validateInstitution(draft.institution).value ?? "",
     photos: Array.isArray(draft.photos) ? draft.photos : [],
     achievements: Array.isArray(draft.achievements) ? draft.achievements : [],
   };

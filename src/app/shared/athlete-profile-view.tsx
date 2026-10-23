@@ -55,6 +55,9 @@ export function AthleteProfileView({
             {athlete.verified && <span className="verified"><Icon name="check" size={14} /></span>}
           </div>
           <p className="location"><Icon name="pin" />{athlete.location}, Philippines</p>
+          {athlete.institution && (
+            <p className="location institution"><Icon name="users" size={15} /><span className="institution-name">{athlete.institution}</span></p>
+          )}
           <p className="profile-bio">{athlete.bio}</p>
           {proudest && (
             <div className="achievement">

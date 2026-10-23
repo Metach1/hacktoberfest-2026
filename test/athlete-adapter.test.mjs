@@ -149,3 +149,35 @@ test("the three real seed athletes keep a single rendering photo (no break)", as
     assert.ok(a.achievements.filter((x) => x.isProudest).length <= 1);
   }
 });
+
+test("toAthlete carries the institution through from the seed record", () => {
+  const a = toAthlete({
+    id: "ath-077", name: "Inst Seed", sport: "Basketball",
+    regionCode: "NCR", region: "National Capital Region", provinceOrLocality: "Manila",
+    bio: "Fictional.", achievements: ["X"], verified: false,
+    fundingGoal: 50000, fundingRaised: 10000, votes: 3, ranking: 20,
+    institution: "University of the Philippines Cebu",
+  });
+  assert.equal(a.institution, "University of the Philippines Cebu");
+});
+
+test("toAthlete defaults institution to an empty string when the seed omits it", () => {
+  const a = toAthlete({
+    id: "ath-078", name: "No Inst", sport: "Swimming",
+    regionCode: "NCR", region: "National Capital Region", provinceOrLocality: "Manila",
+    bio: "Fictional.", achievements: ["X"], verified: false,
+    fundingGoal: 50000, fundingRaised: 10000, votes: 3, ranking: 20,
+  });
+  assert.equal(a.institution, "");
+});
+
+test("every adapted seed athlete has a string institution (shown on card + profile)", async () => {
+  const athletes = adaptAthletes(await loadSeed());
+  for (const a of athletes) {
+    assert.equal(typeof a.institution, "string");
+  }
+  // At least some seed athletes carry a fictional institution for the demo,
+  // and at least one is intentionally blank (prompted on next edit).
+  assert.ok(athletes.some((a) => a.institution.length > 0), "some have an institution");
+  assert.ok(athletes.some((a) => a.institution === ""), "some are intentionally blank");
+});

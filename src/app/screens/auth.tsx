@@ -3,22 +3,36 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Icon, Logo } from "@/src/app/shared/ui";
+import { Icon, InstitutionField, Logo } from "@/src/app/shared/ui";
 import { useStarlete, type Role } from "@/src/app/store";
+import { INSTITUTION_MAX, institutionSuggestions, validateInstitution } from "@/src/app/lib/institution.mjs";
 
 export function AuthScreen({ mode }: { mode: "login" | "register" }) {
-  const { login } = useStarlete();
+  const { login, athletes } = useStarlete();
   const router = useRouter();
   const [role, setRole] = useState<Role>("supporter");
   const [birth, setBirth] = useState("");
   const [consent, setConsent] = useState(false);
+  const [institution, setInstitution] = useState("");
+  const [institutionError, setInstitutionError] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  // Suggestions reuse institutions other athletes already entered, so spelling
+  // stays consistent across the registration and edit forms.
+  const institutionOptions = institutionSuggestions(athletes);
+  const registeringAthlete = mode === "register" && role === "athlete";
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     const age = birth ? Math.floor((Date.now() - new Date(birth).getTime()) / 31557600000) : 99;
     if (role === "athlete" && age < 18 && !consent) return;
+    // Institution is required for a registering athlete (same rule as editing).
+    if (registeringAthlete) {
+      const check = validateInstitution(institution);
+      if (!check.ok) { setInstitutionError(check.error ?? "Enter your school, university, club, or team."); return; }
+    }
+    setInstitutionError(null);
     setError("");
     setSubmitting(true);
     try {
@@ -50,7 +64,7 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
             {mode === "register" && <label>Full name<input required placeholder="Juan dela Cruz" /></label>}
             <label>Email address<input type="email" required defaultValue={mode === "login" ? (role === "supporter" ? "supporter@startlete.ph" : "athlete@startlete.ph") : ""} placeholder="you@example.com" /></label>
             <label>Password<input type="password" required defaultValue={mode === "login" ? "demo123" : ""} placeholder="At least 8 characters" /></label>
-            {mode === "register" && role === "athlete" && <><div className="field-row"><label>Birth date<input type="date" required value={birth} onChange={e => setBirth(e.target.value)} /></label><label>Sport<select required><option>Track &amp; Field</option><option>Boxing</option><option>Basketball</option><option>Swimming</option></select></label></div><label>City / Province<input required placeholder="Cebu City" /></label>{showConsent && <label className="consent"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} /><span><b>Parental consent confirmed</b><small>A parent or guardian has approved this simulated athlete profile.</small></span></label>}</>}
+            {mode === "register" && role === "athlete" && <><div className="field-row"><label>Birth date<input type="date" required value={birth} onChange={e => setBirth(e.target.value)} /></label><label>Sport<select required><option>Track &amp; Field</option><option>Boxing</option><option>Basketball</option><option>Swimming</option></select></label></div><label>City / Province<input required placeholder="Cebu City" /></label><InstitutionField value={institution} onChange={(value) => { setInstitution(value); if (institutionError) setInstitutionError(null); }} suggestions={institutionOptions} error={institutionError} maxLength={INSTITUTION_MAX} listId="institution-options-register" />{showConsent && <label className="consent"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} /><span><b>Parental consent confirmed</b><small>A parent or guardian has approved this simulated athlete profile.</small></span></label>}</>}
             {error && <p className="form-error" role="alert">{error}</p>}
             <button className="button full" type="submit" disabled={submitting}>{mode === "login" ? `Continue as ${role}` : "Create account"} <Icon name="arrow" /></button>
           </form>
