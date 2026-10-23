@@ -125,7 +125,7 @@ function NotificationsBell() {
  * (useSession) and the real sign-out path (endSession + store logout).
  */
 function ProfileMenu({ onNavigate }: { onNavigate: () => void }) {
-  const { role, logout } = useStarlete();
+  const { role, logout, requestLeaveConfirm } = useStarlete();
   const { signOut: endSession, user, displayName, profilePicture } = useSession();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -161,20 +161,27 @@ function ProfileMenu({ onNavigate }: { onNavigate: () => void }) {
   // Supabase session AND clears the store, then lands home — so protected
   // routes redirect afterward. "view-profile" goes to the athlete's own public
   // profile (/athletes/<their Supabase user id>, which the route resolves).
-  const runItem = async (id: string, href?: string) => {
+  const runItem = (id: string, href?: string) => {
     setOpen(false);
     onNavigate();
+    // Each action routes through the unsaved-changes guard: when an editor has
+    // unsaved edits it prompts and only runs the action on "Discard". When
+    // there's no guard (or the form is clean) the action runs immediately.
     if (id === "logout") {
-      await endSession();
-      logout();
-      router.push(LOGOUT_HREF);
+      requestLeaveConfirm(() => {
+        void (async () => {
+          await endSession();
+          logout();
+          router.push(LOGOUT_HREF);
+        })();
+      });
       return;
     }
     if (id === "view-profile") {
-      if (user?.id) router.push(`/athletes/${user.id}`);
+      if (user?.id) requestLeaveConfirm(() => router.push(`/athletes/${user.id}`));
       return;
     }
-    router.push(href ?? EDIT_PROFILE_HREF);
+    requestLeaveConfirm(() => router.push(href ?? EDIT_PROFILE_HREF));
   };
 
   return (
@@ -202,7 +209,7 @@ function ProfileMenu({ onNavigate }: { onNavigate: () => void }) {
               type="button"
               className="profile-menu-item"
               role="menuitem"
-              onClick={() => { void runItem(item.id, item.href); }}
+              onClick={() => runItem(item.id, item.href)}
             >
               <Icon name={iconFor[item.id] ?? "dots"} size={18} />
               {item.label}
@@ -217,7 +224,7 @@ function ProfileMenu({ onNavigate }: { onNavigate: () => void }) {
 function Header() {
   const pathname = usePathname();
   const router = useRouter();
-  const { role } = useStarlete();
+  const { role, requestLeaveConfirm } = useStarlete();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 
@@ -244,7 +251,8 @@ function Header() {
         dest = `/discover?region=${encodeURIComponent(from)}`;
       }
     }
-    router.push(dest);
+    // Route through the unsaved-changes guard so an active editor can prompt.
+    requestLeaveConfirm(() => router.push(dest));
   };
 
   return (

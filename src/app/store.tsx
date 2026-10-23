@@ -308,6 +308,17 @@ interface StarleteState {
   markNotificationRead: (id: string) => void;
   /** Mark every notification for the current role read. */
   markAllNotificationsRead: () => void;
+
+  /**
+   * Unsaved-changes guard. A screen with unsaved edits (e.g. edit-profile)
+   * registers a guard via `registerLeaveGuard`; chrome navigations call
+   * `requestLeaveConfirm(proceed)` first. When no guard is registered, or the
+   * guard allows it, `proceed` runs immediately. When the guard blocks (unsaved
+   * edits), it stashes `proceed` and shows its own confirm modal, which runs or
+   * discards `proceed` based on the user's choice.
+   */
+  registerLeaveGuard: (guard: ((proceed: () => void) => boolean) | null) => void;
+  requestLeaveConfirm: (proceed: () => void) => void;
 }
 
 /** The id for the current actor, used for likes/comments in the demo. */
@@ -366,6 +377,18 @@ interface PendingLikeUpdate {
 
 export function StarleteProvider({ children }: { children: ReactNode }) {
   const { user, loading: sessionLoading, displayName } = useSession();
+  // Unsaved-changes guard registered by the active editor screen, if any.
+  const leaveGuardRef = useRef<((proceed: () => void) => boolean) | null>(null);
+  const registerLeaveGuard = useCallback((guard: ((proceed: () => void) => boolean) | null) => {
+    leaveGuardRef.current = guard;
+  }, []);
+  const requestLeaveConfirm = useCallback((proceed: () => void) => {
+    const guard = leaveGuardRef.current;
+    // No guard, or the guard allows leaving -> proceed now. When the guard
+    // blocks (returns false) it has taken over (shown its modal) and will run
+    // or discard `proceed` itself.
+    if (!guard || guard(proceed)) proceed();
+  }, []);
   const [role, setRole] = useState<Role | null>(null);
   const [athletes, setAthletes] = useState<Athlete[]>(seedAthletes);
   const [mounted, setMounted] = useState(false);
@@ -1308,6 +1331,8 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       unreadCount,
       markNotificationRead,
       markAllNotificationsRead,
+      registerLeaveGuard,
+      requestLeaveConfirm,
     }),
     [
       mounted, role, reconciledAthletes, posts, postsLoading, postError, donationError, donationTarget, donationPrefill, qrCodes, donations, notifications,
@@ -1316,6 +1341,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       submitDonation, confirmDonation, rejectDonation, resubmitDonation, removeDonation, getDonationsForAthlete,
       supporterId, getDonationsForSupporter, addPost, editPost, deletePost, toggleLike, addComment,
       getNotifications, unreadCount, markNotificationRead, markAllNotificationsRead,
+      registerLeaveGuard, requestLeaveConfirm,
     ],
   );
 
