@@ -87,10 +87,54 @@ export function EditProfileScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   // Live preview toggle (no persistence happens while previewing).
   const [previewing, setPreviewing] = useState(false);
+  // Unsaved-changes tracking. Edits mutate local state only; nothing is written
+  // until Save. `dirty` drives the discard prompt and the beforeunload guard.
+  const [dirty, setDirty] = useState(false);
+  // When set, the "Discard changes?" confirm modal is open; running it navigates
+  // to this href without saving.
+  const [confirmLeaveHref, setConfirmLeaveHref] = useState<string | null>(null);
+  // Mark the draft dirty on any user edit. Wrap setters that represent edits.
+  const markDirty = () => setDirty(true);
 
   useEffect(() => {
     if (mounted && !role) router.replace("/login");
   }, [mounted, role, router]);
+
+  // Warn on hard reload / tab close while there are unsaved edits.
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
+
+  // Intercept in-app navigation away from the editor while there are unsaved
+  // edits: catch clicks on any <a href> (Next <Link> renders one) during the
+  // capture phase, cancel them, and open the discard prompt with the target
+  // href instead. Leaving is then resolved by confirmDiscard / Continue.
+  useEffect(() => {
+    if (!dirty) return;
+    const onClickCapture = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const anchor = (e.target as HTMLElement | null)?.closest("a[href]") as HTMLAnchorElement | null;
+      if (!anchor) return;
+      const href = anchor.getAttribute("href");
+      // Only intercept in-app route changes to a DIFFERENT path. Ignore hashes,
+      // new-tab targets, and links back to the editor itself.
+      if (!href || href.startsWith("#") || anchor.target === "_blank") return;
+      const dest = new URL(href, window.location.origin);
+      if (dest.origin !== window.location.origin) return;
+      if (dest.pathname === window.location.pathname) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setConfirmLeaveHref(dest.pathname + dest.search);
+    };
+    document.addEventListener("click", onClickCapture, true);
+    return () => document.removeEventListener("click", onClickCapture, true);
+  }, [dirty]);
 
   useEffect(() => {
     if (!user) return;
@@ -109,6 +153,8 @@ export function EditProfileScreen() {
         setPhotos(profile.photos);
         setAchievements(profile.achievements);
         setInstitution(profile.institution);
+        // Freshly seeded from the saved profile — no unsaved edits yet.
+        setDirty(false);
       })
       .catch((loadError: unknown) => {
         if (active) setError(loadError instanceof Error ? loadError.message : "Could not load your profile.");
@@ -140,8 +186,8 @@ export function EditProfileScreen() {
   const sportOptions = sport && !SPORTS.includes(sport as (typeof SPORTS)[number])
     ? [sport, ...SPORTS]
     : [...SPORTS];
-  const onRegionChange = (value: string) => { setRegionCode(value); setProvince(""); setCity(""); };
-  const onProvinceChange = (value: string) => { setProvince(value); setCity(""); };
+  const onRegionChange = (value: string) => { setRegionCode(value); setProvince(""); setCity(""); markDirty(); };
+  const onProvinceChange = (value: string) => { setProvince(value); setCity(""); markDirty(); };
 
   // Derived (render-time) values for the gallery + preview.
   const photosFull = photos.length >= MAX_PHOTOS;
@@ -189,11 +235,12 @@ export function EditProfileScreen() {
       }
     }
     setPhotos(current);
+    markDirty();
     if (galleryInput.current) galleryInput.current.value = "";
   };
 
-  const onRemovePhoto = (id: string) => { setPhotos((list) => removePhoto(list, id) as AthletePhoto[]); };
-  const onMovePhoto = (index: number, dir: -1 | 1) => { setPhotos((list) => movePhoto(list, index, dir) as AthletePhoto[]); };
+  const onRemovePhoto = (id: string) => { setPhotos((list) => removePhoto(list, id) as AthletePhoto[]); markDirty(); };
+  const onMovePhoto = (index: number, dir: -1 | 1) => { setPhotos((list) => movePhoto(list, index, dir) as AthletePhoto[]); markDirty(); };
 
   // Add a new achievement, or update the one being edited in place.
   const submitAchievement = () => {
@@ -223,6 +270,7 @@ export function EditProfileScreen() {
       }
       setAchievements((list) => addAchievement(list, result.achievement) as Achievement[]);
     }
+    markDirty();
     setAchErrors({});
     setEditingId(null);
     setAchTitle("");
@@ -248,9 +296,10 @@ export function EditProfileScreen() {
     setAchErrors({});
   };
 
-  const onMarkProudest = (id: string) => { setAchievements((list) => markProudest(list, id) as Achievement[]); };
+  const onMarkProudest = (id: string) => { setAchievements((list) => markProudest(list, id) as Achievement[]); markDirty(); };
   const onDeleteAchievement = (id: string) => {
     setAchievements((list) => deleteAchievement(list, id) as Achievement[]);
+    markDirty();
     if (editingId === id) cancelEditAchievement();
   };
 
@@ -278,13 +327,35 @@ export function EditProfileScreen() {
         photos: role === "athlete" ? photos : undefined,
         achievements: role === "athlete" ? achievements : undefined,
         institution: role === "athlete" ? institution : undefined,
+        // The gallery's first photo is the profile picture; keep the header
+        // avatar + public image in sync ("" clears it when no photos).
+        profilePicture: role === "athlete" ? (photos[0]?.src ?? "") : undefined,
       });
+      setDirty(false);
       await refresh();
       router.push("/dashboard");
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Could not save your profile.");
+    } finally {
+      // Always clear the saving flag — on success too — so returning to the
+      // editor (same client-navigated component instance) never stays stuck on
+      // "Saving…".
       setSaving(false);
     }
+  };
+
+  // Leaving the editor: if there are unsaved edits, open the discard prompt;
+  // otherwise navigate straight away. The prompt resolves to discard (navigate)
+  // or continue editing (close prompt).
+  const requestLeave = (href: string) => {
+    if (dirty) setConfirmLeaveHref(href);
+    else router.push(href);
+  };
+  const confirmDiscard = () => {
+    const href = confirmLeaveHref ?? "/dashboard";
+    setDirty(false);
+    setConfirmLeaveHref(null);
+    router.push(href);
   };
 
   // A complete Athlete assembled from the current form state, so the preview
@@ -377,27 +448,27 @@ export function EditProfileScreen() {
           )}
 
           <div className="field-row">
-            <label>Full name<input required value={fullName} onChange={(event) => setFullName(event.target.value)} /></label>
+            <label>Full name<input required value={fullName} onChange={(event) => { setFullName(event.target.value); markDirty(); }} /></label>
             {role === "athlete" && (
               <label>Institution
-                <input value={institution} maxLength={INSTITUTION_MAX} placeholder="School, university, club, or team" onChange={(event) => setInstitution(event.target.value)} aria-invalid={institutionError ? true : undefined} />
+                <input value={institution} maxLength={INSTITUTION_MAX} placeholder="School, university, club, or team" onChange={(event) => { setInstitution(event.target.value); markDirty(); }} aria-invalid={institutionError ? true : undefined} />
                 {institutionError && <small className="field-error">{institutionError}</small>}
               </label>
             )}
           </div>
 
-          <label>Bio<textarea value={bio} onChange={(event) => setBio(event.target.value)} /></label>
+          <label>Bio<textarea value={bio} onChange={(event) => { setBio(event.target.value); markDirty(); }} /></label>
 
           {role === "athlete" && (
             <>
               <label>Region<Combobox options={REGIONS.map(r => ({ value: r.regionCode, label: r.name }))} value={regionCode} onChange={onRegionChange} ariaLabel="Region" placeholder="Type to search regions…" /></label>
               <div className="field-row">
                 <label>Province<Combobox options={provinceOptions} value={province} onChange={onProvinceChange} disabled={!regionCode} ariaLabel="Province" placeholder={regionCode ? "Type to search provinces…" : "Select a region first"} /></label>
-                <label>City/Municipality<Combobox options={cityOptions} value={city} onChange={setCity} disabled={!province} ariaLabel="City or municipality" placeholder={province ? "Type to search cities/municipalities…" : "Select a province first"} /></label>
+                <label>City/Municipality<Combobox options={cityOptions} value={city} onChange={(v) => { setCity(v); markDirty(); }} disabled={!province} ariaLabel="City or municipality" placeholder={province ? "Type to search cities/municipalities…" : "Select a province first"} /></label>
               </div>
               <div className="field-row">
-                <label>Sport<Combobox options={sportOptions} value={sport} onChange={setSport} ariaLabel="Sport" placeholder="Type to search sports…" /></label>
-                <label>Funding goal (₱)<input type="number" min="1" step="1" inputMode="numeric" value={goal} onChange={event => setGoal(event.target.value)} aria-invalid={goalError ? true : undefined} />{goalError && <small className="field-error">{goalError}</small>}</label>
+                <label>Sport<Combobox options={sportOptions} value={sport} onChange={(v) => { setSport(v); markDirty(); }} ariaLabel="Sport" placeholder="Type to search sports…" /></label>
+                <label>Funding goal (₱)<input type="number" min="1" step="1" inputMode="numeric" value={goal} onChange={event => { setGoal(event.target.value); markDirty(); }} aria-invalid={goalError ? true : undefined} />{goalError && <small className="field-error">{goalError}</small>}</label>
               </div>
 
               <fieldset className="editor-section">
@@ -453,12 +524,26 @@ export function EditProfileScreen() {
 
           {error && <p className="field-error" role="alert">{error}</p>}
           <div className="form-actions">
-            <button type="button" className="button secondary" onClick={() => router.push("/dashboard")}>Cancel</button>
+            <button type="button" className="button secondary" onClick={() => requestLeave("/dashboard")}>Cancel</button>
             {role === "athlete" && <button type="button" className="button secondary" onClick={() => setPreviewing(true)}><Icon name="search" size={16} /> Preview</button>}
             <button className="button" disabled={saving || !!goalError || !!institutionError}>{saving ? "Saving…" : "Save changes"}</button>
           </div>
         </form>
       </div>
+
+      {confirmLeaveHref && (
+        <div className="modal-backdrop" onClick={() => setConfirmLeaveHref(null)}>
+          <div className="modal small-modal" role="dialog" aria-modal="true" aria-label="Discard changes" onClick={(e) => e.stopPropagation()}>
+            <span className="eyebrow">Unsaved changes</span>
+            <h2>Discard your changes?</h2>
+            <p className="muted-line">You have edits that haven&rsquo;t been saved. Leaving now will discard them.</p>
+            <div className="form-actions">
+              <button type="button" className="button secondary" onClick={() => setConfirmLeaveHref(null)}>Continue editing</button>
+              <button type="button" className="button danger" onClick={confirmDiscard}>Discard changes</button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
