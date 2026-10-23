@@ -984,6 +984,33 @@ textarea { padding-top: 12px; min-height: 100px; resize: vertical; }
 .slide-dot.active { background: #fff; width: 22px; border-radius: 99px; }
 .slide-nav:focus-visible, .slide-dot:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px; }
 
+/* Zoom wrapper: the clickable image fills the photo frame; cursor hints zoom. */
+.photo-zoom-btn { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.photo-zoom-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* Crossfade: each slide re-triggers this fade-in because the <img> key changes
+   with the source, so React remounts it and the animation replays. */
+.slide-img { animation: slide-fade .6s ease; }
+@keyframes slide-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* Enlarged photo lightbox. Mirrors the receipt fullscreen viewer: a dark,
+   fixed backdrop centering a contained image, above all other modals. */
+.photo-lightbox-backdrop { position: fixed; z-index: 200; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(3,17,31,.92); }
+.photo-lightbox { position: relative; display: flex; align-items: center; justify-content: center; max-width: 100%; max-height: 100%; }
+.photo-lightbox img { display: block; width: auto; height: auto; max-width: min(92vw, 1100px); max-height: calc(100vh - 48px); object-fit: contain; border-radius: 12px; box-shadow: 0 24px 70px rgba(0,0,0,.5); background: #0b1c33; }
+.photo-lightbox .modal-close { position: absolute; top: -14px; right: -14px; z-index: 3; }
+.photo-lightbox .slide-nav { position: absolute; top: 50%; }
+.photo-lightbox .slide-nav.prev { left: 14px; }
+.photo-lightbox .slide-nav.next { right: 14px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-img { animation: none; }
+}
+
+@media (max-width: 760px) {
+  .photo-lightbox .modal-close { top: -6px; right: 6px; }
+}
+
 /* Proudest-achievement meta line + the achievements list on the profile.
    The section reuses the same divider rhythm as .profile-content (top border,
    matching top margin + padding) so it lines up with the rest of the page. */
