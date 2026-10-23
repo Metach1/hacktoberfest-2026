@@ -163,6 +163,8 @@ export interface UpdateMyProfileInput {
   sport?: string;
   regionCode?: string;
   location?: string;
+  province?: string;
+  city?: string;
   achievement?: string;
   fundingGoal?: number | null;
 }
@@ -210,6 +212,8 @@ export async function updateMyProfile(input: UpdateMyProfileInput): Promise<void
         sport: input.sport?.trim() || null,
         region_code: input.regionCode?.trim() || null,
         location: input.location?.trim() || null,
+        province: input.province?.trim() || null,
+        city: input.city?.trim() || null,
         bio: input.bio.trim() || null,
         achievement: input.achievement?.trim() || null,
         funding_goal: input.fundingGoal ?? null,
