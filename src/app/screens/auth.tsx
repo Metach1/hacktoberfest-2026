@@ -12,13 +12,30 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
   const [role, setRole] = useState<Role>("supporter");
   const [birth, setBirth] = useState("");
   const [consent, setConsent] = useState(false);
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const submit = (e: FormEvent) => {
+  const submit = async (e: FormEvent) => {
     e.preventDefault();
     const age = birth ? Math.floor((Date.now() - new Date(birth).getTime()) / 31557600000) : 99;
     if (role === "athlete" && age < 18 && !consent) return;
-    login(role);
-    router.push("/dashboard");
+    setError("");
+    setSubmitting(true);
+    try {
+      const response = await fetch("/api/demo-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Could not start the demo session.");
+      login(role);
+      router.push("/dashboard");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not start the demo session.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const showConsent = role === "athlete" && birth !== "" && new Date(birth) > new Date("2008-10-19");
@@ -34,7 +51,8 @@ export function AuthScreen({ mode }: { mode: "login" | "register" }) {
             <label>Email address<input type="email" required defaultValue={mode === "login" ? (role === "supporter" ? "supporter@startlete.ph" : "athlete@startlete.ph") : ""} placeholder="you@example.com" /></label>
             <label>Password<input type="password" required defaultValue={mode === "login" ? "demo123" : ""} placeholder="At least 8 characters" /></label>
             {mode === "register" && role === "athlete" && <><div className="field-row"><label>Birth date<input type="date" required value={birth} onChange={e => setBirth(e.target.value)} /></label><label>Sport<select required><option>Track &amp; Field</option><option>Boxing</option><option>Basketball</option><option>Swimming</option></select></label></div><label>City / Province<input required placeholder="Cebu City" /></label>{showConsent && <label className="consent"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} /><span><b>Parental consent confirmed</b><small>A parent or guardian has approved this simulated athlete profile.</small></span></label>}</>}
-            <button className="button full" type="submit">{mode === "login" ? `Continue as ${role}` : "Create account"} <Icon name="arrow" /></button>
+            {error && <p className="form-error" role="alert">{error}</p>}
+            <button className="button full" type="submit" disabled={submitting}>{mode === "login" ? `Continue as ${role}` : "Create account"} <Icon name="arrow" /></button>
           </form>
           {mode === "login" && <div className="demo-note"><b>Demo account</b><span>Credentials are pre-filled. No real account is created.</span></div>}
           <p className="auth-switch">{mode === "login" ? "New to Startlete?" : "Already a member?"} <Link href={mode === "login" ? "/register" : "/login"}>{mode === "login" ? "Create an account" : "Log in"}</Link></p>

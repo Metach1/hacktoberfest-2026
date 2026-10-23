@@ -9,9 +9,13 @@ Startlete is an open-source demo platform concept for helping Filipino athletes 
 - Landing page, athlete discovery, athlete profile, dashboards, and a simulated donation flow
 - **Interactive Philippines map on Discover** — click a region to see the athletes training there (see below)
 - Athlete browse cards with search, sport, and region filtering
+- Community posts with moderated image uploads and a local review queue
 - Fictional, repeatable seed data for development and demos (30 athletes across the regions)
 
-The current interface is a frontend prototype. Authentication, verification, real funding, and persistent user data are not implemented.
+The current interface is a frontend prototype. Login is a demo role picker,
+verification and real funding are not implemented, and post data remains in
+browser localStorage. Post image uploads use development-only server routes
+and local disk storage; they are disabled in production.
 
 ## Interactive region map
 
@@ -78,7 +82,7 @@ npm run test
 npm run build
 ```
 
-`npm run test` runs the dependency-free Node test suite (`node --test`) covering
+`npm run test` runs the Node test suite (`node --test`) covering
 the region taxonomy, the seed-to-view adapter, the region/filter helpers, the
 generated region-map data, the donation lifecycle and claimed-amount helpers,
 the receipt-text parser, the EMVCo / QR Ph payment-QR validator, the donation
@@ -159,34 +163,42 @@ close button, outside click, or Escape.
 > cannot distinguish multiple real supporters. This is the safest compatible
 > behavior for the current model, not multi-user isolation.
 
-### Receipt upload filtering
+### Post image uploads and moderation
 
-Uploaded receipts are checked locally, in layers, before they can be stored or
-shown to an athlete. Nothing is ever uploaded to an external service — every
-check runs in the browser, matching how OCR and QR decoding stay on-device.
+- A post can include at most **4 images**, each at most **5 MiB**. The server
+  accepts JPG, PNG, and WebP based on decoded file content, re-encodes them to
+  strip metadata, and generates random filenames.
+- Images are checked by the server before storage. The default is
+  [NSFWJS](https://github.com/infinitered/nsfwjs), a free, open-source
+  TensorFlow.js model that requires no paid key. The strict moderation
+  thresholds are centralized in `src/app/lib/moderation-config.mjs`. Explicit
+  content is rejected; borderline results, errors, and timeouts are held
+  privately for admin review.
+- The server limits the demo account to **5 upload attempts per 15 minutes**.
+  Repeated rejections are flagged in the admin queue. Users can report posts
+  and images; admins can approve/reject pending images or apply the report
+  outcomes dismissed, warning, content removed, and account suspended.
+- Optional hosted moderation can be configured using
+  `IMAGE_MODERATION_API_URL` and `IMAGE_MODERATION_API_KEY`. It is not enabled
+  by default and sends the image to the configured provider; see
+  [`docs/design.md`](./docs/design.md) for the provider comparison and response
+  contract.
 
-1. **File type and size** (PNG/JPG/WebP, ≤ 5 MB) — unchanged.
-2. **Explicit-image moderation (optional, local).** If
-   [`nsfwjs`](https://github.com/infinitered/nsfwjs) (MIT, client-side
-   TensorFlow.js) is installed, confidently explicit images are **rejected**
-   before storage/display with a neutral message. `nsfwjs` is **not** a hard
-   dependency: if it is absent the app degrades to the "uncertain" path below
-   rather than silently claiming an image is safe.
-3. **Receipt-text signal (OCR).** A plausible receipt should contain
-   transaction details (amount, reference, and/or a known method). A QR code
-   alone is **not** evidence of a receipt or of payment. Enough signal →
-   **accept**; no signal → **uncertain**.
-4. **Uncertain handling.** Uncertain uploads are kept **private from the
-   athlete** (submitted as metadata only, image withheld) until a clearer
-   receipt is provided. Rejected image bytes are not retained.
+Uploaded files, report records, and moderation logs are stored in the ignored
+`uploads/` directory **for local development only**. Do not use local file
+storage in production; the upload APIs are disabled when `NODE_ENV=production`.
+The login remains a browser demo role picker, so its signed cookie only supports
+local UX and is not real authentication. Set `DEMO_ADMIN_TOKEN` in `.env.local`
+to access `/admin`. Real auth, durable storage, account-level rate limiting,
+and admin authorization must be added before deployment.
 
-**License & privacy:** `nsfwjs` is MIT-licensed and runs entirely on-device;
-no image or data leaves the browser. **Limitations:** OCR and moderation are
-heuristics, not proof. A low explicit score does not prove an image is a genuine
-receipt, and **none of these checks prove a payment occurred** — a confirmed
-donation reflects the demo workflow, never bank settlement. If `nsfwjs` is not
-installed, explicit-image rejection is unavailable and borderline images fall
-through to the uncertain (kept-private) path by design.
+Receipt OCR and QR decoding remain client-side. Receipt image content is
+screened through the same server moderation function before it can be attached
+to a donation. Uncertain receipts stay private from the athlete; moderation and
+OCR do not prove a payment occurred, and the demo never processes payments.
+
+Read [`docs/community-guidelines.md`](./docs/community-guidelines.md) and
+[`docs/moderation-policy.md`](./docs/moderation-policy.md) for the content rules.
 
 - Use fake data only in source, screenshots, tests, and demos.
 - Keep payments and payouts out of scope; funding values are mock examples.

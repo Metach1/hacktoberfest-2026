@@ -6,7 +6,7 @@ This guide explains the current application structure, how its screens and sampl
 
 Startlete is a frontend prototype for discovering Filipino athletes and illustrating how a community could support them. Its product goals and non-negotiable constraints are described in the [project brief](./PROJECT_BRIEF.md). The UI was developed from the Startlete screen concepts in the [UI design notes](./startletes-ui-design.md).
 
-The current app is a visual demo, not a production funding platform. It has no database, authentication, real athlete records, payment processing, or payouts. Athlete details, rankings, activity, and funding amounts are fictional examples.
+The current app is a visual demo, not a production funding platform. It has no database or real authentication, athlete records, payment processing, or payouts. Athlete details, rankings, activity, and funding amounts are fictional examples. Post uploads use local-only APIs for development.
 
 ## Technology
 
@@ -60,7 +60,9 @@ src/
       payment-qr.mjs         Pure EMVCo / QR Ph payment-QR validator (shared with tests)
       qr-decode.ts           Browser-only jsQR decode + local payment-QR validation
       receipt-filter.mjs     Pure accept/reject/uncertain receipt policy (shared with tests)
-      moderation.ts          Optional browser-only explicit-image moderation (nsfwjs, graceful fallback)
+      moderation.ts          Server-side image moderation provider and fail-closed fallback
+      local-image-store.ts   Development-only file/metadata storage for moderated images
+      demo-session.ts        Signed, local demo cookie (not real authentication)
 data/
   athletes.json              Generated fictional profiles used by the app
   seed.mjs                   Deterministic profile generator and validation
@@ -77,6 +79,15 @@ public/
   philippines-map.svg        Country-outline illustration (single path)
   athlete-placeholder.svg    Generic artwork; not a real athlete photo
 ```
+
+The post-image endpoints live under `app/api/`: `post-images` validates, strips
+metadata, and moderates each image; the dynamic image route hides pending files
+from the public; `admin/images` and `admin/reports` provide the local review
+queue. `uploads/` contains development-only files and JSON metadata and is
+ignored by git. The APIs return an explicit unavailable response in production.
+See [`design.md`](./design.md), the [community guidelines](./community-guidelines.md),
+and the [moderation policy](./moderation-policy.md) for limits and provider
+details.
 
 The app uses real App Router routes. Each `app/.../page.tsx` is a thin entry that
 renders a screen component from `src/app/screens/`. Cross-cutting state that must

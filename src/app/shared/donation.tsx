@@ -10,10 +10,34 @@ import {
   parseClaimedAmount,
 } from "@/src/app/lib/donations.mjs";
 import { classifyReceipt, RECEIPT_DECISION } from "@/src/app/lib/receipt-filter.mjs";
-import { moderateImage } from "@/src/app/lib/moderation";
 
 const MAX_RECEIPT_BYTES = 5 * 1024 * 1024; // 5 MB
 const ACCEPTED_TYPES = ["image/png", "image/jpeg", "image/webp"];
+
+type ServerModeration = {
+  result: "approved" | "needs_review" | "rejected";
+  reason: string;
+  sanitizedDataUrl?: string;
+};
+
+async function checkReceiptOnServer(file: File): Promise<ServerModeration> {
+  try {
+    const form = new FormData();
+    form.set("image", file);
+    const response = await fetch("/api/moderate-image", { method: "POST", body: form });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error ?? "Image moderation is unavailable.");
+    if (!["approved", "needs_review", "rejected"].includes(result.result) || typeof result.reason !== "string") {
+      throw new Error("The moderation response was invalid.");
+    }
+    return result as ServerModeration;
+  } catch {
+    return {
+      result: "needs_review",
+      reason: "The image check could not be completed; it will stay private until reviewed.",
+    };
+  }
+}
 
 /** Validate an uploaded receipt file. Returns an error message or null. */
 function validateReceipt(file: File): string | null {
@@ -187,14 +211,13 @@ export function DonationModal() {
     setFilterState("checking");
     setFilterMessage("");
 
-    // Run OCR (receipt-text signal) and local moderation (explicit-image
-    // signal) best-effort, in parallel. Neither blocks manual field entry and
-    // neither is treated as proof of payment.
+    // OCR suggests receipt fields locally; the server checks image content
+    // before the image can be attached to a donation.
     setOcrState("running");
     setOcrProgress(0);
     const [result, moderation] = await Promise.all([
       recognizeReceipt(file, (p) => setOcrProgress(p)),
-      moderateImage(file),
+      checkReceiptOnServer(file),
     ]);
     const hasAny = result.amount != null || result.reference != null || result.method != null;
     setSuggested({ amount: result.amount, reference: result.reference, method: result.method });
@@ -202,10 +225,16 @@ export function DonationModal() {
 
     // Layered decision: explicit -> reject; receipt signal -> accept;
     // otherwise -> uncertain (kept private from the athlete).
-    const decision = classifyReceipt({
-      ocr: { amount: result.amount, reference: result.reference, method: result.method, rawText: result.rawText },
-      moderation,
-    });
+    const decision = moderation.result === "needs_review"
+      ? {
+          decision: RECEIPT_DECISION.UNCERTAIN,
+          visibleToAthlete: false,
+          reason: moderation.reason,
+        }
+      : classifyReceipt({
+          ocr: { amount: result.amount, reference: result.reference, method: result.method, rawText: result.rawText },
+          moderation: { available: true, explicitScore: moderation.result === "rejected" ? 1 : 0 },
+        });
 
     if (decision.decision === RECEIPT_DECISION.REJECT) {
       // Never store or preview a rejected image; drop the file reference and
@@ -220,9 +249,13 @@ export function DonationModal() {
     // Accepted or uncertain: build a local preview (data URL) for the
     // supporter. For `uncertain` the preview stays local to the supporter and
     // is NOT attached to the athlete-visible submission (handled at submit).
-    const reader = new FileReader();
-    reader.onload = () => setReceiptPreview(String(reader.result ?? ""));
-    reader.readAsDataURL(file);
+    if (moderation.sanitizedDataUrl) {
+      setReceiptPreview(moderation.sanitizedDataUrl);
+    } else {
+      const reader = new FileReader();
+      reader.onload = () => setReceiptPreview(String(reader.result ?? ""));
+      reader.readAsDataURL(file);
+    }
     setFilterState(decision.decision === RECEIPT_DECISION.ACCEPT ? "accepted" : "uncertain");
     setFilterMessage(decision.reason);
 

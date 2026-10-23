@@ -134,11 +134,10 @@ export interface Donation {
 }
 
 /**
- * Bumped whenever persisted data shapes change. v6 adds in-app notifications
- * (on top of v5's supporter identity + reject lifecycle, v4's QR codes,
- * donations, and structured social posts).
+ * Bumped whenever persisted data shapes change. v8 adds post image references;
+ * v7 added notifications on top of the earlier payment and post shapes.
  */
-const DATA_VERSION = "v7";
+const DATA_VERSION = "v8";
 
 /**
  * Backfill the photo gallery + achievement list onto a persisted athlete saved
@@ -350,9 +349,9 @@ interface StarleteState {
   getDonationsForSupporter: () => Donation[];
 
   /** Publish a new post authored by the given athlete. */
-  addPost: (authorAthleteId: number, text: string) => void;
+  addPost: (authorAthleteId: number, text: string, images?: Post["images"], id?: string) => void;
   /** Update the text of an existing post (owner-scoped by the caller). */
-  editPost: (postId: string, text: string) => void;
+  editPost: (postId: string, text: string, images?: Post["images"]) => void;
   /** Permanently remove a post. */
   deletePost: (postId: string) => void;
   /** Toggle a like on a post for the current actor (supporter or athlete). */
@@ -429,7 +428,18 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
       const savedPosts = window.localStorage.getItem("starlete-posts");
       const savedNotifications = window.localStorage.getItem("starlete-notifications");
       setRole(savedRole ?? null);
-      if (savedVersion === DATA_VERSION || savedVersion === "v6" || savedVersion === "v4" || savedVersion === "v3") {
+      if (savedRole === "athlete" || savedRole === "supporter") {
+        void fetch("/api/demo-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role: savedRole }),
+        }).then((response) => {
+          if (!response.ok) console.error("Could not restore the local demo upload session.");
+        }).catch((error: unknown) => {
+          console.error("Could not restore the local demo upload session.", error);
+        });
+      }
+      if (savedVersion === DATA_VERSION || savedVersion === "v7" || savedVersion === "v6" || savedVersion === "v4" || savedVersion === "v3") {
         if (savedAthletes) {
           // Normalize so athletes saved before v7 gain photos[]/achievements[].
           const loadedAthletes = JSON.parse(savedAthletes) as (Partial<Athlete> & { id: number; name: string })[];
@@ -456,7 +466,7 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
           if (Array.isArray(loadedPosts) && loadedPosts.every((post) => typeof post === "string")) {
             setPosts(migrateLegacyPosts(loadedPosts));
           } else {
-            setPosts(loadedPosts as Post[]);
+            setPosts((loadedPosts as Post[]).map((post) => ({ ...post, images: post.images ?? [] })));
           }
         }
         if (savedDonations) {
@@ -528,6 +538,9 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     setRole(null);
     try { window.localStorage.removeItem("starlete-role"); } catch {}
+    void fetch("/api/demo-session", { method: "DELETE" }).catch((error: unknown) => {
+      console.error("Could not clear the demo upload session.", error);
+    });
   }, []);
 
   // Athlete totals are *derived*, not stored: raised/supporters = fixed seed
@@ -834,17 +847,18 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
     [donations],
   );
 
-  const addPost = useCallback((authorAthleteId: number, text: string) => {
+  const addPost = useCallback((authorAthleteId: number, text: string, images: Post["images"] = [], id?: string) => {
     const trimmed = text.trim();
     if (!trimmed) return;
     const post: Post = {
-      id: newId("post"),
+      id: id ?? newId("post"),
       authorAthleteId,
       text: trimmed,
       createdAt: new Date().toISOString(),
       likes: 0,
       likedBy: [],
       comments: [],
+      images,
     };
     setPosts((prev) => [post, ...prev]);
     // Notify the supporter audience that a followed athlete posted. (Demo has
@@ -855,13 +869,13 @@ export function StarleteProvider({ children }: { children: ReactNode }) {
     });
   }, [pushNotification, getAthlete]);
 
-  const editPost = useCallback((postId: string, text: string) => {
+  const editPost = useCallback((postId: string, text: string, images?: Post["images"]) => {
     const trimmed = text.trim();
     if (!trimmed) return;
     setPosts((prev) =>
       prev.map((p) =>
         p.id === postId
-          ? { ...p, text: trimmed, editedAt: new Date().toISOString() }
+          ? { ...p, text: trimmed, images: images ?? p.images ?? [], editedAt: new Date().toISOString() }
           : p,
       ),
     );

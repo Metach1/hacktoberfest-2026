@@ -24,6 +24,13 @@ export interface Comment {
   createdAt: string;
 }
 
+export interface PostImage {
+  id: string;
+  alt: string;
+  status: "approved" | "needs_review" | "rejected";
+  reason?: string;
+}
+
 export interface Post {
   id: string;
   /** The athlete who authored the post. */
@@ -38,6 +45,8 @@ export interface Post {
   /** Actor ids that have liked this post, used to toggle and prevent dupes. */
   likedBy: ActorId[];
   comments: Comment[];
+  /** Moderated server-uploaded images; older persisted posts omit this field. */
+  images?: PostImage[];
 }
 
 /** Monotonic-ish id generator good enough for an in-memory demo. */
@@ -102,6 +111,7 @@ function buildSeedPosts(): Post[] {
       text,
       createdAt: new Date(now - s.daysAgo * day + (i + 1) * 3_600_000).toISOString(),
     })),
+    images: [],
   }));
 }
 
@@ -123,6 +133,7 @@ export function migrateLegacyPosts(legacy: string[]): Post[] {
     likes: 0,
     likedBy: [],
     comments: [],
+    images: [],
   }));
 }
 
