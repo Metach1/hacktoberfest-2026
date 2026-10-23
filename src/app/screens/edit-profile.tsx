@@ -49,7 +49,7 @@ type ValidateAchievementResult =
   | { ok: false; errors: AchievementErrors };
 
 export function EditProfileScreen() {
-  const { role, athletes, mounted } = useStarlete();
+  const { role, athletes, mounted, registerLeaveGuard } = useStarlete();
   const { user, refresh } = useSession();
   const router = useRouter();
   const demoAthlete = athletes[0];
@@ -90,9 +90,9 @@ export function EditProfileScreen() {
   // Unsaved-changes tracking. Edits mutate local state only; nothing is written
   // until Save. `dirty` drives the discard prompt and the beforeunload guard.
   const [dirty, setDirty] = useState(false);
-  // When set, the "Discard changes?" confirm modal is open; running it navigates
-  // to this href without saving.
-  const [confirmLeaveHref, setConfirmLeaveHref] = useState<string | null>(null);
+  // When non-null, the "Discard changes?" confirm modal is open; running it
+  // executes this pending action (a navigation OR logout) without saving.
+  const [pendingLeave, setPendingLeave] = useState<(() => void) | null>(null);
   // Mark the draft dirty on any user edit. Wrap setters that represent edits.
   const markDirty = () => setDirty(true);
 
@@ -130,11 +130,24 @@ export function EditProfileScreen() {
       if (dest.pathname === window.location.pathname) return;
       e.preventDefault();
       e.stopPropagation();
-      setConfirmLeaveHref(dest.pathname + dest.search);
+      const target = dest.pathname + dest.search;
+      setPendingLeave(() => () => router.push(target));
     };
     document.addEventListener("click", onClickCapture, true);
     return () => document.removeEventListener("click", onClickCapture, true);
-  }, [dirty]);
+  }, [dirty, router]);
+
+  // Register a shared leave guard so chrome's button navigations (Discover,
+  // View profile, Log out) also prompt. When dirty, stash the pending action
+  // and open the discard modal, blocking the navigation until the user decides.
+  useEffect(() => {
+    registerLeaveGuard((proceed) => {
+      if (!dirty) return true; // clean -> allow immediately
+      setPendingLeave(() => proceed);
+      return false; // block; the modal runs or discards `proceed`
+    });
+    return () => registerLeaveGuard(null);
+  }, [dirty, registerLeaveGuard]);
 
   useEffect(() => {
     if (!user) return;
@@ -153,8 +166,10 @@ export function EditProfileScreen() {
         setPhotos(profile.photos);
         setAchievements(profile.achievements);
         setInstitution(profile.institution);
-        // Freshly seeded from the saved profile — no unsaved edits yet.
+        // Freshly seeded from the saved profile — no unsaved edits yet, and
+        // always start on the editor (never a stale preview from a prior visit).
         setDirty(false);
+        setPreviewing(false);
       })
       .catch((loadError: unknown) => {
         if (active) setError(loadError instanceof Error ? loadError.message : "Could not load your profile.");
@@ -344,18 +359,22 @@ export function EditProfileScreen() {
     }
   };
 
-  // Leaving the editor: if there are unsaved edits, open the discard prompt;
-  // otherwise navigate straight away. The prompt resolves to discard (navigate)
-  // or continue editing (close prompt).
+  // Leaving the editor via an in-screen control (Cancel): if there are unsaved
+  // edits, open the discard prompt with the navigation as the pending action;
+  // otherwise navigate straight away.
   const requestLeave = (href: string) => {
-    if (dirty) setConfirmLeaveHref(href);
+    if (dirty) setPendingLeave(() => () => router.push(href));
     else router.push(href);
   };
+  // "Discard changes" — clear dirty so the guard/beforeunload stop blocking,
+  // then run whatever action was pending (navigation or logout).
   const confirmDiscard = () => {
-    const href = confirmLeaveHref ?? "/dashboard";
+    const proceed = pendingLeave;
     setDirty(false);
-    setConfirmLeaveHref(null);
-    router.push(href);
+    setPendingLeave(null);
+    // Run after dirty is cleared so a logout/navigation isn't re-blocked.
+    if (proceed) proceed();
+    else router.push("/dashboard");
   };
 
   // A complete Athlete assembled from the current form state, so the preview
@@ -385,6 +404,22 @@ export function EditProfileScreen() {
 
   // Athlete preview: the real athlete profile, rendered from the draft, under a
   // top bar to return to editing or save. Mirrors frontend-main.
+  // Discard-changes prompt, rendered in BOTH the preview and editor views so
+  // the leave guard works from either (it's driven by `pendingLeave`).
+  const discardModal = pendingLeave && (
+    <div className="modal-backdrop" onClick={() => setPendingLeave(null)}>
+      <div className="modal small-modal" role="dialog" aria-modal="true" aria-label="Discard changes" onClick={(e) => e.stopPropagation()}>
+        <span className="eyebrow">Unsaved changes</span>
+        <h2>Discard your changes?</h2>
+        <p className="muted-line">You have edits that haven&rsquo;t been saved. Leaving now will discard them.</p>
+        <div className="form-actions">
+          <button type="button" className="button secondary" onClick={() => setPendingLeave(null)}>Continue editing</button>
+          <button type="button" className="button danger" onClick={confirmDiscard}>Discard changes</button>
+        </div>
+      </div>
+    </div>
+  );
+
   if (previewing && role === "athlete") {
     return (
       <main className="profile-page preview-page">
@@ -396,6 +431,7 @@ export function EditProfileScreen() {
           </div>
         </div>
         <AthleteProfileView athlete={draftAthlete} preview isOwner />
+        {discardModal}
       </main>
     );
   }
@@ -525,25 +561,13 @@ export function EditProfileScreen() {
           {error && <p className="field-error" role="alert">{error}</p>}
           <div className="form-actions">
             <button type="button" className="button secondary" onClick={() => requestLeave("/dashboard")}>Cancel</button>
-            {role === "athlete" && <button type="button" className="button secondary" onClick={() => setPreviewing(true)}><Icon name="search" size={16} /> Preview</button>}
+            {role === "athlete" && <button type="button" className="button secondary" onClick={() => { setPreviewing(true); window.scrollTo(0, 0); }}><Icon name="search" size={16} /> Preview</button>}
             <button className="button" disabled={saving || !!goalError || !!institutionError}>{saving ? "Saving…" : "Save changes"}</button>
           </div>
         </form>
       </div>
 
-      {confirmLeaveHref && (
-        <div className="modal-backdrop" onClick={() => setConfirmLeaveHref(null)}>
-          <div className="modal small-modal" role="dialog" aria-modal="true" aria-label="Discard changes" onClick={(e) => e.stopPropagation()}>
-            <span className="eyebrow">Unsaved changes</span>
-            <h2>Discard your changes?</h2>
-            <p className="muted-line">You have edits that haven&rsquo;t been saved. Leaving now will discard them.</p>
-            <div className="form-actions">
-              <button type="button" className="button secondary" onClick={() => setConfirmLeaveHref(null)}>Continue editing</button>
-              <button type="button" className="button danger" onClick={confirmDiscard}>Discard changes</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {discardModal}
     </main>
   );
 }

@@ -225,14 +225,17 @@ footer p { margin: 0; flex: 1; }
 .post small, .dash-post small { color: var(--blue); text-transform: uppercase; font-size: 9px; letter-spacing: .1em; }
 .post h3 { margin: 10px 0; }
 
-.auth-page { min-height: 100vh; display: grid; grid-template-columns: .8fr 1.2fr; }
-.auth-art { background: linear-gradient(180deg, rgba(7,28,52,.15), rgba(7,28,52,.97)), url("https://images.unsplash.com/photo-1728532483490-708f6562b738?auto=format&fit=crop&w=1200&q=85") center/cover; color: white; padding: 42px 7vw; display: flex; flex-direction: column; justify-content: space-between; }
+.auth-page { min-height: 100vh; }
+/* Left art is FIXED to the viewport (≈40% = the old .8fr of a 2.0fr grid), so
+   it never moves when the form grows (toggle) or the page scrolls. The form
+   column is pushed right by the same width and scrolls on its own. */
+.auth-art { position: fixed; top: 0; left: 0; width: 40vw; height: 100vh; background: linear-gradient(180deg, rgba(7,28,52,.15), rgba(7,28,52,.97)), url("https://images.unsplash.com/photo-1728532483490-708f6562b738?auto=format&fit=crop&w=1200&q=85") center/cover; color: white; padding: 42px 7vw; display: flex; flex-direction: column; justify-content: space-between; }
 .auth-art .logo { color: white; align-self: flex-start; }
 .auth-art h1 { font-size: 45px; line-height: 1.1; max-width: 500px; }
 .auth-art p { color: #b8c6d5; line-height: 1.7; }
 .auth-art > small { color: #899caf; }
-.auth-panel { padding: 55px 9vw; display: flex; align-items: center; }
-.auth-form { width: 100%; max-width: 540px; margin: auto; }
+.auth-panel { margin-left: 40vw; min-height: 100vh; padding: 55px 9vw; display: flex; align-items: flex-start; }
+.auth-form { width: 100%; max-width: 540px; margin: 0 auto; }
 .auth-form h2 { font-size: 34px; margin: 0 0 9px; }
 .auth-form > p { color: var(--muted); font-size: 14px; }
 .auth-error { display: flex; align-items: flex-start; gap: 10px; margin: 4px 0 16px; padding: 12px 14px; border: 1px solid #f2c6c6; border-radius: 10px; background: #fff5f5; color: #9f2525; font-size: 13px; font-weight: 500; line-height: 1.45; }
@@ -377,8 +380,8 @@ a.leader-row:hover strong { color: var(--blue); }
   .how-section { grid-template-columns: 1fr; gap: 50px; }
   .profile-hero { grid-template-columns: 1fr 1fr; }
   .support-card { grid-column: 1/-1; }
-  .auth-page { grid-template-columns: 1fr; }
-  .auth-art { min-height: 330px; }
+  .auth-art { position: static; width: auto; height: auto; min-height: 330px; }
+  .auth-panel { margin-left: 0; }
   .auth-art > small { display: none; }
 }
 
@@ -958,8 +961,9 @@ a.leader-row:hover strong { color: var(--blue); }
 .photo-manage-row { position: relative; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
 .photo-manage-row img { width: 100%; height: 110px; object-fit: cover; display: block; }
 .profile-pic-tag { position: absolute; top: 6px; left: 6px; background: var(--gold); color: var(--navy); font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; padding: 3px 7px; border-radius: 99px; }
-.photo-manage-actions { display: flex; justify-content: center; gap: 4px; padding: 6px; background: #fafbfc; }
-.photo-manage-actions .icon-only { color: var(--muted); border: 0; background: none; cursor: pointer; padding: 4px; border-radius: 8px; }
+.photo-manage-actions { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 6px; background: #fafbfc; }
+.photo-manage-actions .icon-only { display: inline-flex; align-items: center; justify-content: center; color: var(--muted); border: 0; background: none; cursor: pointer; padding: 4px; border-radius: 8px; line-height: 0; }
+.photo-manage-actions .icon-only > span { display: inline-flex; }
 .photo-manage-actions .icon-only:hover:not(:disabled) { background: #eef1f4; }
 .photo-manage-actions .icon-only:disabled { opacity: .35; cursor: not-allowed; }
 .photo-manage-actions .icon-only.danger { color: #c0392b; }
