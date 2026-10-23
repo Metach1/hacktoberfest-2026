@@ -1,8 +1,10 @@
 # Startlete
 
-Startlete is an open-source demo platform concept for helping Filipino athletes get discovered and funded by region, merit, and need. The current Next.js app demonstrates athlete discovery, a Philippines map, browsing, a leaderboard, and an athlete profile.
+Startlete is an open-source platform for helping Filipino athletes get discovered and funded by region, merit, and need. The Next.js app covers athlete discovery, a Philippines map, browsing, a leaderboard, and athlete profiles.
 
-> **Demo safety:** All athlete records and funding figures must be fictional. Funding and voting are illustrative only: this project does not process payments, transfer funds, or provide payouts. Do not add real athlete information, personal documents, credentials, or payment details.
+**Live site:** [startlete.vercel.app](https://startlete.vercel.app)
+
+> **Disclaimer:** Some information in the app is fictional. All athlete records and funding figures are illustrative sample data, and the funding flow is a simulation: this project does not process payments, transfer funds, or provide payouts. Do not add real athlete information, personal documents, credentials, or payment details.
 
 ## Features
 
@@ -11,7 +13,7 @@ Startlete is an open-source demo platform concept for helping Filipino athletes 
 - Athlete browse cards with search, sport, and region filtering
 - Fictional, repeatable seed data for development and demos (30 athletes across the regions)
 
-The current interface is a frontend prototype. Authentication, verification, real funding, and persistent user data are not implemented.
+The app is backed by Supabase for authentication, athlete profiles, posts, and the donation lifecycle. Real money movement is intentionally out of scope — the funding flow is simulated, and verification remains a demo flag rather than a vetting process.
 
 ## Interactive region map
 
