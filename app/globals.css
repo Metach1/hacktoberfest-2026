@@ -961,8 +961,9 @@ a.leader-row:hover strong { color: var(--blue); }
 .photo-manage-row { position: relative; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
 .photo-manage-row img { width: 100%; height: 110px; object-fit: cover; display: block; }
 .profile-pic-tag { position: absolute; top: 6px; left: 6px; background: var(--gold); color: var(--navy); font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; padding: 3px 7px; border-radius: 99px; }
-.photo-manage-actions { display: flex; justify-content: center; gap: 4px; padding: 6px; background: #fafbfc; }
-.photo-manage-actions .icon-only { color: var(--muted); border: 0; background: none; cursor: pointer; padding: 4px; border-radius: 8px; }
+.photo-manage-actions { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 6px; background: #fafbfc; }
+.photo-manage-actions .icon-only { display: inline-flex; align-items: center; justify-content: center; color: var(--muted); border: 0; background: none; cursor: pointer; padding: 4px; border-radius: 8px; line-height: 0; }
+.photo-manage-actions .icon-only > span { display: inline-flex; }
 .photo-manage-actions .icon-only:hover:not(:disabled) { background: #eef1f4; }
 .photo-manage-actions .icon-only:disabled { opacity: .35; cursor: not-allowed; }
 .photo-manage-actions .icon-only.danger { color: #c0392b; }
