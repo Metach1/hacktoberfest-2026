@@ -148,7 +148,7 @@ export function DonationsPanel({ athleteId, profileId }: { athleteId: number; pr
       )}
 
       {popup === "top" && (
-        <Popup title="Top donors" onClose={() => setPopup(null)}>
+        <Popup title="Top supporters" onClose={() => setPopup(null)}>
           <ul className="donation-list scroll">
             {topDonors.map((donor, i) => (
               <li className="donation-item" key={donor.id}>
