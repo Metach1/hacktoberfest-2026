@@ -202,6 +202,45 @@ export function markAllRead(notifications, role) {
   return notifications.map((n) => (n.audience === audience && !n.read ? { ...n, read: true } : n));
 }
 
+/**
+ * Resolve the EXCLUSIVE recipient user id for a built notification, given the
+ * source records involved in the event. Returning null means "no concrete
+ * recipient" (don't emit a backend row). This is the backend counterpart of the
+ * old role/audience scoping: instead of broadcasting to everyone of a role, a
+ * notification is addressed to exactly one user.
+ *
+ *   - donation_pending                          -> the recipient athlete (donation.athleteProfileId)
+ *   - donation_confirmed / donation_rejected     -> the supporter who paid (donation.supporterId)
+ *   - post_like / post_comment                   -> the post author (post.ownerId)
+ *   - new_post                                   -> no concrete recipient (no follow graph) -> null
+ *
+ * Only string ids (Supabase user UUIDs) are valid recipients; the demo's
+ * numeric supporter sentinel is not a real account and resolves to null.
+ *
+ * @param {string} type
+ * @param {{ donation?: {athleteProfileId?: string|null, supporterId?: string|number|null},
+ *           post?: {ownerId?: string|null} }} sources
+ * @returns {string|null}
+ */
+export function recipientForNotification(type, sources = {}) {
+  const { donation, post } = sources;
+  const asUserId = (value) => (typeof value === "string" && value !== "" ? value : null);
+  switch (type) {
+    case "donation_pending":
+      return asUserId(donation?.athleteProfileId);
+    case "donation_confirmed":
+    case "donation_rejected":
+      return asUserId(donation?.supporterId);
+    case "post_like":
+    case "post_comment":
+      return asUserId(post?.ownerId);
+    // new_post has no follow graph, so there is no single recipient to address.
+    case "new_post":
+    default:
+      return null;
+  }
+}
+
 /** Normalize a persisted notification to the current shape (defensive). */
 export function normalizeNotification(n, fallbackId) {
   return {
